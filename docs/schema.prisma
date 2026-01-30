@@ -1,0 +1,1683 @@
+// ============================================================
+// PRISMA SCHEMA - Construction ERP-Lite SaaS
+// Generated from ERD Mejorado (51 tablas)
+// ============================================================
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema", "fullTextSearch"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL") // For migrations on Neon
+  schemas  = ["public", "finance", "inventory", "quality"]
+}
+
+// ============================================================
+// CORE: TENANCY & SECURITY
+// ============================================================
+
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  taxId     String?  @map("tax_id")
+  country   String?
+  city      String?
+  address   String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  profile             OrgProfile?
+  members             OrgMember[]
+  projects            Project[]
+  parties             Party[]
+  moduleActivations   ModuleActivation[]
+  apiKeys             ApiKey[]
+  idempotencyKeys     IdempotencyKey[]
+  auditLogs           AuditLog[]
+  customFieldDefs     CustomFieldDefinition[]
+  workflowDefinitions WorkflowDefinition[]
+  inventoryItems      InventoryItem[]
+  inventoryLocations  InventoryLocation[]
+  savedReports        SavedReport[]
+  templates           Template[]
+  exportRuns          ExportRun[]
+  documents           Document[]
+  financialTransactions FinanceTransaction[]
+  commitments         Commitment[]
+  certifications      Certification[]
+  changeOrders        ChangeOrder[]
+  rfis                RFI[]
+  submittals          Submittal[]
+  inspections         Inspection[]
+  scheduleTasks       ScheduleTask[]
+  progressUpdates     ProgressUpdate[]
+  dailyReports        DailyReport[]
+  siteLogEntries      SiteLogEntry[]
+  notifications       Notification[]
+  webhookEndpoints    WebhookEndpoint[]
+  outboxEvents        OutboxEvent[]
+
+  @@index([slug])
+  @@index([active])
+  @@map("organizations")
+  @@schema("public")
+}
+
+model OrgProfile {
+  id                  String   @id @default(uuid())
+  orgId               String   @unique @map("org_id")
+  legalName           String   @map("legal_name")
+  taxId               String?  @map("tax_id")
+  address             String?
+  city                String?
+  country             String?
+  phone               String?
+  email               String?
+  website             String?
+  baseCurrency        String   @default("USD") @map("base_currency")
+  defaultTaxPct       Decimal  @default(0) @db.Decimal(5, 2) @map("default_tax_pct")
+  logoStorageKey      String?  @map("logo_storage_key")
+  documentFooterText  String?  @map("document_footer_text")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  currency     Currency     @relation(fields: [baseCurrency], references: [code])
+
+  @@map("org_profiles")
+  @@schema("public")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  username     String?  @unique
+  fullName     String   @map("full_name")
+  passwordHash String?  @map("password_hash")
+  avatarUrl    String?  @map("avatar_url")
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  lastLoginAt  DateTime? @map("last_login_at")
+
+  // Relations
+  memberships      OrgMember[]
+  sessions         Session[]
+  refreshTokens    RefreshToken[]
+  idempotencyKeys  IdempotencyKey[]
+  auditLogs        AuditLog[]
+  notifications    Notification[]
+
+  @@index([email])
+  @@index([active])
+  @@map("users")
+  @@schema("public")
+}
+
+enum OrgRole {
+  OWNER
+  ADMIN
+  EDITOR
+  ACCOUNTANT
+  VIEWER
+
+  @@schema("public")
+}
+
+model OrgMember {
+  id        String   @id @default(uuid())
+  orgId     String   @map("org_id")
+  userId    String   @map("user_id")
+  role      OrgRole
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  organization       Organization         @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user               User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectMembers     ProjectMember[]
+  workflowApprovals  WorkflowApproval[]
+  createdProjects    Project[]            @relation("ProjectCreatedBy")
+  createdBudgets     BudgetVersion[]      @relation("BudgetCreatedBy")
+  approvedBudgets    BudgetVersion[]      @relation("BudgetApprovedBy")
+  createdTemplates   Template[]
+  requestedExports   ExportRun[]
+  requestedReports   SavedReportRun[]
+  createdReports     SavedReport[]
+  createdDocuments   Document[]
+  uploadedDocVersions DocumentVersion[]
+  createdSiteLogs    SiteLogEntry[]
+  createdDailyReports DailyReport[]
+  createdPayments    Payment[]
+  createdInventoryMovements InventoryMovement[]
+  requestedChangeOrders ChangeOrder[]      @relation("ChangeOrderRequestedBy")
+  approvedChangeOrders  ChangeOrder[]      @relation("ChangeOrderApprovedBy")
+  raisedRFIs         RFI[]                @relation("RFIRaisedBy")
+  assignedRFIs       RFI[]                @relation("RFIAssignedTo")
+  createdRFIComments RFIComment[]
+  reviewedSubmittals Submittal[]
+  inspectorOf        Inspection[]
+  createdProgressUpdates ProgressUpdate[]
+  issuedCertifications Certification[]    @relation("CertificationIssuedBy")
+  approvedCertifications Certification[]  @relation("CertificationApprovedBy")
+  createdFinanceTx   FinanceTransaction[] @relation("FinanceTransactionCreatedBy")
+  deletedFinanceTx   FinanceTransaction[] @relation("FinanceTransactionDeletedBy")
+  createdCommitments Commitment[]         @relation("CommitmentCreatedBy")
+  approvedCommitments Commitment[]        @relation("CommitmentApprovedBy")
+
+  @@unique([orgId, userId])
+  @@index([userId])
+  @@index([orgId, role])
+  @@map("org_members")
+  @@schema("public")
+}
+
+model Session {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  ipAddress String?   @map("ip_address")
+  userAgent String?   @map("user_agent")
+  createdAt DateTime  @default(now()) @map("created_at")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+  @@schema("public")
+}
+
+model ModuleActivation {
+  id            String    @id @default(uuid())
+  orgId         String    @map("org_id")
+  module        String    // PROJECTS|BUDGET|FINANCE|etc
+  active        Boolean   @default(true)
+  activatedAt   DateTime  @default(now()) @map("activated_at")
+  deactivatedAt DateTime? @map("deactivated_at")
+
+  // Relations
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, module])
+  @@index([orgId, active])
+  @@map("module_activations")
+  @@schema("public")
+}
+
+model ApiKey {
+  id         String    @id @default(uuid())
+  orgId      String    @map("org_id")
+  name       String
+  keyHash    String    @unique @map("key_hash")
+  scopes     String[]  // Array of permissions
+  createdAt  DateTime  @default(now()) @map("created_at")
+  revokedAt  DateTime? @map("revoked_at")
+  lastUsedAt DateTime? @map("last_used_at")
+
+  // Relations
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@map("api_keys")
+  @@schema("public")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  createdAt DateTime  @default(now()) @map("created_at")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+  @@schema("public")
+}
+
+model IdempotencyKey {
+  id           String    @id @default(uuid())
+  orgId        String    @map("org_id")
+  userId       String    @map("user_id")
+  scope        String    // INVENTORY|PAYMENT|CERTIFICATION
+  key          String    @unique
+  requestHash  String    @map("request_hash")
+  responseJson String?   @map("response_json") @db.Text
+  status       String    // IN_PROGRESS|COMPLETED|FAILED
+  createdAt    DateTime  @default(now()) @map("created_at")
+  expiresAt    DateTime  @map("expires_at")
+
+  // Relations
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, scope])
+  @@index([expiresAt])
+  @@map("idempotency_keys")
+  @@schema("public")
+}
+
+model AuditLog {
+  id              String   @id @default(uuid())
+  orgId           String   @map("org_id")
+  actorUserId     String   @map("actor_user_id")
+  projectId       String?  @map("project_id")
+  action          String   // CREATE|UPDATE|DELETE|APPROVE|REJECT|ISSUE
+  entityType      String   @map("entity_type")
+  entityId        String   @map("entity_id")
+  requestId       String?  @map("request_id")
+  ipAddress       String?  @map("ip_address")
+  userAgent       String?  @map("user_agent")
+  beforeSnapshot  Json?    @map("before_snapshot")
+  afterSnapshot   Json?    @map("after_snapshot")
+  detailsJson     Json?    @map("details_json")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  // Relations
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  actor        User         @relation(fields: [actorUserId], references: [id])
+
+  @@index([orgId, entityType, entityId])
+  @@index([createdAt])
+  @@index([actorUserId])
+  @@map("audit_logs")
+  @@schema("public")
+}
+
+// ============================================================
+// EXTENSIBILITY
+// ============================================================
+
+enum FieldType {
+  TEXT
+  NUMBER
+  DATE
+  SELECT
+  MULTI_SELECT
+  CHECKBOX
+  URL
+  EMAIL
+  PHONE
+
+  @@schema("public")
+}
+
+model CustomFieldDefinition {
+  id           String    @id @default(uuid())
+  orgId        String    @map("org_id")
+  entityType   String    @map("entity_type") // PROJECT|WBS_NODE|PARTY|etc
+  fieldName    String    @map("field_name")
+  fieldType    FieldType @map("field_type")
+  options      Json?     // For SELECT types
+  required     Boolean   @default(false)
+  searchable   Boolean   @default(false)
+  displayOrder Int       @default(0) @map("display_order")
+  helpText     String?   @map("help_text")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  organization Organization       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  values       CustomFieldValue[]
+
+  @@unique([orgId, entityType, fieldName])
+  @@index([orgId, entityType])
+  @@map("custom_field_definitions")
+  @@schema("public")
+}
+
+model CustomFieldValue {
+  id                  String   @id @default(uuid())
+  orgId               String   @map("org_id")
+  fieldDefinitionId   String   @map("field_definition_id")
+  entityId            String   @map("entity_id")
+  entityType          String   @map("entity_type")
+  value               Json
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  fieldDefinition CustomFieldDefinition @relation(fields: [fieldDefinitionId], references: [id], onDelete: Cascade)
+
+  @@unique([fieldDefinitionId, entityId])
+  @@index([entityId, entityType])
+  @@map("custom_field_values")
+  @@schema("public")
+}
+
+// ============================================================
+// WORKFLOW ENGINE
+// ============================================================
+
+model WorkflowDefinition {
+  id          String   @id @default(uuid())
+  orgId       String   @map("org_id")
+  entityType  String   @map("entity_type") // BUDGET|CHANGE_ORDER|etc
+  name        String
+  description String?
+  steps       Json     // Array of step definitions
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  organization Organization       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  instances    WorkflowInstance[]
+
+  @@index([orgId, entityType, active])
+  @@map("workflow_definitions")
+  @@schema("public")
+}
+
+model WorkflowInstance {
+  id                   String   @id @default(uuid())
+  orgId                String   @map("org_id")
+  workflowDefinitionId String   @map("workflow_definition_id")
+  entityType           String   @map("entity_type")
+  entityId             String   @map("entity_id")
+  status               String   // PENDING|IN_PROGRESS|APPROVED|REJECTED
+  currentStep          Json     @map("current_step")
+  createdAt            DateTime @default(now()) @map("created_at")
+  completedAt          DateTime? @map("completed_at")
+
+  // Relations
+  workflowDefinition WorkflowDefinition @relation(fields: [workflowDefinitionId], references: [id])
+  approvals          WorkflowApproval[]
+
+  @@index([entityId, entityType])
+  @@index([status])
+  @@map("workflow_instances")
+  @@schema("public")
+}
+
+model WorkflowApproval {
+  id                 String   @id @default(uuid())
+  orgId              String   @map("org_id")
+  workflowInstanceId String   @map("workflow_instance_id")
+  orgMemberId        String   @map("org_member_id")
+  stepNumber         Int      @map("step_number")
+  action             String   // APPROVED|REJECTED|DELEGATED
+  comments           String?
+  metadata           Json?
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  // Relations
+  workflowInstance WorkflowInstance @relation(fields: [workflowInstanceId], references: [id], onDelete: Cascade)
+  approver         OrgMember        @relation(fields: [orgMemberId], references: [id])
+
+  @@index([workflowInstanceId])
+  @@map("workflow_approvals")
+  @@schema("public")
+}
+
+// ============================================================
+// PROJECTS
+// ============================================================
+
+enum ProjectPhase {
+  PRE_CONSTRUCTION
+  CONSTRUCTION
+  CLOSEOUT
+  COMPLETE
+
+  @@schema("public")
+}
+
+model Project {
+  id                   String       @id @default(uuid())
+  orgId                String       @map("org_id")
+  projectNumber        String       @map("project_number")
+  name                 String
+  description          String?
+  clientName           String?      @map("client_name")
+  location             String?
+  m2                   Decimal?     @db.Decimal(15, 2)
+  phase                ProjectPhase @default(PRE_CONSTRUCTION)
+  status               String       @default("DRAFT")
+  startDate            DateTime?    @map("start_date") @db.Date
+  plannedEndDate       DateTime?    @map("planned_end_date") @db.Date
+  actualEndDate        DateTime?    @map("actual_end_date") @db.Date
+  customFields         Json         @default("{}") @map("custom_fields")
+  active               Boolean      @default(true)
+  createdByOrgMemberId String       @map("created_by_org_member_id")
+  createdAt            DateTime     @default(now()) @map("created_at")
+  updatedAt            DateTime     @updatedAt @map("updated_at")
+
+  // Relations
+  organization       Organization          @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdBy          OrgMember             @relation("ProjectCreatedBy", fields: [createdByOrgMemberId], references: [id])
+  members            ProjectMember[]
+  wbsNodes           WbsNode[]
+  budgetVersions     BudgetVersion[]
+  changeOrders       ChangeOrder[]
+  certifications     Certification[]
+  financeTransactions FinanceTransaction[]
+  commitments        Commitment[]
+  rfis               RFI[]
+  submittals         Submittal[]
+  inspections        Inspection[]
+  documents          Document[]
+  scheduleTasks      ScheduleTask[]
+  progressUpdates    ProgressUpdate[]
+  dailyReports       DailyReport[]
+  siteLogEntries     SiteLogEntry[]
+  inventoryLocations InventoryLocation[]
+  inventoryMovements InventoryMovement[]
+  exportRuns         ExportRun[]
+  overheadAllocations OverheadAllocation[]
+
+  @@unique([orgId, projectNumber])
+  @@index([orgId, status])
+  @@index([orgId, phase])
+  @@map("projects")
+  @@schema("public")
+}
+
+model ProjectMember {
+  id          String   @id @default(uuid())
+  projectId   String   @map("project_id")
+  orgMemberId String   @map("org_member_id")
+  projectRole String   @map("project_role") // MANAGER|SUPERINTENDENT|VIEWER
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  orgMember OrgMember @relation(fields: [orgMemberId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, orgMemberId])
+  @@index([orgMemberId])
+  @@map("project_members")
+  @@schema("public")
+}
+
+// ============================================================
+// WBS (Work Breakdown Structure)
+// ============================================================
+
+model WbsNode {
+  id          String   @id @default(uuid())
+  orgId       String   @map("org_id")
+  projectId   String   @map("project_id")
+  parentId    String?  @map("parent_id")
+  code        String
+  name        String
+  category    String   // PHASE|ZONE|BUDGET_ITEM|TASK|MILESTONE
+  description String?
+  unit        String?
+  quantity    Decimal? @db.Decimal(15, 4)
+  metadata    Json     @default("{}")
+  sortOrder   Int      @default(0) @map("sort_order")
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  project              Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parent               WbsNode?              @relation("WbsHierarchy", fields: [parentId], references: [id])
+  children             WbsNode[]             @relation("WbsHierarchy")
+  budgetLines          BudgetLine[]
+  changeOrderLines     ChangeOrderLine[]
+  certificationLines   CertificationLine[]
+  financeLines         FinanceLine[]
+  commitmentLines      CommitmentLine[]
+  inventoryMovements   InventoryMovement[]
+  rfis                 RFI[]
+  submittals           Submittal[]
+  inspections          Inspection[]
+  scheduleTasks        ScheduleTask[]
+  progressUpdates      ProgressUpdate[]
+
+  @@unique([projectId, code])
+  @@index([projectId, parentId])
+  @@index([projectId, category])
+  @@map("wbs_nodes")
+  @@schema("public")
+}
+
+// ============================================================
+// BUDGET + CHANGE ORDERS
+// ============================================================
+
+model BudgetVersion {
+  id                   String   @id @default(uuid())
+  orgId                String   @map("org_id")
+  projectId            String   @map("project_id")
+  versionCode          String   @map("version_code")
+  versionType          String   @default("BASELINE") @map("version_type")
+  status               String   @default("DRAFT")
+  notes                String?
+  createdByOrgMemberId String   @map("created_by_org_member_id")
+  approvedByOrgMemberId String? @map("approved_by_org_member_id")
+  createdAt            DateTime @default(now()) @map("created_at")
+  approvedAt           DateTime? @map("approved_at")
+  lockedAt             DateTime? @map("locked_at")
+
+  // Relations
+  project        Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy      OrgMember        @relation("BudgetCreatedBy", fields: [createdByOrgMemberId], references: [id])
+  approvedBy     OrgMember?       @relation("BudgetApprovedBy", fields: [approvedByOrgMemberId], references: [id])
+  budgetLines    BudgetLine[]
+  changeOrders   ChangeOrder[]
+  certifications Certification[]
+
+  @@unique([projectId, versionCode])
+  @@index([projectId, status])
+  @@map("budget_versions")
+  @@schema("public")
+}
+
+model BudgetLine {
+  id               String  @id @default(uuid())
+  orgId            String  @map("org_id")
+  budgetVersionId  String  @map("budget_version_id")
+  wbsNodeId        String  @map("wbs_node_id")
+  description      String
+  unit             String
+  quantity         Decimal @db.Decimal(15, 4)
+  directCostTotal  Decimal @map("direct_cost_total") @db.Decimal(15, 2)
+  salePriceTotal   Decimal @map("sale_price_total") @db.Decimal(15, 2)
+  overheadPct      Decimal @default(0) @map("overhead_pct") @db.Decimal(5, 2)
+  financialPct     Decimal @default(0) @map("financial_pct") @db.Decimal(5, 2)
+  profitPct        Decimal @default(0) @map("profit_pct") @db.Decimal(5, 2)
+  taxPct           Decimal @default(0) @map("tax_pct") @db.Decimal(5, 2)
+  retentionPct     Decimal @default(0) @map("retention_pct") @db.Decimal(5, 2)
+  sortOrder        Int     @default(0) @map("sort_order")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  budgetVersion      BudgetVersion        @relation(fields: [budgetVersionId], references: [id], onDelete: Cascade)
+  wbsNode            WbsNode              @relation(fields: [wbsNodeId], references: [id])
+  resources          BudgetResource[]
+  certificationLines CertificationLine[]
+
+  @@index([budgetVersionId])
+  @@index([wbsNodeId])
+  @@map("budget_lines")
+  @@schema("public")
+}
+
+model BudgetResource {
+  id           String   @id @default(uuid())
+  orgId        String   @map("org_id")
+  budgetLineId String   @map("budget_line_id")
+  resourceType String   @map("resource_type")
+  description  String
+  unit         String
+  quantity     Decimal  @db.Decimal(15, 4)
+  unitCost     Decimal  @map("unit_cost") @db.Decimal(15, 2)
+  totalCost    Decimal  @map("total_cost") @db.Decimal(15, 2)
+  attributes   Json     @default("{}")
+  sortOrder    Int      @default(0) @map("sort_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  // Relations
+  budgetLine BudgetLine @relation(fields: [budgetLineId], references: [id], onDelete: Cascade)
+
+  @@index([budgetLineId])
+  @@map("budget_resources")
+  @@schema("public")
+}
+
+model ChangeOrder {
+  id                     String   @id @default(uuid())
+  orgId                  String   @map("org_id")
+  projectId              String   @map("project_id")
+  budgetVersionId        String?  @map("budget_version_id")
+  number                 Int
+  status                 String   @default("DRAFT")
+  changeType             String   @map("change_type")
+  requestDate            DateTime @default(now()) @map("request_date") @db.Date
+  approvedDate           DateTime? @map("approved_date") @db.Date
+  implementedDate        DateTime? @map("implemented_date") @db.Date
+  reason                 String
+  justification          String?
+  costImpact             Decimal  @map("cost_impact") @db.Decimal(15, 2)
+  timeImpactDays         Int      @default(0) @map("time_impact_days")
+  requestedByOrgMemberId String   @map("requested_by_org_member_id")
+  approvedByOrgMemberId  String?  @map("approved_by_org_member_id")
+  workflowInstanceId     String?  @map("workflow_instance_id")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  organization  Organization    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  project       Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  budgetVersion BudgetVersion?  @relation(fields: [budgetVersionId], references: [id])
+  requestedBy   OrgMember       @relation("ChangeOrderRequestedBy", fields: [requestedByOrgMemberId], references: [id])
+  approvedBy    OrgMember?      @relation("ChangeOrderApprovedBy", fields: [approvedByOrgMemberId], references: [id])
+  lines         ChangeOrderLine[]
+
+  @@unique([projectId, number])
+  @@index([projectId, status])
+  @@map("change_orders")
+  @@schema("public")
+}
+
+model ChangeOrderLine {
+  id               String   @id @default(uuid())
+  orgId            String   @map("org_id")
+  changeOrderId    String   @map("change_order_id")
+  wbsNodeId        String   @map("wbs_node_id")
+  changeType       String   @map("change_type") // ADD|MODIFY|DELETE
+  originalQty      Decimal? @map("original_qty") @db.Decimal(15, 4)
+  newQty           Decimal? @map("new_qty") @db.Decimal(15, 4)
+  originalUnitCost Decimal? @map("original_unit_cost") @db.Decimal(15, 2)
+  newUnitCost      Decimal? @map("new_unit_cost") @db.Decimal(15, 2)
+  originalTotalCost Decimal? @map("original_total_cost") @db.Decimal(15, 2)
+  newTotalCost     Decimal? @map("new_total_cost") @db.Decimal(15, 2)
+  deltaCost        Decimal  @map("delta_cost") @db.Decimal(15, 2)
+  justification    String
+  sortOrder        Int      @default(0) @map("sort_order")
+
+  // Relations
+  changeOrder ChangeOrder @relation(fields: [changeOrderId], references: [id], onDelete: Cascade)
+  wbsNode     WbsNode     @relation(fields: [wbsNodeId], references: [id])
+
+  @@index([changeOrderId])
+  @@map("change_order_lines")
+  @@schema("public")
+}
+
+// ============================================================
+// PARTIES (Suppliers/Clients)
+// ============================================================
+
+model Party {
+  id          String   @id @default(uuid())
+  orgId       String   @map("org_id")
+  partyType   String   @map("party_type") // SUPPLIER|CLIENT|SUBCONTRACTOR
+  name        String
+  taxId       String?  @map("tax_id")
+  email       String?
+  phone       String?
+  address     String?
+  city        String?
+  country     String?
+  website     String?
+  metadata    Json     @default("{}")
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  organization        Organization          @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  contacts            PartyContact[]
+  financeTransactions FinanceTransaction[]
+  commitments         Commitment[]
+  submittals          Submittal[]
+
+  @@index([orgId, partyType])
+  @@index([orgId, name])
+  @@map("parties")
+  @@schema("public")
+}
+
+model PartyContact {
+  id        String   @id @default(uuid())
+  orgId     String   @map("org_id")
+  partyId   String   @map("party_id")
+  fullName  String   @map("full_name")
+  role      String?
+  email     String?
+  phone     String?
+  isPrimary Boolean  @default(false) @map("is_primary")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  party Party @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  @@index([partyId])
+  @@map("party_contacts")
+  @@schema("public")
+}
+
+// ============================================================
+// FINANCE (Multi-Currency)
+// ============================================================
+
+model Currency {
+  code          String @id
+  name          String
+  symbol        String
+  decimalPlaces Int    @default(2) @map("decimal_places")
+  active        Boolean @default(true)
+
+  // Relations
+  orgProfiles          OrgProfile[]
+  exchangeRatesFrom    ExchangeRate[]         @relation("ExchangeRateFrom")
+  exchangeRatesTo      ExchangeRate[]         @relation("ExchangeRateTo")
+  financeTransactions  FinanceTransaction[]
+  commitments          Commitment[]
+
+  @@map("currencies")
+  @@schema("finance")
+}
+
+model ExchangeRate {
+  id            String   @id @default(uuid())
+  fromCurrency  String   @map("from_currency")
+  toCurrency    String   @map("to_currency")
+  rate          Decimal  @db.Decimal(15, 6)
+  effectiveDate DateTime @map("effective_date") @db.Date
+  source        String   @default("MANUAL")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  // Relations
+  fromCurrencyRel Currency @relation("ExchangeRateFrom", fields: [fromCurrency], references: [code])
+  toCurrencyRel   Currency @relation("ExchangeRateTo", fields: [toCurrency], references: [code])
+
+  @@unique([fromCurrency, toCurrency, effectiveDate])
+  @@index([effectiveDate])
+  @@map("exchange_rates")
+  @@schema("finance")
+}
+
+model FinanceTransaction {
+  id                    String   @id @default(uuid())
+  orgId                 String   @map("org_id")
+  projectId             String?  @map("project_id")
+  partyId               String?  @map("party_id")
+  type                  String   // EXPENSE|INCOME|PURCHASE|SALE|OVERHEAD
+  status                String   @default("DRAFT")
+  transactionNumber     String   @map("transaction_number")
+  issueDate             DateTime @map("issue_date") @db.Date
+  dueDate               DateTime? @map("due_date") @db.Date
+  paidDate              DateTime? @map("paid_date") @db.Date
+  currency              String   @default("USD")
+  subtotal              Decimal  @db.Decimal(15, 2)
+  taxTotal              Decimal  @default(0) @map("tax_total") @db.Decimal(15, 2)
+  total                 Decimal  @db.Decimal(15, 2)
+  amountBaseCurrency    Decimal  @map("amount_base_currency") @db.Decimal(15, 2)
+  exchangeRateSnapshot  Json?    @map("exchange_rate_snapshot")
+  description           String
+  reference             String?
+  deleted               Boolean  @default(false)
+  deletedAt             DateTime? @map("deleted_at")
+  deletedByOrgMemberId  String?  @map("deleted_by_org_member_id")
+  createdByOrgMemberId  String   @map("created_by_org_member_id")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  organization         Organization          @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  project              Project?              @relation(fields: [projectId], references: [id])
+  party                Party?                @relation(fields: [partyId], references: [id])
+  currencyRel          Currency              @relation(fields: [currency], references: [code])
+  createdBy            OrgMember             @relation("FinanceTransactionCreatedBy", fields: [createdByOrgMemberId], references: [id])
+  deletedBy            OrgMember?            @relation("FinanceTransactionDeletedBy", fields: [deletedByOrgMemberId], references: [id])
+  lines                FinanceLine[]
+  payments             Payment[]
+  overheadAllocations  OverheadAllocation[]
+  inventoryMovements   InventoryMovement[]
+
+  @@unique([orgId, transactionNumber])
+  @@index([orgId, projectId])
+  @@index([orgId, type, status])
+  @@index([issueDate])
+  @@map("finance_transactions")
+  @@schema("finance")
+}
+
+model FinanceLine {
+  id            String  @id @default(uuid())
+  orgId         String  @map("org_id")
+  transactionId String  @map("transaction_id")
+  wbsNodeId     String? @map("wbs_node_id")
+  description   String
+  unit          String?
+  quantity      Decimal @db.Decimal(15, 4)
+  unitPrice     Decimal @map("unit_price") @db.Decimal(15, 2)
+  lineTotal     Decimal @map("line_total") @db.Decimal(15, 2)
+  sortOrder     Int     @default(0) @map("sort_order")
+
+  // Relations
+  transaction FinanceTransaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  wbsNode     WbsNode?           @relation(fields: [wbsNodeId], references: [id])
+
+  @@index([transactionId])
+  @@map("finance_lines")
+  @@schema("finance")
+}
+
+model Payment {
+  id                   String   @id @default(uuid())
+  orgId                String   @map("org_id")
+  transactionId        String   @map("transaction_id")
+  paymentNumber        String   @map("payment_number")
+  paidOn               DateTime @map("paid_on") @db.Date
+  amount               Decimal  @db.Decimal(15, 2)
+  method               String   @default("WIRE")
+  reference            String?
+  notes                String?
+  createdByOrgMemberId String   @map("created_by_org_member_id")
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  // Relations
+  transaction FinanceTransaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  createdBy   OrgMember          @relation(fields: [createdByOrgMemberId], references: [id])
+
+  @@index([transactionId])
+  @@index([paidOn])
+  @@map("payments")
+  @@schema("finance")
+}
+
+model OverheadAllocation {
+  id               String   @id @default(uuid())
+  orgId            String   @map("org_id")
+  transactionId    String   @map("transaction_id")
+  projectId        String   @map("project_id")
+  allocationPct    Decimal  @map("allocation_pct") @db.Decimal(5, 2)
+  allocationAmount Decimal  @map("allocation_amount") @db.Decimal(15, 2)
+  notes            String?
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  // Relations
+  transaction FinanceTransaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  project     Project            @relation(fields: [projectId], references: [id])
+
+  @@index([transactionId])
+  @@index([projectId])
+  @@map("overhead_allocations")
+  @@schema("finance")
+}
+
+// ============================================================
+// COMMITMENTS (PO/Contracts)
+// ============================================================
+
+model Commitment {
+  id                    String   @id @default(uuid())
+  orgId                 String   @map("org_id")
+  projectId             String   @map("project_id")
+  partyId               String   @map("party_id")
+  commitmentType        String   @map("commitment_type") // PO|CONTRACT|SUBCONTRACT
+  commitmentNumber      String   @map("commitment_number")
+  status                String   @default("DRAFT")
+  issueDate             DateTime @map("issue_date") @db.Date
+  startDate             DateTime? @map("start_date") @db.Date
+  endDate               DateTime? @map("end_date") @db.Date
+  reference             String?
+  description           String?
+  total                 Decimal  @db.Decimal(15, 2)
+  currency              String   @default("USD")
+  totalBaseCurrency     Decimal  @map("total_base_currency") @db.Decimal(15, 2)
+  deleted               Boolean  @default(false)
+  createdByOrgMemberId  String   @map("created_by_org_member_id")
+  approvedByOrgMemberId String?  @map("approved_by_org_member_id")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  organization Organization       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  project      Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  party        Party              @relation(fields: [partyId], references: [id])
+  currencyRel  Currency           @relation(fields: [currency], references: [code])
+  createdBy    OrgMember          @relation("CommitmentCreatedBy", fields: [createdByOrgMemberId], references: [id])
+  approvedBy   OrgMember?         @relation("CommitmentApprovedBy", fields: [approvedByOrgMemberId], references: [id])
+  lines        CommitmentLine[]
+
+  @@unique([orgId, commitmentNumber])
+  @@index([projectId, status])
+  @@map("commitments")
+  @@schema("public")
+}
+
+model CommitmentLine {
+  id           String  @id @default(uuid())
+  orgId        String  @map("org_id")
+  commitmentId String  @map("commitment_id")
+  wbsNodeId    String? @map("wbs_node_id")
+  description  String
+  unit         String?
+  quantity     Decimal @db.Decimal(15, 4)
+  unitPrice    Decimal @map("unit_price") @db.Decimal(15, 2)
+  lineTotal    Decimal @map("line_total") @db.Decimal(15, 2)
+  sortOrder    Int     @default(0) @map("sort_order")
+
+  // Relations
+  commitment Commitment @relation(fields: [commitmentId], references: [id], onDelete: Cascade)
+  wbsNode    WbsNode?   @relation(fields: [wbsNodeId], references: [id])
+
+  @@index([commitmentId])
+  @@map("commitment_lines")
+  @@schema("public")
+}
+
+// ============================================================
+// CERTIFICATIONS (Immutable)
+// ============================================================
+
+model Certification {
+  id                    String   @id @default(uuid())
+  orgId                 String   @map("org_id")
+  projectId             String   @map("project_id")
+  budgetVersionId       String   @map("budget_version_id")
+  number                Int
+  periodMonth           Int      @map("period_month")
+  periodYear            Int      @map("period_year")
+  issuedDate            DateTime? @map("issued_date") @db.Date
+  status                String   @default("DRAFT")
+  notes                 String?
+  integritySeal         String?  @map("integrity_seal")
+  issuedByOrgMemberId   String?  @map("issued_by_org_member_id")
+  approvedByOrgMemberId String?  @map("approved_by_org_member_id")
+  createdAt             DateTime @default(now()) @map("created_at")
+  issuedAt              DateTime? @map("issued_at")
+  approvedAt            DateTime? @map("approved_at")
+
+  // Relations
+  organization  Organization        @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  project       Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  budgetVersion BudgetVersion       @relation(fields: [budgetVersionId], references: [id])
+  issuedBy      OrgMember?          @relation("CertificationIssuedBy", fields: [issuedByOrgMemberId], references: [id])
+  approvedBy    OrgMember?          @relation("CertificationApprovedBy", fields: [approvedByOrgMemberId], references: [id])
+  lines         CertificationLine[]
+
+  @@unique([projectId, number])
+  @@index([projectId, status])
+  @@map("certifications")
+  @@schema("public")
+}
+
+model CertificationLine {
+  id                      String   @id @default(uuid())
+  orgId                   String   @map("org_id")
+  certificationId         String   @map("certification_id")
+  wbsNodeId               String   @map("wbs_node_id")
+  budgetLineId            String   @map("budget_line_id")
+  prevProgressPct         Decimal  @default(0) @map("prev_progress_pct") @db.Decimal(5, 2)
+  periodProgressPct       Decimal  @map("period_progress_pct") @db.Decimal(5, 2)
+  totalProgressPct        Decimal  @map("total_progress_pct") @db.Decimal(5, 2)
+  contractualQtySnapshot  Decimal  @map("contractual_qty_snapshot") @db.Decimal(15, 4)
+  unitPriceSnapshot       Decimal  @map("unit_price_snapshot") @db.Decimal(15, 2)
+  prevQty                 Decimal  @default(0) @map("prev_qty") @db.Decimal(15, 4)
+  periodQty               Decimal  @map("period_qty") @db.Decimal(15, 4)
+  totalQty                Decimal  @map("total_qty") @db.Decimal(15, 4)
+  remainingQty            Decimal  @map("remaining_qty") @db.Decimal(15, 4)
+  prevAmount              Decimal  @default(0) @map("prev_amount") @db.Decimal(15, 2)
+  periodAmount            Decimal  @map("period_amount") @db.Decimal(15, 2)
+  totalAmount             Decimal  @map("total_amount") @db.Decimal(15, 2)
+  createdAt               DateTime @default(now()) @map("created_at")
+
+  // Relations
+  certification Certification @relation(fields: [certificationId], references: [id], onDelete: Cascade)
+  wbsNode       WbsNode       @relation(fields: [wbsNodeId], references: [id])
+  budgetLine    BudgetLine    @relation(fields: [budgetLineId], references: [id])
+
+  @@index([certificationId])
+  @@map("certification_lines")
+  @@schema("public")
+}
+
+// ============================================================
+// INVENTORY (Ledger-based)
+// ============================================================
+
+model InventoryItem {
+  id            String   @id @default(uuid())
+  orgId         String   @map("org_id")
+  sku           String
+  name          String
+  description   String?
+  category      String
+  unit          String
+  minStockQty   Decimal? @map("min_stock_qty") @db.Decimal(15, 4)
+  reorderQty    Decimal? @map("reorder_qty") @db.Decimal(15, 4)
+  metadata      Json     @default("{}")
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  organization Organization        @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  movements    InventoryMovement[]
+
+  @@unique([orgId, sku])
+  @@index([orgId, category])
+  @@map("inventory_items")
+  @@schema("inventory")
+}
+
+model InventoryLocation {
+  id        String   @id @default(uuid())
+  orgId     String   @map("org_id")
+  type      String   // CENTRAL_WAREHOUSE|PROJECT_SITE|SUPPLIER
+  projectId String?  @map("project_id")
+  name      String
+  address   String?
+  metadata  Json     @default("{}")
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  organization   Organization        @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  project        Project?            @relation(fields: [projectId], references: [id])
+  movementsFrom  InventoryMovement[] @relation("MovementFrom")
+  movementsTo    InventoryMovement[] @relation("MovementTo")
+
+  @@index([orgId, type])
+  @@index([projectId])
+  @@map("inventory_locations")
+  @@schema("inventory")
+}
+
+model InventoryMovement {
+  id                   String   @id @default(uuid())
+  orgId                String   @map("org_id")
+  itemId               String   @map("item_id")
+  movementType         String   @map("movement_type") // PURCHASE|TRANSFER|ISSUE|ADJUSTMENT
+  fromLocationId       String?  @map("from_location_id")
+  toLocationId         String?  @map("to_location_id")
+  projectId            String?  @map("project_id")
+  wbsNodeId            String?  @map("wbs_node_id")
+  transactionId        String?  @map("transaction_id")
+  quantity             Decimal  @db.Decimal(15, 4)
+  unitCost             Decimal  @map("unit_cost") @db.Decimal(15, 2)
+  totalCost            Decimal  @map("total_cost") @db.Decimal(15, 2)
+  notes                String?
+  idempotencyKey       String   @unique @map("idempotency_key")
+  createdByOrgMemberId String   @map("created_by_org_member_id")
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  // Relations
+  item         InventoryItem       @relation(fields: [itemId], references: [id])
+  fromLocation InventoryLocation?  @relation("MovementFrom", fields: [fromLocationId], references: [id])
+  toLocation   InventoryLocation?  @relation("MovementTo", fields: [toLocationId], references: [id])
+  project      Project?            @relation(fields: [projectId], references: [id])
+  wbsNode      WbsNode?            @relation(fields: [wbsNodeId], references: [id])
+  transaction  FinanceTransaction? @relation(fields: [transactionId], references: [id])
+  createdBy    OrgMember           @relation(fields: [createdByOrgMemberId], references: [id])
+
+  @@index([itemId, toLocationId])
+  @@index([projectId])
+  @@index([createdAt])
+  @@map("inventory_movements")
+  @@schema("inventory")
+}
+
+// ============================================================
+// QUALITY MANAGEMENT
+// ============================================================
+
+model RFI {
+  id                   String   @id @default(uuid())
+  orgId                String   @map("org_id")
+  projectId            String   @map("project_id")
+  number               Int
+  status               String   @default("OPEN")
+  priority             String   @default("MEDIUM")
+  wbsNodeId            String?  @map("wbs_node_id")
+  raisedByOrgMemberId  String   @map("raised_by_org_member_id")
+  assignedToOrgMemberId String? @map("assigned_to_org_member_id")
+  subject              String
+  question             String
+  answer               String?
+  dueDate              DateTime? @map("due_date") @db.Date
+  answeredDate         DateTime? @map("answered_date") @db.Date
+  closedDate           DateTime? @map("closed_date") @db.Date
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  wbsNode      WbsNode?     @relation(fields: [wbsNodeId], references: [id])
+  raisedBy     OrgMember    @relation("RFIRaisedBy", fields: [raisedByOrgMemberId], references: [id])
+  assignedTo   OrgMember?   @relation("RFIAssignedTo", fields: [assignedToOrgMemberId], references: [id])
+  comments     RFIComment[]
+
+  @@unique([projectId, number])
+  @@index([projectId, status])
+  @@map("rfis")
+  @@schema("quality")
+}
+
+model RFIComment {
+  id          String   @id @default(uuid())
+  orgId       String   @map("org_id")
+  rfiId       String   @map("rfi_id")
+  orgMemberId String   @map("org_member_id")
+  comment     String
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  rfi    RFI       @relation(fields: [rfiId], references: [id], onDelete: Cascade)
+  author OrgMember @relation(fields: [orgMemberId], references: [id])
+
+  @@index([rfiId])
+  @@map("rfi_comments")
+  @@schema("quality")
+}
+
+model Submittal {
+  id                    String   @id @default(uuid())
+  orgId                 String   @map("org_id")
+  projectId             String   @map("project_id")
+  wbsNodeId             String?  @map("wbs_node_id")
+  number                Int
+  submittalType         String   @map("submittal_type")
+  status                String   @default("DRAFT")
+  specSection           String?  @map("spec_section")
+  submittedByPartyId    String?  @map("submitted_by_party_id")
+  reviewedByOrgMemberId String?  @map("reviewed_by_org_member_id")
+  submittedDate         DateTime? @map("submitted_date") @db.Date
+  dueDate               DateTime @map("due_date") @db.Date
+  reviewedDate          DateTime? @map("reviewed_date") @db.Date
+  reviewComments        String?  @map("review_comments")
+  revisionNumber        Int      @default(0) @map("revision_number")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  wbsNode      WbsNode?     @relation(fields: [wbsNodeId], references: [id])
+  submittedBy  Party?       @relation(fields: [submittedByPartyId], references: [id])
+  reviewedBy   OrgMember?   @relation(fields: [reviewedByOrgMemberId], references: [id])
+
+  @@unique([projectId, number])
+  @@index([projectId, status])
+  @@map("submittals")
+  @@schema("quality")
+}
+
+model Inspection {
+  id                    String   @id @default(uuid())
+  orgId                 String   @map("org_id")
+  projectId             String   @map("project_id")
+  wbsNodeId             String?  @map("wbs_node_id")
+  number                Int
+  inspectionType        String   @map("inspection_type")
+  status                String   @default("SCHEDULED")
+  scheduledDate         DateTime? @map("scheduled_date") @db.Date
+  completedDate         DateTime? @map("completed_date") @db.Date
+  inspectorOrgMemberId  String?  @map("inspector_org_member_id")
+  findings              String?
+  correctiveActions     String?  @map("corrective_actions")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  organization Organization      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  project      Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  wbsNode      WbsNode?          @relation(fields: [wbsNodeId], references: [id])
+  inspector    OrgMember?        @relation(fields: [inspectorOrgMemberId], references: [id])
+  items        InspectionItem[]
+
+  @@unique([projectId, number])
+  @@index([projectId, status])
+  @@map("inspections")
+  @@schema("quality")
+}
+
+model InspectionItem {
+  id              String @id @default(uuid())
+  orgId           String @map("org_id")
+  inspectionId    String @map("inspection_id")
+  itemDescription String @map("item_description")
+  status          String // PASS|FAIL|NA
+  notes           String?
+  sortOrder       Int    @default(0) @map("sort_order")
+
+  // Relations
+  inspection Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+
+  @@index([inspectionId])
+  @@map("inspection_items")
+  @@schema("quality")
+}
+
+// ============================================================
+// DOCUMENTS (Versioned)
+// ============================================================
+
+model Document {
+  id                   String   @id @default(uuid())
+  orgId                String   @map("org_id")
+  projectId            String?  @map("project_id")
+  title                String
+  docType              String   @map("doc_type")
+  category             String?
+  description          String?
+  isPublic             Boolean  @default(false) @map("is_public")
+  deleted              Boolean  @default(false)
+  createdByOrgMemberId String   @map("created_by_org_member_id")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  organization    Organization      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  project         Project?          @relation(fields: [projectId], references: [id])
+  createdBy       OrgMember         @relation(fields: [createdByOrgMemberId], references: [id])
+  versions        DocumentVersion[]
+  links           DocumentLink[]
+  dailyReportPhotos DailyReportPhoto[]
+
+  @@index([orgId, projectId])
+  @@index([orgId, docType])
+  @@map("documents")
+  @@schema("public")
+}
+
+model DocumentVersion {
+  id                   String   @id @default(uuid())
+  orgId                String   @map("org_id")
+  documentId           String   @map("document_id")
+  versionNumber        Int      @map("version_number")
+  fileName             String   @map("file_name")
+  mimeType             String   @map("mime_type")
+  sizeBytes            Int      @map("size_bytes")
+  storageKey           String   @map("storage_key")
+  checksum             String
+  notes                String?
+  uploadedByOrgMemberId String  @map("uploaded_by_org_member_id")
+  uploadedAt           DateTime @default(now()) @map("uploaded_at")
+
+  // Relations
+  document   Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  uploadedBy OrgMember @relation(fields: [uploadedByOrgMemberId], references: [id])
+
+  @@index([documentId])
+  @@map("document_versions")
+  @@schema("public")
+}
+
+model DocumentLink {
+  id         String   @id @default(uuid())
+  orgId      String   @map("org_id")
+  documentId String   @map("document_id")
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  // Relations
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+  @@index([entityType, entityId])
+  @@map("document_links")
+  @@schema("public")
+}
+
+// ============================================================
+// TEMPLATES & EXPORTS
+// ============================================================
+
+model Template {
+  id                   String   @id @default(uuid())
+  orgId                String   @map("org_id")
+  templateType         String   @map("template_type")
+  name                 String
+  version              Int      @default(1)
+  active               Boolean  @default(true)
+  storageKey           String   @map("storage_key")
+  variables            Json?
+  notes                String?
+  createdByOrgMemberId String   @map("created_by_org_member_id")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdBy    OrgMember    @relation(fields: [createdByOrgMemberId], references: [id])
+
+  @@index([orgId, templateType])
+  @@map("templates")
+  @@schema("public")
+}
+
+model ExportRun {
+  id                     String   @id @default(uuid())
+  orgId                  String   @map("org_id")
+  projectId              String?  @map("project_id")
+  requestedByOrgMemberId String   @map("requested_by_org_member_id")
+  exportType             String   @map("export_type")
+  format                 String
+  status                 String   @default("QUEUED")
+  fileStorageKey         String?  @map("file_storage_key")
+  paramsJson             Json?    @map("params_json")
+  errorMessage           String?  @map("error_message")
+  createdAt              DateTime @default(now()) @map("created_at")
+  completedAt            DateTime? @map("completed_at")
+
+  // Relations
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  project      Project?     @relation(fields: [projectId], references: [id])
+  requestedBy  OrgMember    @relation(fields: [requestedByOrgMemberId], references: [id])
+
+  @@index([orgId, status])
+  @@index([createdAt])
+  @@map("export_runs")
+  @@schema("public")
+}
+
+// ============================================================
+// REPORTING
+// ============================================================
+
+model SavedReport {
+  id                   String   @id @default(uuid())
+  orgId                String   @map("org_id")
+  name                 String
+  description          String?
+  entityType           String   @map("entity_type")
+  filtersJson          Json     @map("filters_json")
+  columnsJson          Json     @map("columns_json")
+  sortJson             Json?    @map("sort_json")
+  aggregationsJson     Json?    @map("aggregations_json")
+  visibility           String   @default("PRIVATE")
+  createdByOrgMemberId String   @map("created_by_org_member_id")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  organization Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdBy    OrgMember        @relation(fields: [createdByOrgMemberId], references: [id])
+  runs         SavedReportRun[]
+
+  @@index([orgId, entityType])
+  @@map("saved_reports")
+  @@schema("public")
+}
+
+model SavedReportRun {
+  id                     String   @id @default(uuid())
+  orgId                  String   @map("org_id")
+  reportId               String   @map("report_id")
+  requestedByOrgMemberId String   @map("requested_by_org_member_id")
+  format                 String
+  status                 String   @default("QUEUED")
+  fileStorageKey         String?  @map("file_storage_key")
+  paramsOverride         Json?    @map("params_override")
+  createdAt              DateTime @default(now()) @map("created_at")
+  completedAt            DateTime? @map("completed_at")
+
+  // Relations
+  report      SavedReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  requestedBy OrgMember   @relation(fields: [requestedByOrgMemberId], references: [id])
+
+  @@index([reportId])
+  @@map("saved_report_runs")
+  @@schema("public")
+}
+
+// ============================================================
+// SCHEDULING & PROGRESS
+// ============================================================
+
+model ScheduleTask {
+  id                  String   @id @default(uuid())
+  orgId               String   @map("org_id")
+  projectId           String   @map("project_id")
+  wbsNodeId           String?  @map("wbs_node_id")
+  taskNumber          String   @map("task_number")
+  name                String
+  description         String?
+  startDate           DateTime @map("start_date") @db.Date
+  endDate             DateTime @map("end_date") @db.Date
+  durationDays        Int      @map("duration_days")
+  status              String   @default("NOT_STARTED")
+  plannedProgressPct  Decimal  @default(0) @map("planned_progress_pct") @db.Decimal(5, 2)
+  actualProgressPct   Decimal  @default(0) @map("actual_progress_pct") @db.Decimal(5, 2)
+  isMilestone         Boolean  @default(false) @map("is_milestone")
+  isCriticalPath      Boolean  @default(false) @map("is_critical_path")
+  dependencies        Json     @default("[]")
+  sortOrder           Int      @default(0) @map("sort_order")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  organization    Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  project         Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  wbsNode         WbsNode?         @relation(fields: [wbsNodeId], references: [id])
+  progressUpdates ProgressUpdate[]
+
+  @@index([projectId, status])
+  @@map("schedule_tasks")
+  @@schema("public")
+}
+
+model ProgressUpdate {
+  id                   String   @id @default(uuid())
+  orgId                String   @map("org_id")
+  projectId            String   @map("project_id")
+  wbsNodeId            String?  @map("wbs_node_id")
+  scheduleTaskId       String?  @map("schedule_task_id")
+  asOfDate             DateTime @map("as_of_date") @db.Date
+  progressPct          Decimal  @map("progress_pct") @db.Decimal(5, 2)
+  notes                String?
+  createdByOrgMemberId String   @map("created_by_org_member_id")
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  // Relations
+  organization Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  project      Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  wbsNode      WbsNode?      @relation(fields: [wbsNodeId], references: [id])
+  scheduleTask ScheduleTask? @relation(fields: [scheduleTaskId], references: [id])
+  createdBy    OrgMember     @relation(fields: [createdByOrgMemberId], references: [id])
+
+  @@index([projectId, asOfDate])
+  @@map("progress_updates")
+  @@schema("public")
+}
+
+// ============================================================
+// DAILY REPORTS (Enhanced)
+// ============================================================
+
+model DailyReport {
+  id                   String   @id @default(uuid())
+  orgId                String   @map("org_id")
+  projectId            String   @map("project_id")
+  reportDate           DateTime @map("report_date") @db.Date
+  weather              String?
+  temperatureHigh      Decimal? @map("temperature_high") @db.Decimal(5, 2)
+  temperatureLow       Decimal? @map("temperature_low") @db.Decimal(5, 2)
+  workAccomplished     String?  @map("work_accomplished")
+  delays               String?
+  safetyIncidents      String?  @map("safety_incidents")
+  visitors             String?
+  deliveries           String?
+  laborCountTotal      Int?     @map("labor_count_total")
+  equipmentCountTotal  Int?     @map("equipment_count_total")
+  createdByOrgMemberId String   @map("created_by_org_member_id")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  organization Organization           @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  project      Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy    OrgMember              @relation(fields: [createdByOrgMemberId], references: [id])
+  labor        DailyReportLabor[]
+  equipment    DailyReportEquipment[]
+  photos       DailyReportPhoto[]
+
+  @@unique([projectId, reportDate])
+  @@index([projectId])
+  @@map("daily_reports")
+  @@schema("public")
+}
+
+model DailyReportLabor {
+  id            String  @id @default(uuid())
+  orgId         String  @map("org_id")
+  dailyReportId String  @map("daily_report_id")
+  trade         String
+  workerCount   Int     @map("worker_count")
+  hoursWorked   Decimal @map("hours_worked") @db.Decimal(10, 2)
+  notes         String?
+
+  // Relations
+  dailyReport DailyReport @relation(fields: [dailyReportId], references: [id], onDelete: Cascade)
+
+  @@index([dailyReportId])
+  @@map("daily_report_labor")
+  @@schema("public")
+}
+
+model DailyReportEquipment {
+  id            String  @id @default(uuid())
+  orgId         String  @map("org_id")
+  dailyReportId String  @map("daily_report_id")
+  equipmentType String  @map("equipment_type")
+  quantity      Int
+  hoursUsed     Decimal @map("hours_used") @db.Decimal(10, 2)
+  notes         String?
+
+  // Relations
+  dailyReport DailyReport @relation(fields: [dailyReportId], references: [id], onDelete: Cascade)
+
+  @@index([dailyReportId])
+  @@map("daily_report_equipment")
+  @@schema("public")
+}
+
+model DailyReportPhoto {
+  id            String @id @default(uuid())
+  orgId         String @map("org_id")
+  dailyReportId String @map("daily_report_id")
+  documentId    String @map("document_id")
+  caption       String?
+  sortOrder     Int    @default(0) @map("sort_order")
+
+  // Relations
+  dailyReport DailyReport @relation(fields: [dailyReportId], references: [id], onDelete: Cascade)
+  document    Document    @relation(fields: [documentId], references: [id])
+
+  @@index([dailyReportId])
+  @@map("daily_report_photos")
+  @@schema("public")
+}
+
+// Legacy Site Log (can be deprecated later)
+model SiteLogEntry {
+  id                   String   @id @default(uuid())
+  orgId                String   @map("org_id")
+  projectId            String   @map("project_id")
+  logDate              DateTime @map("log_date") @db.Date
+  title                String
+  description          String?
+  weather              String?
+  createdByOrgMemberId String   @map("created_by_org_member_id")
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  // Relations
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy    OrgMember    @relation(fields: [createdByOrgMemberId], references: [id])
+
+  @@index([projectId, logDate])
+  @@map("site_log_entries")
+  @@schema("public")
+}
+
+// ============================================================
+// EVENTS & WEBHOOKS
+// ============================================================
+
+model OutboxEvent {
+  id           String    @id @default(uuid())
+  orgId        String?   @map("org_id")
+  eventType    String    @map("event_type")
+  payload      Json
+  status       String    @default("PENDING")
+  retryCount   Int       @default(0) @map("retry_count")
+  errorMessage String?   @map("error_message")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  processedAt  DateTime? @map("processed_at")
+  nextRetryAt  DateTime? @map("next_retry_at")
+
+  // Relations
+  organization      Organization?       @relation(fields: [orgId], references: [id])
+  webhookDeliveries WebhookDelivery[]
+
+  @@index([status, createdAt])
+  @@index([nextRetryAt])
+  @@map("outbox_events")
+  @@schema("public")
+}
+
+model WebhookEndpoint {
+  id        String   @id @default(uuid())
+  orgId     String   @map("org_id")
+  url       String
+  events    String[] // Array of event types
+  secret    String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  organization      Organization      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  webhookDeliveries WebhookDelivery[]
+
+  @@index([orgId, active])
+  @@map("webhook_endpoints")
+  @@schema("public")
+}
+
+model WebhookDelivery {
+  id                String   @id @default(uuid())
+  webhookEndpointId String   @map("webhook_endpoint_id")
+  outboxEventId     String   @map("outbox_event_id")
+  attemptNumber     Int      @map("attempt_number")
+  httpStatus        Int?     @map("http_status")
+  responseBody      String?  @map("response_body")
+  deliveredAt       DateTime @default(now()) @map("delivered_at")
+
+  // Relations
+  webhookEndpoint WebhookEndpoint @relation(fields: [webhookEndpointId], references: [id], onDelete: Cascade)
+  outboxEvent     OutboxEvent     @relation(fields: [outboxEventId], references: [id])
+
+  @@index([webhookEndpointId])
+  @@index([outboxEventId])
+  @@map("webhook_deliveries")
+  @@schema("public")
+}
+
+// ============================================================
+// NOTIFICATIONS
+// ============================================================
+
+model Notification {
+  id        String    @id @default(uuid())
+  orgId     String    @map("org_id")
+  userId    String    @map("user_id")
+  type      String    // EMAIL|IN_APP|SMS
+  category  String    // APPROVAL_REQUEST|DEADLINE|MENTION|etc
+  title     String
+  message   String
+  metadata  Json?
+  read      Boolean   @default(false)
+  readAt    DateTime? @map("read_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([createdAt])
+  @@map("notifications")
+  @@schema("public")
+}
