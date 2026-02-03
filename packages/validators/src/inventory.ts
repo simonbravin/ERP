@@ -113,7 +113,7 @@ const adjustmentMovementSchema = baseMovementSchema
     }
   )
 
-export const createInventoryMovementSchema = z.discriminatedUnion('movementType', [
+export const createInventoryMovementSchema = z.union([
   purchaseMovementSchema,
   transferMovementSchema,
   issueMovementSchema,

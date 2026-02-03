@@ -49,3 +49,17 @@ export const updateBudgetLineSchema = z.object({
   indirectCostPct: z.coerce.number().min(0).max(100).optional(),
 })
 export type UpdateBudgetLineInput = z.infer<typeof updateBudgetLineSchema>
+
+export const BUDGET_RESOURCE_TYPES = ['MATERIAL', 'LABOR', 'EQUIPMENT'] as const
+export type BudgetResourceType = (typeof BUDGET_RESOURCE_TYPES)[number]
+
+export const budgetResourceSchema = z.object({
+  type: z.enum(BUDGET_RESOURCE_TYPES),
+  name: z.string().min(1, 'El nombre es requerido'),
+  description: z.string().optional(),
+  unit: z.string().min(1, 'La unidad es requerida'),
+  quantity: z.number().positive('La cantidad debe ser mayor a 0'),
+  unitCost: z.number().min(0, 'El costo unitario no puede ser negativo'),
+  supplierName: z.string().optional(),
+})
+export type BudgetResourceInput = z.infer<typeof budgetResourceSchema>

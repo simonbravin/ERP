@@ -5,10 +5,12 @@ import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { BudgetLinesClient } from './budget-lines-client'
+import { BudgetVersionView } from './budget-version-view'
 import { ComputeSheetHierarchical } from './compute-sheet-hierarchical'
 import { APUDetailModal } from './apu-detail-modal'
 import { deleteBudgetLine } from '@/app/actions/budget'
 import type { BudgetLineRow } from './budget-line-table'
+import type { BudgetTreeNode } from './budget-tree-table-admin'
 
 type WbsOption = { id: string; code: string; name: string }
 type VersionOption = { id: string; versionCode: string }
@@ -38,15 +40,17 @@ type WbsTreeNode = {
 type BudgetVersionTabsProps = {
   projectId: string
   versionId: string
-  version: { status: string; versionCode: string }
+  version: { id: string; status: string; versionCode: string; versionType?: string; overheadPct?: number; financialPct?: number; profitPct?: number; taxPct?: number }
   lines: BudgetLineRow[]
   wbsTree: WbsTreeNode[]
+  treeData: BudgetTreeNode[]
   computeSheetLines: ComputeSheetLine[]
   versionTotal: number
   wbsOptions: WbsOption[]
   otherVersions: VersionOption[]
   canEdit: boolean
   canViewAdmin?: boolean
+  userRole: string
   defaultIndirectPct?: number
 }
 
@@ -56,12 +60,14 @@ export function BudgetVersionTabs({
   version,
   lines,
   wbsTree,
+  treeData,
   computeSheetLines,
   versionTotal,
   wbsOptions,
   otherVersions,
   canEdit,
   canViewAdmin = false,
+  userRole,
   defaultIndirectPct,
 }: BudgetVersionTabsProps) {
   const t = useTranslations('budget')
@@ -108,11 +114,11 @@ export function BudgetVersionTabs({
         </TabsContent>
 
         <TabsContent value="compute">
-          <ComputeSheetHierarchical
-            wbsTree={wbsTree}
-            lines={lines}
+          <BudgetVersionView
+            version={{ id: version.id, status: version.status, overheadPct: version.overheadPct, financialPct: version.financialPct, profitPct: version.profitPct, taxPct: version.taxPct }}
+            treeData={treeData}
             canEdit={canEdit}
-            onDelete={handleDeleteLine}
+            userRole={userRole}
           />
           {selectedLineId && (
             <APUDetailModal

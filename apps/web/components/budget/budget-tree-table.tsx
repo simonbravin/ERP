@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge'
 import { ChevronRight, ChevronDown, Calculator } from 'lucide-react'
 import { APUEditorDialog } from './apu-editor-dialog'
 import { calculateBudgetLine } from '@/lib/budget-calculations'
+import { RESOURCE_TYPES } from '@/lib/constants/budget'
 import type { BudgetLineRow } from './budget-line-table'
 
 type WbsTreeNode = {
@@ -145,13 +146,13 @@ export function BudgetTreeTable({
       for (const line of nodeLines) {
         const resources = line.resources ?? []
         const materialsTotal = resources
-          .filter((r: { resourceType: string }) => r.resourceType === 'MATERIAL')
+          .filter((r: { resourceType: string }) => r.resourceType === RESOURCE_TYPES.MATERIAL)
           .reduce((s: number, r: { quantity: number; unitCost: number }) => s + r.quantity * r.unitCost, 0)
         const laborTotal = resources
-          .filter((r: { resourceType: string }) => r.resourceType === 'LABOR')
+          .filter((r: { resourceType: string }) => r.resourceType === RESOURCE_TYPES.LABOR)
           .reduce((s: number, r: { quantity: number; unitCost: number }) => s + r.quantity * r.unitCost, 0)
-        const subcontractTotal = resources
-          .filter((r: { resourceType: string }) => r.resourceType === 'SUBCONTRACT')
+        const equipmentTotal = resources
+          .filter((r: { resourceType: string }) => r.resourceType === RESOURCE_TYPES.EQUIPMENT || r.resourceType === 'SUBCONTRACT')
           .reduce((s: number, r: { quantity: number; unitCost: number }) => s + r.quantity * r.unitCost, 0)
         const hasAPU = resources.length > 0
         const unitPrice = lineUnitPrice(line)
@@ -170,7 +171,7 @@ export function BudgetTreeTable({
                 <div className="space-y-1">
                   <div className="text-blue-600 dark:text-blue-400">Mat: {formatCurrency(materialsTotal)}</div>
                   <div className="text-green-600 dark:text-green-400">MO: {formatCurrency(laborTotal)}</div>
-                  <div className="text-orange-600 dark:text-orange-400">Sub: {formatCurrency(subcontractTotal)}</div>
+                  <div className="text-orange-600 dark:text-orange-400">{t('equipment', { defaultValue: 'Equipo' })}: {formatCurrency(equipmentTotal)}</div>
                 </div>
               </TableCell>
             )}

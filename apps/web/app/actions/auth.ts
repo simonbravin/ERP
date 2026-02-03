@@ -35,12 +35,14 @@ async function resolveEmailFromLogin(value: string): Promise<string | null> {
   const trimmed = value.trim()
   if (!trimmed) return null
   if (trimmed.includes('@')) return trimmed
-  const user = await prisma.user.findUnique({
+  const user = await prisma.user.findFirst({
     where: { username: trimmed, active: true },
     select: { email: true },
   })
   return user?.email ?? null
 }
+
+const CREDENTIALS_ERROR = { _form: ['Usuario o contraseña incorrectos'] as const }
 
 export async function login(credentials: LoginFormInput) {
   const parsed = loginFormSchema.safeParse(credentials)
@@ -48,19 +50,33 @@ export async function login(credentials: LoginFormInput) {
     return { error: parsed.error.flatten().fieldErrors }
   }
   const { emailOrUsername, password } = parsed.data
-  const email = await resolveEmailFromLogin(emailOrUsername)
-  if (!email) {
-    return { error: { _form: ['Usuario o contraseña incorrectos'] } }
+  try {
+    const email = await resolveEmailFromLogin(emailOrUsername)
+    if (!email) {
+      return { error: CREDENTIALS_ERROR }
+    }
+    // Validar contra la DB aquí; si falla, no llamar a signIn (evita bugs de Auth.js con server actions)
+    const user = await prisma.user.findFirst({
+      where: { email, active: true },
+      select: { id: true, passwordHash: true },
+    })
+    if (!user?.passwordHash) {
+      return { error: CREDENTIALS_ERROR }
+    }
+    const valid = await bcrypt.compare(password, user.passwordHash)
+    if (!valid) {
+      return { error: CREDENTIALS_ERROR }
+    }
+    // Credenciales correctas: iniciar sesión vía Auth.js
+    const result = await signIn('credentials', { email, password, redirect: false })
+    if (result?.error || !result?.ok) {
+      return { error: CREDENTIALS_ERROR }
+    }
+    return redirectTo('/dashboard')
+  } catch (err) {
+    console.error('[auth] login error:', err)
+    return { error: CREDENTIALS_ERROR }
   }
-  const result = await signIn('credentials', {
-    email,
-    password,
-    redirect: false,
-  })
-  if (result?.error || !result?.ok) {
-    return { error: { _form: ['Usuario o contraseña incorrectos'] } }
-  }
-  return redirectTo('/dashboard')
 }
 
 export async function register(data: RegisterInput) {

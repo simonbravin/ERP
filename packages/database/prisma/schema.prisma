@@ -64,6 +64,7 @@ model Organization {
   outboxEvents        OutboxEvent[]
   orgPartyLinks       OrgPartyLink[]
   resources           Resource[]
+  customReports       CustomReport[]
 
   @@index([slug])
   @@index([active])
@@ -119,6 +120,7 @@ model User {
   idempotencyKeys  IdempotencyKey[]
   auditLogs        AuditLog[]
   notifications    Notification[]
+  customReports    CustomReport[]
 
   @@index([email])
   @@index([active])
@@ -160,7 +162,8 @@ model OrgMember {
   createdDocuments   Document[]
   uploadedDocVersions DocumentVersion[]
   createdSiteLogs    SiteLogEntry[]
-  createdDailyReports DailyReport[]
+  createdDailyReports DailyReport[]  @relation("DailyReportReportedBy")
+  approvedDailyReports DailyReport[] @relation("DailyReportApprovedBy")
   createdPayments    Payment[]
   createdInventoryMovements InventoryMovement[]
   requestedChangeOrders ChangeOrder[]      @relation("ChangeOrderRequestedBy")
@@ -488,6 +491,7 @@ model Project {
   inventoryMovements InventoryMovement[]
   exportRuns         ExportRun[]
   overheadAllocations OverheadAllocation[]
+  alerts             Alert[]
 
   @@unique([orgId, projectNumber])
   @@index([orgId, status])
@@ -536,6 +540,18 @@ model WbsNode {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
+  // Tier 2 - Progress tracking
+  plannedHours      Decimal?  @map("planned_hours") @db.Decimal(15, 2)
+  plannedCost        Decimal?  @map("planned_cost") @db.Decimal(15, 2)
+  actualHours        Decimal   @default(0) @map("actual_hours") @db.Decimal(15, 2)
+  actualCost         Decimal   @default(0) @map("actual_cost") @db.Decimal(15, 2)
+  plannedStartDate   DateTime? @map("planned_start_date")
+  plannedEndDate     DateTime? @map("planned_end_date")
+  actualStartDate    DateTime? @map("actual_start_date")
+  actualEndDate      DateTime? @map("actual_end_date")
+  progressPct        Decimal   @default(0) @map("progress_pct") @db.Decimal(5, 2)
+  healthStatus       String?   @map("health_status") // ON_TRACK|AT_RISK|DELAYED|AHEAD
+
   // Relations
   project              Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
   parent               WbsNode?              @relation("WbsHierarchy", fields: [parentId], references: [id])
@@ -551,10 +567,16 @@ model WbsNode {
   inspections          Inspection[]
   scheduleTasks        ScheduleTask[]
   progressUpdates      ProgressUpdate[]
+  dailyReports        DailyReport[]
+  dailyReportWbsNodes  DailyReportWbsNode[]
+  wbsProgressUpdates   WbsProgressUpdate[]
 
   @@unique([projectId, code])
   @@index([projectId, parentId])
   @@index([projectId, category])
+  @@index([actualHours])
+  @@index([progressPct])
+  @@index([healthStatus])
   @@map("wbs_nodes")
   @@schema("public")
 }
@@ -611,6 +633,7 @@ model BudgetLine {
   sortOrder        Int     @default(0) @map("sort_order")
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
+  actualCostTotal   Decimal  @default(0) @map("actual_cost_total") @db.Decimal(15, 2)
 
   // Relations
   budgetVersion      BudgetVersion        @relation(fields: [budgetVersionId], references: [id], onDelete: Cascade)
@@ -618,10 +641,13 @@ model BudgetLine {
   resource           Resource?            @relation(fields: [resourceId], references: [id])
   resources          BudgetResource[]
   certificationLines CertificationLine[]
+  dailyReports       DailyReport[]
+  actualCosts        BudgetLineActualCost[]
 
   @@index([budgetVersionId])
   @@index([wbsNodeId])
   @@index([resourceId])
+  @@index([actualCostTotal])
   @@map("budget_lines")
   @@schema("public")
 }
@@ -630,7 +656,7 @@ model BudgetResource {
   id           String   @id @default(uuid())
   orgId        String   @map("org_id")
   budgetLineId String   @map("budget_line_id")
-  resourceType String   @map("resource_type")
+  resourceType String   @map("resource_type") // MATERIAL, LABOR, EQUIPMENT
   description  String
   unit         String
   quantity     Decimal  @db.Decimal(15, 4)
@@ -850,6 +876,12 @@ model GlobalParty {
   avgRating         Decimal? @map("avg_rating") @db.Decimal(3, 2)
   reviewCount       Int      @default(0) @map("review_count")
   orgCount          Int      @default(0) @map("org_count")
+
+  // Tier 2 - Supplier performance from daily reports
+  lastUsedDate       DateTime? @map("last_used_date")
+  totalSpentAllTime  Decimal   @default(0) @map("total_spent_all_time") @db.Decimal(15, 2)
+  onTimePercentage   Decimal   @default(100) @map("on_time_percentage") @db.Decimal(5, 2)
+  qualityScore       Decimal   @default(5) @map("quality_score") @db.Decimal(3, 2)
   
   active            Boolean  @default(true)
   createdAt         DateTime @default(now()) @map("created_at")
@@ -861,10 +893,13 @@ model GlobalParty {
   products          GlobalProduct[]
   claims            GlobalPartyClaim[]
   reviews           GlobalPartyReview[]
+  dailyReportInteractions DailyReportSupplier[]
 
   @@index([category])
   @@index([verified])
   @@index([name])
+  @@index([lastUsedDate])
+  @@index([onTimePercentage])
   @@map("global_parties")
   @@schema("public")
 }
@@ -1130,6 +1165,7 @@ model FinanceTransaction {
   createdByOrgMemberId  String   @map("created_by_org_member_id")
   createdAt             DateTime @default(now()) @map("created_at")
   updatedAt             DateTime @updatedAt @map("updated_at")
+  dailyReportId         String?  @map("daily_report_id")
 
   // Relations
   organization         Organization          @relation(fields: [orgId], references: [id], onDelete: Cascade)
@@ -1138,6 +1174,7 @@ model FinanceTransaction {
   currencyRel          Currency              @relation(fields: [currency], references: [code])
   createdBy            OrgMember             @relation("FinanceTransactionCreatedBy", fields: [createdByOrgMemberId], references: [id])
   deletedBy            OrgMember?            @relation("FinanceTransactionDeletedBy", fields: [deletedByOrgMemberId], references: [id])
+  dailyReport          DailyReport?          @relation(fields: [dailyReportId], references: [id])
   lines                FinanceLine[]
   payments             Payment[]
   overheadAllocations  OverheadAllocation[]
@@ -1147,6 +1184,7 @@ model FinanceTransaction {
   @@index([orgId, projectId])
   @@index([orgId, type, status])
   @@index([issueDate])
+  @@index([dailyReportId])
   @@map("finance_transactions")
   @@schema("finance")
 }
@@ -1365,6 +1403,7 @@ model InventoryItem {
   // Relations
   organization Organization        @relation(fields: [orgId], references: [id], onDelete: Cascade)
   movements    InventoryMovement[]
+  consumptions InventoryConsumption[]
 
   @@unique([orgId, sku])
   @@index([orgId, category])
@@ -1413,6 +1452,7 @@ model InventoryMovement {
   idempotencyKey       String   @unique @map("idempotency_key")
   createdByOrgMemberId String   @map("created_by_org_member_id")
   createdAt            DateTime @default(now()) @map("created_at")
+  dailyReportId        String?  @map("daily_report_id")
 
   // Relations
   item         InventoryItem       @relation(fields: [itemId], references: [id])
@@ -1421,11 +1461,13 @@ model InventoryMovement {
   project      Project?            @relation(fields: [projectId], references: [id])
   wbsNode      WbsNode?            @relation(fields: [wbsNodeId], references: [id])
   transaction  FinanceTransaction? @relation(fields: [transactionId], references: [id])
+  dailyReport  DailyReport?        @relation(fields: [dailyReportId], references: [id])
   createdBy    OrgMember           @relation(fields: [createdByOrgMemberId], references: [id])
 
   @@index([itemId, toLocationId])
   @@index([projectId])
   @@index([createdAt])
+  @@index([dailyReportId])
   @@map("inventory_movements")
   @@schema("inventory")
 }
@@ -1737,6 +1779,40 @@ model SavedReportRun {
 }
 
 // ============================================================
+// REPORTING & EXPORTS (Custom Reports)
+// ============================================================
+
+model CustomReport {
+  id              String    @id @default(uuid())
+  orgId           String    @map("org_id")
+  name            String
+  description     String?   @db.Text
+  category        String    // "BUDGET", "MATERIALS", "FINANCE", "CERTIFICATIONS", "CUSTOM"
+  reportType      String    @map("report_type") // "TABLE", "SUMMARY", "PIVOT"
+
+  // Configuración JSON
+  config          Json      // { query, filters, columns, groupBy, orderBy }
+
+  // Metadata
+  isPublic        Boolean   @default(false) @map("is_public")
+  createdByUserId String    @map("created_by_user_id")
+  lastRunAt       DateTime? @map("last_run_at")
+  runCount        Int       @default(0) @map("run_count")
+
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdBy     User        @relation(fields: [createdByUserId], references: [id])
+
+  @@index([orgId])
+  @@index([createdByUserId])
+  @@index([category])
+  @@map("custom_reports")
+  @@schema("public")
+}
+
+// ============================================================
 // SCHEDULING & PROGRESS
 // ============================================================
 
@@ -1805,31 +1881,71 @@ model DailyReport {
   orgId                String   @map("org_id")
   projectId            String   @map("project_id")
   reportDate           DateTime @map("report_date") @db.Date
+  summary              String   @db.VarChar(200)
+  workAccomplished     String?  @map("work_accomplished") @db.Text
+  observations         String?  @db.Text
   weather              String?
   temperatureHigh      Decimal? @map("temperature_high") @db.Decimal(5, 2)
   temperatureLow       Decimal? @map("temperature_low") @db.Decimal(5, 2)
-  workAccomplished     String?  @map("work_accomplished")
-  delays               String?
-  safetyIncidents      String?  @map("safety_incidents")
-  visitors             String?
-  deliveries           String?
+  delays               String?  @db.Text
+  safetyIncidents      String?  @map("safety_incidents") @db.Text
+  visitors             String?  @db.Text
+  deliveries           String?  @db.Text
   laborCountTotal      Int?     @map("labor_count_total")
   equipmentCountTotal  Int?     @map("equipment_count_total")
+  status               String   @default("DRAFT") // DRAFT|SUBMITTED|APPROVED|PUBLISHED
+  submittedAt          DateTime? @map("submitted_at")
+  approvedByOrgMemberId String?  @map("approved_by_org_member_id")
+  approvedAt          DateTime? @map("approved_at")
+  wbsNodeId            String?  @map("wbs_node_id")
   createdByOrgMemberId String   @map("created_by_org_member_id")
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @updatedAt @map("updated_at")
 
+  // Tier 2 - Budget & costs (optional, default 0)
+  budgetLineId         String?  @map("budget_line_id")
+  laborCosts           Decimal  @default(0) @map("labor_costs") @db.Decimal(15, 2)
+  materialCosts        Decimal  @default(0) @map("material_costs") @db.Decimal(15, 2)
+  otherCosts           Decimal  @default(0) @map("other_costs") @db.Decimal(15, 2)
+  totalCost            Decimal  @default(0) @map("total_cost") @db.Decimal(15, 2)
+
   // Relations
   organization Organization           @relation(fields: [orgId], references: [id], onDelete: Cascade)
   project      Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  createdBy    OrgMember              @relation(fields: [createdByOrgMemberId], references: [id])
+  createdBy    OrgMember              @relation("DailyReportReportedBy", fields: [createdByOrgMemberId], references: [id])
+  approvedBy   OrgMember?             @relation("DailyReportApprovedBy", fields: [approvedByOrgMemberId], references: [id])
+  wbsNode      WbsNode?               @relation(fields: [wbsNodeId], references: [id])
+  budgetLine   BudgetLine?            @relation(fields: [budgetLineId], references: [id])
   labor        DailyReportLabor[]
   equipment    DailyReportEquipment[]
   photos       DailyReportPhoto[]
+  wbsNodes     DailyReportWbsNode[]
+  inventoryConsumptions InventoryConsumption[]
+  supplierInteractions  DailyReportSupplier[]
+  progressUpdates       WbsProgressUpdate[]
+  budgetLineActualCosts BudgetLineActualCost[]
+  inventoryMovements    InventoryMovement[]
+  financialTransactions FinanceTransaction[]
+  alerts                Alert[]
 
-  @@unique([projectId, reportDate])
   @@index([projectId])
+  @@index([projectId, reportDate])
+  @@index([status])
+  @@index([budgetLineId])
   @@map("daily_reports")
+  @@schema("public")
+}
+
+model DailyReportWbsNode {
+  id            String      @id @default(uuid())
+  dailyReportId String      @map("daily_report_id")
+  wbsNodeId     String      @map("wbs_node_id")
+  dailyReport   DailyReport @relation(fields: [dailyReportId], references: [id], onDelete: Cascade)
+  wbsNode       WbsNode     @relation(fields: [wbsNodeId], references: [id], onDelete: Cascade)
+  @@unique([dailyReportId, wbsNodeId])
+  @@index([dailyReportId])
+  @@index([wbsNodeId])
+  @@map("daily_report_wbs_nodes")
   @@schema("public")
 }
 
@@ -1881,6 +1997,138 @@ model DailyReportPhoto {
 
   @@index([dailyReportId])
   @@map("daily_report_photos")
+  @@schema("public")
+}
+
+// Tier 2 - Inventory consumptions linked to daily report
+model InventoryConsumption {
+  id                String   @id @default(uuid())
+  dailyReportId     String   @map("daily_report_id")
+  inventoryItemId   String   @map("inventory_item_id")
+  quantity          Decimal  @db.Decimal(15, 4)
+  unit              String
+  costPerUnit       Decimal? @map("cost_per_unit") @db.Decimal(15, 2)
+  totalCost         Decimal? @map("total_cost") @db.Decimal(15, 2)
+  movementId        String?  @map("movement_id")
+  metadata          Json     @default("{}")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  dailyReport     DailyReport     @relation(fields: [dailyReportId], references: [id], onDelete: Cascade)
+  inventoryItem   InventoryItem   @relation(fields: [inventoryItemId], references: [id])
+
+  @@index([dailyReportId])
+  @@index([inventoryItemId])
+  @@map("inventory_consumptions")
+  @@schema("public")
+}
+
+// Tier 2 - Supplier interactions per daily report
+model DailyReportSupplier {
+  id              String   @id @default(uuid())
+  dailyReportId   String   @map("daily_report_id")
+  globalPartyId   String   @map("global_party_id")
+  type            String   // PURCHASE|DELIVERY|ISSUE|COMMUNICATION|VISIT
+  amount          Decimal? @db.Decimal(15, 2)
+  currency        String   @default("USD")
+  quantity        Decimal? @db.Decimal(15, 4)
+  quantityUnit    String?  @map("quantity_unit")
+  deliveryStatus  String?  @map("delivery_status") // ON_TIME|LATE|PARTIAL|FULL
+  daysLate        Int?     @map("days_late")
+  invoiceNumber   String?  @map("invoice_number")
+  invoiceUrl      String?  @map("invoice_url")
+  description     String?  @db.Text
+  quality         String?  // PERFECT|GOOD|ACCEPTABLE|POOR|REJECTED
+  issues          String?  @db.Text
+  commitmentId    String?  @map("commitment_id")
+  paymentId       String?  @map("payment_id")
+  metadata        Json     @default("{}")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  dailyReport   DailyReport @relation(fields: [dailyReportId], references: [id], onDelete: Cascade)
+  globalParty   GlobalParty @relation(fields: [globalPartyId], references: [id])
+
+  @@index([dailyReportId])
+  @@index([globalPartyId])
+  @@index([type])
+  @@map("daily_report_suppliers")
+  @@schema("public")
+}
+
+// Tier 2 - WBS progress updates from daily reports
+model WbsProgressUpdate {
+  id              String   @id @default(uuid())
+  wbsNodeId       String   @map("wbs_node_id")
+  dailyReportId   String   @map("daily_report_id")
+  hoursAdded      Decimal  @map("hours_added") @db.Decimal(15, 2)
+  costAdded       Decimal? @map("cost_added") @db.Decimal(15, 2)
+  progressBefore  Decimal  @map("progress_before") @db.Decimal(5, 2)
+  progressAfter   Decimal  @map("progress_after") @db.Decimal(5, 2)
+  status          String   // ON_TRACK|AT_RISK|DELAYED|AHEAD
+  variance        Decimal? @db.Decimal(5, 2)
+  notes           String?  @db.Text
+  metadata        Json     @default("{}")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  wbsNode     WbsNode     @relation(fields: [wbsNodeId], references: [id])
+  dailyReport DailyReport @relation(fields: [dailyReportId], references: [id])
+
+  @@index([wbsNodeId])
+  @@index([dailyReportId])
+  @@index([status])
+  @@map("wbs_progress_updates")
+  @@schema("public")
+}
+
+// Tier 2 - Actual costs per budget line per daily report
+model BudgetLineActualCost {
+  id              String   @id @default(uuid())
+  budgetLineId    String   @map("budget_line_id")
+  dailyReportId   String   @map("daily_report_id")
+  laborCost       Decimal  @default(0) @map("labor_cost") @db.Decimal(15, 2)
+  materialCost    Decimal  @default(0) @map("material_cost") @db.Decimal(15, 2)
+  equipmentCost   Decimal  @default(0) @map("equipment_cost") @db.Decimal(15, 2)
+  subcontractCost Decimal @default(0) @map("subcontract_cost") @db.Decimal(15, 2)
+  otherCost       Decimal  @default(0) @map("other_cost") @db.Decimal(15, 2)
+  totalCost       Decimal  @map("total_cost") @db.Decimal(15, 2)
+  budgetedCost    Decimal? @map("budgeted_cost") @db.Decimal(15, 2)
+  variance        Decimal? @db.Decimal(5, 2)
+  date            DateTime @default(now())
+  metadata        Json     @default("{}")
+
+  budgetLine   BudgetLine   @relation(fields: [budgetLineId], references: [id])
+  dailyReport DailyReport   @relation(fields: [dailyReportId], references: [id])
+
+  @@unique([budgetLineId, dailyReportId])
+  @@index([budgetLineId])
+  @@index([date])
+  @@map("budget_line_actual_costs")
+  @@schema("public")
+}
+
+// Tier 2 - Alerts generated from daily report approval (WBS delayed, budget over, etc.)
+model Alert {
+  id                String    @id @default(uuid())
+  projectId         String    @map("project_id")
+  dailyReportId     String?   @map("daily_report_id")
+  type              String    // WBS_DELAYED|BUDGET_OVER|BUDGET_CRITICAL|CASHFLOW_RISK
+  severity          String    // INFO|WARNING|CRITICAL
+  title             String
+  description       String    @db.Text
+  affectedEntityId  String?   @map("affected_entity_id")   // wbsNodeId or budgetLineId
+  affectedEntityType String?  @map("affected_entity_type") // WBS|BUDGET
+  metadata          Json?     @default("{}")               // e.g. { variance: 15.5, budgeted: 5000, actual: 5775 }
+  resolved          Boolean   @default(false)
+  resolvedAt        DateTime? @map("resolved_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  project    Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  dailyReport DailyReport? @relation(fields: [dailyReportId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([dailyReportId])
+  @@index([type])
+  @@index([resolved])
+  @@map("alerts")
   @@schema("public")
 }
 
@@ -2073,7 +2321,7 @@ model WbsTemplate {
 model BudgetResourceTemplate {
   id             String   @id @default(uuid())
   wbsTemplateId  String   @map("wbs_template_id")
-  type           String   // MATERIAL, LABOR, SUBCONTRACT
+  type           String   // MATERIAL, LABOR, EQUIPMENT
   name           String
   description    String?  @db.Text
   unit           String

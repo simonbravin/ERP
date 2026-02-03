@@ -38,6 +38,7 @@ import {
 } from '@/app/actions/budget'
 import { toast } from 'sonner'
 import { formatCurrency, formatNumber } from '@/lib/format-utils'
+import { RESOURCE_TYPES } from '@/lib/constants/budget'
 import { Plus, Trash2, Save, Loader2 } from 'lucide-react'
 
 interface BudgetResourceRow {
@@ -104,25 +105,25 @@ export function APUEditorDialog({
   const totals = budgetLine?.resources.reduce(
     (acc, r) => {
       const total = r.quantity * r.unitCost
-      if (r.type === 'MATERIAL') acc.materials += total
-      else if (r.type === 'LABOR') acc.labor += total
-      else if (r.type === 'SUBCONTRACT') acc.subcontract += total
+      if (r.type === RESOURCE_TYPES.MATERIAL) acc.materials += total
+      else if (r.type === RESOURCE_TYPES.LABOR) acc.labor += total
+      else if (r.type === RESOURCE_TYPES.EQUIPMENT || r.type === 'SUBCONTRACT') acc.equipment += total
       acc.total += total
       return acc
     },
-    { materials: 0, labor: 0, subcontract: 0, total: 0 }
-  ) ?? { materials: 0, labor: 0, subcontract: 0, total: 0 }
+    { materials: 0, labor: 0, equipment: 0, total: 0 }
+  ) ?? { materials: 0, labor: 0, equipment: 0, total: 0 }
 
   const projectTotal = totals.total * (budgetLine?.quantity ?? 0)
 
-  const typeForTab = activeTab === 'materials' ? 'MATERIAL' : activeTab === 'labor' ? 'LABOR' : 'SUBCONTRACT'
+  const typeForTab = activeTab === 'materials' ? RESOURCE_TYPES.MATERIAL : activeTab === 'labor' ? RESOURCE_TYPES.LABOR : RESOURCE_TYPES.EQUIPMENT
 
   function handleAddResource() {
     if (!newResource.name.trim() || !budgetLine) return
 
     startTransition(async () => {
       const result = await addBudgetResource(budgetLineId, {
-        type: typeForTab as 'MATERIAL' | 'LABOR' | 'SUBCONTRACT',
+        type: typeForTab as 'MATERIAL' | 'LABOR' | 'EQUIPMENT',
         name: newResource.name.trim(),
         description: newResource.description.trim() || null,
         unit: newResource.unit,
@@ -217,9 +218,9 @@ export function APUEditorDialog({
 
   if (!budgetLine) return null
 
-  const materials = budgetLine.resources.filter((r) => r.type === 'MATERIAL')
-  const labor = budgetLine.resources.filter((r) => r.type === 'LABOR')
-  const subcontracts = budgetLine.resources.filter((r) => r.type === 'SUBCONTRACT')
+  const materials = budgetLine.resources.filter((r) => r.type === RESOURCE_TYPES.MATERIAL)
+  const labor = budgetLine.resources.filter((r) => r.type === RESOURCE_TYPES.LABOR)
+  const equipment = budgetLine.resources.filter((r) => r.type === RESOURCE_TYPES.EQUIPMENT || r.type === 'SUBCONTRACT')
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -250,9 +251,9 @@ export function APUEditorDialog({
             </p>
           </div>
           <div>
-            <p className="text-sm font-medium text-muted-foreground">{t('subcontracts', { defaultValue: 'Subcontratos' })}</p>
+            <p className="text-sm font-medium text-muted-foreground">{t('equipment', { defaultValue: 'Equipos' })}</p>
             <p className="mt-1 text-xl font-semibold text-orange-600 dark:text-orange-400">
-              {formatCurrency(totals.subcontract)}
+              {formatCurrency(totals.equipment)}
             </p>
           </div>
           <div className="border-l-2 border-border pl-4">
@@ -277,8 +278,8 @@ export function APUEditorDialog({
             <TabsTrigger value="labor">
               {t('labor', { defaultValue: 'Mano de obra' })} ({labor.length})
             </TabsTrigger>
-            <TabsTrigger value="subcontracts">
-              {t('subcontracts', { defaultValue: 'Subcontratos' })} ({subcontracts.length})
+            <TabsTrigger value="equipment">
+              {t('equipment', { defaultValue: 'Equipos' })} ({equipment.length})
             </TabsTrigger>
           </TabsList>
 
@@ -320,17 +321,17 @@ export function APUEditorDialog({
             />
           </TabsContent>
 
-          <TabsContent value="subcontracts" className="space-y-4">
+          <TabsContent value="equipment" className="space-y-4">
             <ResourceTable
-              resources={subcontracts}
-              type="SUBCONTRACT"
+              resources={equipment}
+              type={RESOURCE_TYPES.EQUIPMENT}
               onUpdate={handleUpdateResource}
               onDelete={handleDeleteResource}
               isPending={isPending}
               t={t}
             />
             <AddResourceForm
-              type="SUBCONTRACT"
+              type={RESOURCE_TYPES.EQUIPMENT}
               resource={newResource}
               onChange={setNewResource}
               onAdd={handleAddResource}
@@ -390,7 +391,7 @@ function ResourceTable({
             <TableHead className="w-[100px] text-right">{t('quantity', { defaultValue: 'Cantidad' })}</TableHead>
             <TableHead className="w-[120px] text-right">{t('unitCost', { defaultValue: 'Costo u.' })}</TableHead>
             <TableHead className="w-[120px] text-right">{t('subtotal', { defaultValue: 'Subtotal' })}</TableHead>
-            {type === 'MATERIAL' && (
+            {type === RESOURCE_TYPES.MATERIAL && (
               <TableHead className="w-[150px]">{t('supplier', { defaultValue: 'Proveedor' })}</TableHead>
             )}
             <TableHead className="w-[50px]" />
@@ -446,7 +447,7 @@ function ResourceTable({
               <TableCell className="text-right font-semibold tabular-nums">
                 {formatCurrency(resource.quantity * resource.unitCost)}
               </TableCell>
-              {type === 'MATERIAL' && (
+              {type === RESOURCE_TYPES.MATERIAL && (
                 <TableCell>
                   <Input
                     value={resource.supplierName ?? ''}
@@ -503,7 +504,7 @@ function AddResourceForm({
       ? t('materials', { defaultValue: 'Material' })
       : type === 'LABOR'
         ? t('labor', { defaultValue: 'Mano de obra' })
-        : t('subcontracts', { defaultValue: 'Subcontrato' })
+        : t('equipment', { defaultValue: 'Equipo' })
 
   return (
     <div className="rounded-lg border border-border bg-muted/20 p-4">
@@ -565,7 +566,7 @@ function AddResourceForm({
             disabled={isPending}
           />
         </div>
-        {type === 'MATERIAL' && (
+        {type === RESOURCE_TYPES.MATERIAL && (
           <div className="col-span-2">
             <Input
               placeholder={t('supplier', { defaultValue: 'Proveedor' })}
@@ -575,7 +576,7 @@ function AddResourceForm({
             />
           </div>
         )}
-        <div className={type === 'MATERIAL' ? 'col-span-1' : 'col-span-3'}>
+        <div className={type === RESOURCE_TYPES.MATERIAL ? 'col-span-1' : 'col-span-3'}>
           <Button onClick={onAdd} disabled={!resource.name.trim() || isPending} className="w-full">
             <Plus className="mr-1 h-4 w-4" />
             {t('add', { defaultValue: 'Agregar' })}

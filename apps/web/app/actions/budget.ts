@@ -727,7 +727,7 @@ async function recalcBudgetLineFromResources(budgetLineId: string) {
 }
 
 export type AddBudgetResourceInput = {
-  type: 'MATERIAL' | 'LABOR' | 'SUBCONTRACT'
+  type: 'MATERIAL' | 'LABOR' | 'EQUIPMENT'
   name: string
   description?: string | null
   unit: string
@@ -751,6 +751,10 @@ export async function addBudgetResource(
   if (!line) return { success: false, error: 'Línea no encontrada' }
   if (!isEditableVersion(line.budgetVersion.status)) {
     return { success: false, error: 'No se puede editar esta versión' }
+  }
+  const validTypes = ['MATERIAL', 'LABOR', 'EQUIPMENT'] as const
+  if (!validTypes.includes(data.type as (typeof validTypes)[number])) {
+    return { success: false, error: 'Tipo de recurso inválido' }
   }
 
   const totalCost = new Prisma.Decimal(data.quantity * data.unitCost)
@@ -857,5 +861,48 @@ export async function deleteBudgetResource(resourceId: string): Promise<{ succes
   await prisma.budgetResource.delete({ where: { id: resourceId } })
   await recalcBudgetLineFromResources(budgetLineId)
   revalidatePath(`/projects/${resource.budgetLine.budgetVersion.projectId}/budget/${resource.budgetLine.budgetVersionId}`)
+  return { success: true }
+}
+
+/** Update budget line quantity only; recalculates directCostTotal and salePriceTotal. */
+export async function updateBudgetLineQuantity(
+  budgetLineId: string,
+  newQuantity: number
+): Promise<{ success: boolean; error?: string }> {
+  const { org } = await getAuthContext()
+  requireRole(org.role, 'EDITOR')
+
+  if (newQuantity <= 0 || !Number.isFinite(newQuantity)) {
+    return { success: false, error: 'Cantidad inválida' }
+  }
+
+  const line = await prisma.budgetLine.findFirst({
+    where: { id: budgetLineId, orgId: org.orgId },
+    include: { budgetVersion: { select: { status: true, projectId: true } } },
+  })
+  if (!line) return { success: false, error: 'Línea no encontrada' }
+  if (!isEditableVersion(line.budgetVersion.status)) {
+    return { success: false, error: 'No se puede editar cantidad en versión aprobada' }
+  }
+
+  const qty = Number(line.quantity) || 1
+  const direct = Number(line.directCostTotal)
+  const sale = Number(line.salePriceTotal ?? line.directCostTotal)
+  const unitDirect = qty > 0 ? direct / qty : 0
+  const unitSale = qty > 0 ? sale / qty : 0
+  const newDirectCostTotal = new Prisma.Decimal(unitDirect * newQuantity)
+  const newSalePriceTotal = new Prisma.Decimal(unitSale * newQuantity)
+
+  await prisma.budgetLine.update({
+    where: { id: budgetLineId },
+    data: {
+      quantity: new Prisma.Decimal(newQuantity),
+      directCostTotal: newDirectCostTotal,
+      salePriceTotal: newSalePriceTotal,
+    },
+  })
+
+  revalidatePath(`/projects/${line.budgetVersion.projectId}/budget`)
+  revalidatePath(`/projects/${line.budgetVersion.projectId}/budget/${line.budgetVersionId}`)
   return { success: true }
 }

@@ -256,6 +256,15 @@ export default async function ProjectDetailPage({ params }: PageProps) {
               {t('documents')}
             </span>
           </Link>
+          <Link
+            href={`/projects/${project.id}/daily-reports`}
+            className="flex flex-col items-center gap-2 rounded-lg border border-slate-200 p-4 text-center transition-colors hover:bg-slate-50"
+          >
+            <FileText className="h-6 w-6 text-sky-600" />
+            <span className="text-sm font-medium text-slate-700">
+              {t('dailyReports')}
+            </span>
+          </Link>
         </div>
       </div>
     </div>

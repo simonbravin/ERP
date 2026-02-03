@@ -50,6 +50,7 @@ export default auth((req) => {
 
 export const config = {
   matcher: [
-    '/((?!api|_next|_vercel|.*\\..*).*)',
+    // Exclude api, _next, _vercel, static files (.*.), and /icon (favicon rewrite)
+    '/((?!api|_next|_vercel|icon|.*\\..*).*)',
   ],
 }

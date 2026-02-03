@@ -6,7 +6,9 @@ const withNextIntl = createNextIntlPlugin('./i18n/request.ts')
 const nextConfig: NextConfig = {
   reactStrictMode: true,
 
-  transpilePackages: ['@repo/database', '@repo/validators'],
+  transpilePackages: ['@repo/validators'],
+
+  serverExternalPackages: ['@prisma/client'],
 
   async rewrites() {
     return [{ source: '/favicon.ico', destination: '/icon' }]

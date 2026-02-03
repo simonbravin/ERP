@@ -18,6 +18,7 @@ const robotoMono = Roboto_Mono({
 export const metadata: Metadata = {
   title: 'Construction ERP',
   description: 'Multi-tenant Construction ERP SaaS',
+  icons: { icon: '/icon' },
 }
 
 export default function RootLayout({

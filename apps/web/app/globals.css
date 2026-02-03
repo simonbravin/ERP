@@ -366,5 +366,11 @@
 }
 
 @layer utilities {
-  /* Custom utilities if needed */
+  /* Custom slate-150 for budget tree hierarchy */
+  .bg-slate-150 {
+    background-color: hsl(215 16% 92%);
+  }
+  .dark .bg-slate-150 {
+    background-color: hsl(215 16% 18%);
+  }
 }

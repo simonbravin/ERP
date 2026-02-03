@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { getSession } from '@/lib/session'
+import { Package } from 'lucide-react'
 import { getOrgContext } from '@/lib/org-context'
 import { hasMinimumRole } from '@/lib/rbac'
 import { getProject } from '@/app/actions/projects'
@@ -98,6 +99,44 @@ export default async function BudgetVersionLinesPage({ params }: PageProps) {
   }
   const serializedWbsTree = (wbsTree ?? []).map((n) => serializeWbsNode(n as { id: string; code: string; name: string; category: string; parentId: string | null; unit: string | null; quantity: unknown; children: unknown[] }))
 
+  // Build tree data for BudgetVersionView: { wbsNode, lines, children } per node
+  type WbsNodeSerialized = { id: string; code: string; name: string; category: string; parentId: string | null; unit: string | null; quantity: number; children: WbsNodeSerialized[] }
+  type LineSerialized = ReturnType<typeof serializeLine>
+  const linesByWbsId = new Map<string, LineSerialized[]>()
+  for (const line of serializedLines) {
+    const id = line.wbsNode.id
+    if (!linesByWbsId.has(id)) linesByWbsId.set(id, [])
+    linesByWbsId.get(id)!.push(line)
+  }
+  function buildTreeData(nodes: WbsNodeSerialized[]): import('@/components/budget/budget-tree-table-admin').BudgetTreeNode[] {
+    return nodes.map((node) => {
+      const nodeLines = linesByWbsId.get(node.id) ?? []
+      const treeLines = nodeLines.map((l) => ({
+        id: l.id,
+        description: l.description,
+        unit: l.unit,
+        quantity: l.quantity,
+        directCostTotal: l.directCostTotal,
+        overheadPct: l.overheadPct,
+        financialPct: l.financialPct,
+        profitPct: l.profitPct,
+        taxPct: l.taxPct,
+        resources: (l.resources ?? []).map((r) => ({
+          id: r.id,
+          resourceType: r.resourceType,
+          quantity: r.quantity,
+          unitCost: r.unitCost,
+        })),
+      }))
+      return {
+        wbsNode: { id: node.id, code: node.code, name: node.name, category: node.category },
+        lines: treeLines,
+        children: buildTreeData(node.children ?? []),
+      }
+    })
+  }
+  const treeData = buildTreeData(serializedWbsTree as WbsNodeSerialized[])
+
   const computeSheetLines = (lines ?? [])
     .map((line) => {
       const qty = typeof line.quantity === 'number' ? line.quantity : Number(line.quantity)
@@ -133,16 +172,27 @@ export default async function BudgetVersionLinesPage({ params }: PageProps) {
           ← Budget
         </Link>
       </div>
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
           {version.versionCode} — {version.versionType} ({version.status})
         </h2>
-        <Link
-          href={`/projects/${projectId}/budget/${versionId}/compute`}
-          className="text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
-        >
-          Planilla de cómputo →
-        </Link>
+        <div className="flex items-center gap-3">
+          {(version.status === 'BASELINE' || version.status === 'APPROVED') && (
+            <Link
+              href={`/projects/${projectId}/budget/${versionId}/materials`}
+              className="inline-flex items-center text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+            >
+              <Package className="mr-1.5 h-4 w-4" />
+              Ver Materiales
+            </Link>
+          )}
+          <Link
+            href={`/projects/${projectId}/budget/${versionId}/compute`}
+            className="text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
+          >
+            Planilla de cómputo →
+          </Link>
+        </div>
       </div>
       <BudgetVersionTabs
         projectId={projectId}
@@ -150,12 +200,14 @@ export default async function BudgetVersionLinesPage({ params }: PageProps) {
         version={version}
         lines={serializedLines}
         wbsTree={serializedWbsTree}
+        treeData={treeData}
         computeSheetLines={computeSheetLines}
         versionTotal={versionTotal}
         wbsOptions={wbsOptions}
         otherVersions={otherVersions.map((v) => ({ id: v.id, versionCode: v.versionCode }))}
         canEdit={canEdit}
         canViewAdmin={canViewAdmin}
+        userRole={org.role}
         defaultIndirectPct={defaultIndirectPct}
       />
     </div>

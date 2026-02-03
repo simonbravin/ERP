@@ -7,7 +7,7 @@ import { listProjects } from '@/app/actions/projects'
 import { ProjectsListClient } from '@/components/projects/projects-list-client'
 import { Link } from '@/i18n/navigation'
 import { Button } from '@/components/ui/button'
-import { Plus } from 'lucide-react'
+import { Plus, FileSpreadsheet } from 'lucide-react'
 
 type PageProps = {
   searchParams: Promise<{ status?: string; phase?: string; search?: string }>
@@ -41,14 +41,22 @@ export default async function ProjectsPage({ searchParams }: PageProps) {
           </p>
         </div>
 
-        {/* New project button - only for EDITOR and above */}
+        {/* New project and Import - only for EDITOR and above */}
         {canEdit && (
-          <Button asChild>
-            <Link href="/projects/new">
-              <Plus className="mr-2 h-4 w-4" />
-              {t('newProject')}
-            </Link>
-          </Button>
+          <div className="flex gap-2">
+            <Button asChild variant="outline">
+              <Link href="/projects/import">
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                {t('importFromExcel', { defaultValue: 'Importar desde Excel' })}
+              </Link>
+            </Button>
+            <Button asChild>
+              <Link href="/projects/new">
+                <Plus className="mr-2 h-4 w-4" />
+                {t('newProject')}
+              </Link>
+            </Button>
+          </div>
         )}
       </div>
 
