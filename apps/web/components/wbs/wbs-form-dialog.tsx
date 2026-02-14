@@ -93,7 +93,7 @@ export function WbsFormDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="fixed inset-0 bg-black/50" aria-hidden onClick={onClose} />
       <div
-        className="relative z-10 w-full max-w-2xl erp-form-modal rounded-lg border border-border bg-card p-6 shadow-xl"
+        className="relative z-10 erp-form-modal rounded-lg border border-border bg-card p-6 shadow-xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="wbs-dialog-title"

@@ -19,9 +19,9 @@ export const RESOURCE_TYPE_LABELS_PLURAL: Record<ResourceType, string> = {
 }
 
 export const RESOURCE_TYPE_COLORS: Record<ResourceType, string> = {
-  MATERIAL: 'hsl(217 91% 60%)', // blue-500
-  LABOR: 'hsl(142 76% 36%)', // green-600
-  EQUIPMENT: 'hsl(25 95% 53%)', // orange-500
+  MATERIAL: 'hsl(var(--chart-1))',
+  LABOR: 'hsl(var(--chart-2))',
+  EQUIPMENT: 'hsl(var(--chart-3))',
 }
 
 export const RESOURCE_TYPE_ICONS: Record<ResourceType, string> = {

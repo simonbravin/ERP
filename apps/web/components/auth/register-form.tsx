@@ -258,7 +258,7 @@ export function RegisterForm({ onSwitchToLogin, embedded }: RegisterFormProps) {
         {onSwitchToLogin ? (
           <button
             type="button"
-            className="font-medium text-[#5D5CDE] underline hover:no-underline dark:text-[#8B8BEE]"
+            className="font-medium text-auth-primary underline hover:no-underline"
             onClick={onSwitchToLogin}
           >
             {t('signIn')}

@@ -785,28 +785,30 @@ model BudgetResource {
 }
 
 model ChangeOrder {
-  id                     String   @id @default(uuid())
-  orgId                  String   @map("org_id")
-  projectId              String   @map("project_id")
-  budgetVersionId        String?  @map("budget_version_id")
+  id                     String    @id @default(uuid())
+  orgId                  String    @map("org_id")
+  projectId              String    @map("project_id")
+  budgetVersionId        String?   @map("budget_version_id")
   number                 Int
   title                  String
-  status                 String   @default("DRAFT")
-  changeType             String   @map("change_type")
-  requestDate            DateTime @default(now()) @map("request_date") @db.Date
+  status                 String    @default("DRAFT")
+  changeType             String    @map("change_type")
+  budgetImpactType       String    @default("DEVIATION") @map("budget_impact_type") // DEVIATION | APPROVED_CHANGE
+  requestDate            DateTime  @default(now()) @map("request_date") @db.Date
   approvedDate           DateTime? @map("approved_date") @db.Date
   implementedDate        DateTime? @map("implemented_date") @db.Date
   reason                 String
   justification          String?
-  costImpact             Decimal  @map("cost_impact") @db.Decimal(15, 2)
-  timeImpactDays         Int      @default(0) @map("time_impact_days")
-  requestedByOrgMemberId String   @map("requested_by_org_member_id")
-  approvedByOrgMemberId  String?  @map("approved_by_org_member_id")
-  rejectionReason        String?  @map("rejection_reason")
-  feedbackRequested      String?  @map("feedback_requested")
-  workflowInstanceId     String?  @map("workflow_instance_id")
-  createdAt              DateTime @default(now()) @map("created_at")
-  updatedAt              DateTime @updatedAt @map("updated_at")
+  costImpact             Decimal   @map("cost_impact") @db.Decimal(15, 2)
+  timeImpactDays         Int       @default(0) @map("time_impact_days")
+  requestedByOrgMemberId String    @map("requested_by_org_member_id")
+  approvedByOrgMemberId  String?   @map("approved_by_org_member_id")
+  partyId                String?   @map("party_id")
+  rejectionReason        String?   @map("rejection_reason")
+  feedbackRequested      String?   @map("feedback_requested")
+  workflowInstanceId     String?   @map("workflow_instance_id")
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
 
   // Relations
   organization  Organization    @relation(fields: [orgId], references: [id], onDelete: Cascade)
@@ -814,11 +816,13 @@ model ChangeOrder {
   budgetVersion BudgetVersion?  @relation(fields: [budgetVersionId], references: [id])
   requestedBy   OrgMember       @relation("ChangeOrderRequestedBy", fields: [requestedByOrgMemberId], references: [id])
   approvedBy    OrgMember?      @relation("ChangeOrderApprovedBy", fields: [approvedByOrgMemberId], references: [id])
+  party         Party?          @relation(fields: [partyId], references: [id])
   lines         ChangeOrderLine[]
   approvals     ChangeOrderApproval[]
 
   @@unique([projectId, number])
   @@index([projectId, status])
+  @@index([projectId, budgetImpactType])
   @@map("change_orders")
   @@schema("public")
 }
@@ -893,6 +897,7 @@ model Party {
   commitments         Commitment[]
   submittals          Submittal[]
   suppliedResources   Resource[]
+  changeOrders        ChangeOrder[]
 
   @@index([orgId, partyType])
   @@index([orgId, name])

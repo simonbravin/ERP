@@ -21,7 +21,7 @@ export default async function FinanceTransactionsPage() {
   const canCreate = hasMinimumRole(org.role, 'ACCOUNTANT')
 
   return (
-    <div className="p-6">
+    <div className="space-y-4">
       <CompanyTransactionsListClient
         initialTransactions={transactions ?? []}
         filterOptions={filterOptions ?? { projects: [], parties: [] }}

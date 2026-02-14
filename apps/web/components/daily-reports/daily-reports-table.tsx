@@ -20,7 +20,7 @@ function StatusBadge({ statusKey, label }: { statusKey: string; label: string })
   const styles: Record<string, string> = {
     DRAFT: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
     SUBMITTED: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400',
-    APPROVED: 'bg-[#7d9d7a]/20 text-[#4a6741] dark:bg-[#7d9d7a]/25 dark:text-[#9fbd9a]',
+    APPROVED: 'badge-success',
     PUBLISHED: 'bg-violet-100/80 text-violet-700 dark:bg-violet-900/25 dark:text-violet-400',
   }
   return (

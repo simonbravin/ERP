@@ -17,6 +17,7 @@
     "db:seed-presupuesto-oficial": "tsx src/seed-presupuesto-oficial.ts",
     "set-bravin-admin": "tsx src/set-bravin-admin.ts",
     "set-bravin-password": "tsx src/set-bravin-password.ts",
+    "set-superadmin-password": "tsx src/set-superadmin-password.ts",
     "build": "prisma generate",
     "lint": "echo \"Add lint\""
   },

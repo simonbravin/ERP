@@ -54,6 +54,10 @@ export type MessageBusEventType =
   | 'PARTY.UPDATED'
   | 'PARTY.LINKED'
   | 'PARTY.UNLINKED'
+  // Change orders
+  | 'CHANGE_ORDER.CREATED'
+  | 'CHANGE_ORDER.UPDATED'
+  | 'CHANGE_ORDER.APPROVED'
 
 /** All event types for "subscribe to all" (e.g. debug widget). */
 export const ALL_MESSAGE_BUS_EVENT_TYPES: MessageBusEventType[] = [
@@ -98,6 +102,9 @@ export const ALL_MESSAGE_BUS_EVENT_TYPES: MessageBusEventType[] = [
   'PARTY.UPDATED',
   'PARTY.LINKED',
   'PARTY.UNLINKED',
+  'CHANGE_ORDER.CREATED',
+  'CHANGE_ORDER.UPDATED',
+  'CHANGE_ORDER.APPROVED',
 ]
 
 export type MessageBusPayload = {

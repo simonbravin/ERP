@@ -2,6 +2,7 @@ import { redirectToLogin } from '@/lib/i18n-redirect'
 import { getSession } from '@/lib/session'
 import { getOrgContext } from '@/lib/org-context'
 import { prisma } from '@repo/database'
+import { serializeForClient } from '@/lib/utils/serialization'
 import { PageHeader } from '@/components/layout/page-header'
 import { ItemsListClient } from '@/components/inventory/items-list-client'
 import { Button } from '@/components/ui/button'
@@ -133,11 +134,13 @@ export default async function InventoryItemsListPage({
 
   const categoryOptions = categories.map((c) => ({ id: c.id, name: c.name }))
 
+  const itemsPlain = filteredItems.map((item) => serializeForClient(item))
+
   return (
     <div className="h-full">
       <PageHeader
         title="Items de Inventario"
-        subtitle={`${filteredItems.length} items encontrados`}
+        subtitle={`${itemsPlain.length} items encontrados`}
         actions={
           <Button asChild variant="default">
             <Link href="/inventory/items/new">
@@ -149,7 +152,7 @@ export default async function InventoryItemsListPage({
       />
 
       <div className="p-6">
-        <ItemsListClient items={filteredItems} categories={categoryOptions} />
+        <ItemsListClient items={itemsPlain} categories={categoryOptions} />
       </div>
     </div>
   )

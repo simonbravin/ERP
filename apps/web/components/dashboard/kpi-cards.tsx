@@ -49,10 +49,7 @@ export function KPICards({ kpis }: KPICardsProps) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {cards.map((card) => (
-        <div
-          key={card.title}
-          className="rounded-lg border border-border bg-card p-6 shadow-sm transition-shadow hover:shadow-md"
-        >
+        <div key={card.title} className="erp-card p-6 erp-transition-colors hover:shadow-[var(--shadow-card-hover)]">
           <div className="flex items-center justify-between">
             <div className="flex-1">
               <p className="text-sm font-medium text-muted-foreground">{card.title}</p>

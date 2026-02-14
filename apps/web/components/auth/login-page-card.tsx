@@ -12,9 +12,6 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
-/** VBT-style: púrpura sólido profundo (ERD/brand) */
-const BRAND_PURPLE = '#4A49A8'
-
 const features = [
   { icon: LayoutDashboard, textKey: 'featureDashboard' as const },
   { icon: FileSpreadsheet, textKey: 'featureBudget' as const },
@@ -36,10 +33,7 @@ export function LoginPageCard({ initialTab = 'login' }: LoginPageCardProps) {
   return (
     <div className="w-full max-w-4xl overflow-hidden rounded-2xl bg-card shadow-xl md:flex md:min-h-[520px]">
       {/* Left: Brand — bloque centrado en la vista, texto alineado a la izquierda (estética VBT) */}
-      <div
-        className="flex flex-col justify-center px-10 py-12 text-primary-foreground md:w-[45%] md:min-w-[280px] md:px-12 md:py-14"
-        style={{ backgroundColor: BRAND_PURPLE }}
-      >
+      <div className="flex flex-col justify-center px-10 py-12 text-primary-foreground bg-auth-primary md:w-[45%] md:min-w-[280px] md:px-12 md:py-14">
         <div className="mx-auto w-full max-w-[20rem] text-left">
           <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
             Construction ERP

@@ -207,7 +207,8 @@ export function APUEditorDialog({
   if (isLoading) {
     return (
       <Dialog open onOpenChange={() => onClose()}>
-        <DialogContent className="max-w-6xl max-h-[90vh]">
+        <DialogContent className="max-w-6xl max-h-[90vh]" aria-describedby={undefined}>
+          <DialogTitle className="sr-only">Cargando APU…</DialogTitle>
           <div className="flex items-center justify-center p-12">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>

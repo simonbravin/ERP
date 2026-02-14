@@ -11,7 +11,9 @@ export type ChangeOrderRow = {
   displayNumber: string
   title: string
   status: string
+  budgetImpactType: string | null
   costImpact: number
+  timeImpactDays: number
   requestDate: Date
   requestedBy: { user: { fullName: string } }
 }
@@ -37,19 +39,23 @@ function formatDate(d: Date): string {
 
 function StatusBadge({ status, label }: { status: string; label: string }) {
   const styles: Record<string, string> = {
-    DRAFT: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300',
-    SUBMITTED: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
-    APPROVED: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400',
-    REJECTED: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-    CHANGES_REQUESTED: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+    DRAFT: 'badge-neutral',
+    SUBMITTED: 'badge-warning',
+    APPROVED: 'badge-success',
+    REJECTED: 'badge-danger',
+    CHANGES_REQUESTED: 'badge-info',
   }
   return (
-    <span
-      className={cn(
-        'rounded px-2 py-0.5 text-xs font-medium',
-        styles[status] ?? 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
-      )}
-    >
+    <span className={cn('rounded px-2 py-0.5 text-xs font-medium', styles[status] ?? 'badge-neutral')}>
+      {label}
+    </span>
+  )
+}
+
+function BudgetImpactBadge({ type, label }: { type: string; label: string }) {
+  const className = type === 'APPROVED_CHANGE' ? 'badge-success' : 'badge-neutral'
+  return (
+    <span className={cn('rounded px-2 py-0.5 text-xs font-medium', className)}>
       {label}
     </span>
   )
@@ -61,7 +67,7 @@ export function COList({ projectId, orders, canEdit }: COListProps) {
 
   if (orders.length === 0) {
     return (
-      <div className="rounded-lg border border-gray-200 bg-white py-12 text-center text-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400">
+      <div className="erp-panel py-12 text-center text-muted-foreground">
         {t('noChangeOrdersYet')}
       </div>
     )
@@ -75,37 +81,53 @@ export function COList({ projectId, orders, canEdit }: COListProps) {
     CHANGES_REQUESTED: t('statusChangesRequested'),
   }
 
+  const budgetImpactLabels: Record<string, string> = {
+    DEVIATION: t('budgetImpactDeviation'),
+    APPROVED_CHANGE: t('budgetImpactApproved'),
+  }
+
   return (
-    <div className="rounded-lg border border-gray-200 dark:border-gray-700">
+    <div className="erp-panel overflow-hidden">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50">
-            <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">{t('number')}</th>
-            <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">{t('title_field')}</th>
-            <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">{t('requestedBy')}</th>
-            <th className="px-3 py-2 text-right font-medium text-gray-600 dark:text-gray-400">{t('amount')}</th>
-            <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">{t('status')}</th>
-            <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">{t('date')}</th>
+          <tr className="border-b border-border bg-muted/50">
+            <th className="px-3 py-2 text-left font-medium text-muted-foreground">{t('number')}</th>
+            <th className="px-3 py-2 text-left font-medium text-muted-foreground">{t('title_field')}</th>
+            <th className="px-3 py-2 text-left font-medium text-muted-foreground">{t('requestedBy')}</th>
+            <th className="px-3 py-2 text-right font-medium text-muted-foreground">{t('amount')}</th>
+            <th className="px-3 py-2 text-right font-medium text-muted-foreground">{t('timeImpactDays')}</th>
+            <th className="px-3 py-2 text-left font-medium text-muted-foreground">{t('status')}</th>
+            <th className="px-3 py-2 text-left font-medium text-muted-foreground">{t('budgetImpactType')}</th>
+            <th className="px-3 py-2 text-left font-medium text-muted-foreground">{t('date')}</th>
             <th className="w-20 px-3 py-2" />
           </tr>
         </thead>
         <tbody>
           {orders.map((row) => (
-            <tr key={row.id} className="border-b border-gray-100 dark:border-gray-800">
-              <td className="whitespace-nowrap px-3 py-2 font-mono text-gray-700 dark:text-gray-300">
+            <tr key={row.id} className="border-b border-border last:border-0">
+              <td className="whitespace-nowrap px-3 py-2 font-mono text-foreground">
                 {row.displayNumber}
               </td>
-              <td className="px-3 py-2 font-medium text-gray-900 dark:text-white">{row.title}</td>
-              <td className="px-3 py-2 text-gray-600 dark:text-gray-400">
+              <td className="px-3 py-2 font-medium text-foreground">{row.title}</td>
+              <td className="px-3 py-2 text-muted-foreground">
                 {row.requestedBy.user.fullName}
               </td>
-              <td className="text-right tabular-nums text-gray-700 dark:text-gray-300">
+              <td className="text-right tabular-nums text-foreground">
                 {formatCurrency(row.costImpact)}
+              </td>
+              <td className="px-3 py-2 text-right text-muted-foreground">
+                {row.timeImpactDays ?? 0}
               </td>
               <td className="px-3 py-2">
                 <StatusBadge status={row.status} label={statusLabels[row.status] ?? row.status.replace('_', ' ')} />
               </td>
-              <td className="px-3 py-2 text-gray-500 dark:text-gray-400">
+              <td className="px-3 py-2">
+                <BudgetImpactBadge
+                  type={row.budgetImpactType ?? 'DEVIATION'}
+                  label={budgetImpactLabels[row.budgetImpactType ?? 'DEVIATION'] ?? row.budgetImpactType ?? 'DEVIATION'}
+                />
+              </td>
+              <td className="px-3 py-2 text-muted-foreground">
                 {formatDate(row.requestDate)}
               </td>
               <td className="px-3 py-2">

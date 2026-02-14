@@ -72,7 +72,7 @@ export function InviteUserDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl">
+      <DialogContent className="erp-form-modal max-w-xl">
         <DialogHeader>
           <DialogTitle>Invitar Usuario</DialogTitle>
           <DialogDescription>
@@ -82,49 +82,56 @@ export function InviteUserDialog({
 
         <form
           onSubmit={form.handleSubmit(handleSubmit)}
-          className="space-y-4"
+          className="space-y-6"
         >
-          <div>
-            <Label htmlFor="invite-email">Email</Label>
-            <Input
-              id="invite-email"
-              type="email"
-              placeholder="usuario@ejemplo.com"
-              className="mt-1"
-              {...form.register('email')}
-            />
-            {form.formState.errors.email && (
-              <p className="mt-1 text-sm text-destructive">
-                {form.formState.errors.email.message}
-              </p>
-            )}
-          </div>
-
-          <div>
-            <Label htmlFor="invite-role">Rol</Label>
-            <Select
-              value={form.watch('role')}
-              onValueChange={(v) => form.setValue('role', v as FormData['role'])}
-            >
-              <SelectTrigger id="invite-role" className="mt-1">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {(
-                  Object.entries(ROLE_DESCRIPTIONS) as [OrgRole, string][]
-                ).map(
-                  ([role, desc]) =>
-                    role !== 'OWNER' && (
-                      <SelectItem key={role} value={role}>
-                        {role} — {desc}
-                      </SelectItem>
-                    )
+          <div className="rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-900">
+            <div className="space-y-6">
+              <div>
+                <Label htmlFor="invite-email">Email</Label>
+                <Input
+                  id="invite-email"
+                  type="email"
+                  placeholder="usuario@ejemplo.com"
+                  className="mt-1"
+                  {...form.register('email')}
+                />
+                {form.formState.errors.email && (
+                  <p className="mt-1 text-sm text-destructive">
+                    {form.formState.errors.email.message}
+                  </p>
                 )}
-              </SelectContent>
-            </Select>
-            <p className="mt-1 text-xs text-slate-500">
-              {ROLE_DESCRIPTIONS[form.watch('role') as OrgRole]}
-            </p>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  La persona recibirá un enlace para unirse a la organización
+                </p>
+              </div>
+
+              <div>
+                <Label htmlFor="invite-role">Rol</Label>
+                <Select
+                  value={form.watch('role')}
+                  onValueChange={(v) => form.setValue('role', v as FormData['role'])}
+                >
+                  <SelectTrigger id="invite-role" className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(
+                      Object.entries(ROLE_DESCRIPTIONS) as [OrgRole, string][]
+                    ).map(
+                      ([role, desc]) =>
+                        role !== 'OWNER' && (
+                          <SelectItem key={role} value={role}>
+                            {role} — {desc}
+                          </SelectItem>
+                        )
+                    )}
+                  </SelectContent>
+                </Select>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {ROLE_DESCRIPTIONS[form.watch('role') as OrgRole]}
+                </p>
+              </div>
+            </div>
           </div>
 
           <DialogFooter>

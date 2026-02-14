@@ -47,12 +47,10 @@ export default async function WbsPage({ params }: PageProps) {
   const canEdit = ['EDITOR', 'ADMIN', 'OWNER'].includes(org.role)
 
   return (
-    <div className="space-y-6 p-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">
-          {t('title')}
-        </h1>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+    <div className="erp-view-container space-y-6">
+      <div className="erp-section-header">
+        <h1 className="erp-page-title">{t('title')}</h1>
+        <p className="erp-section-desc">
           {project.name} ({project.projectNumber})
         </p>
       </div>

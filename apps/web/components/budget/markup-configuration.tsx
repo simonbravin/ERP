@@ -166,20 +166,14 @@ export function MarkupConfiguration({
         </CardHeader>
 
         <CardContent className="space-y-3 pb-4 pt-0">
-          <div
-            className={`rounded border px-2.5 py-2 text-xs ${
-              mode === 'SIMPLE'
-                ? 'border-blue-200 bg-blue-50'
-                : 'border-purple-200 bg-purple-50'
-            }`}
-          >
+          <div className="rounded border border-border bg-muted/50 px-2.5 py-2 text-xs">
             <div className="flex items-start gap-2">
-              <Info className="h-3.5 w-3.5 shrink-0 mt-0.5 text-blue-600" />
+              <Info className="h-3.5 w-3.5 shrink-0 mt-0.5 text-primary" />
               <div>
                 {mode === 'SIMPLE' ? (
-                  <p className="font-medium text-blue-900">{t('simpleModeTitle')}: {t('simpleModeDesc')}</p>
+                  <p className="font-medium text-foreground">{t('simpleModeTitle')}: {t('simpleModeDesc')}</p>
                 ) : (
-                  <p className="font-medium text-purple-900">{t('advancedModeTitle')}: {t('advancedModeDesc')}</p>
+                  <p className="font-medium text-foreground">{t('advancedModeTitle')}: {t('advancedModeDesc')}</p>
                 )}
               </div>
             </div>
@@ -187,7 +181,7 @@ export function MarkupConfiguration({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 {t('globalMarkupsBase')}
               </h3>
               <div className="space-y-1.5">
@@ -211,7 +205,7 @@ export function MarkupConfiguration({
                     disabled={!canEdit || isPending}
                     className="h-8 w-20 text-right text-sm"
                   />
-                  <span className="font-mono text-xs tabular-nums text-slate-700">
+                  <span className="font-mono text-xs tabular-nums text-muted-foreground">
                     {formatCurrency(overheadAmount)}
                   </span>
                 </div>
@@ -235,7 +229,7 @@ export function MarkupConfiguration({
                     disabled={!canEdit || isPending}
                     className="h-8 w-20 text-right text-sm"
                   />
-                  <span className="font-mono text-xs tabular-nums text-slate-700">
+                  <span className="font-mono text-xs tabular-nums text-muted-foreground">
                     {formatCurrency(financialAmount)}
                   </span>
                 </div>
@@ -259,7 +253,7 @@ export function MarkupConfiguration({
                     disabled={!canEdit || isPending}
                     className="h-8 w-20 text-right text-sm"
                   />
-                  <span className="font-mono text-xs tabular-nums text-slate-700">
+                  <span className="font-mono text-xs tabular-nums text-muted-foreground">
                     {formatCurrency(profitAmount)}
                   </span>
                 </div>
@@ -283,7 +277,7 @@ export function MarkupConfiguration({
                     disabled={!canEdit || isPending}
                     className="h-8 w-20 text-right text-sm"
                   />
-                  <span className="font-mono text-xs tabular-nums text-slate-700">
+                  <span className="font-mono text-xs tabular-nums text-muted-foreground">
                     {formatCurrency(taxAmount)}
                   </span>
                 </div>

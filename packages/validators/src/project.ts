@@ -1,5 +1,20 @@
 import { z } from 'zod'
 
+/** Parse YYYY-MM-DD as UTC noon so the calendar day does not shift in any timezone */
+function parseDateOnly(v: unknown): Date | undefined | null {
+  if (v === '' || v === undefined) return undefined
+  if (v === null) return null
+  if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)) {
+    const parts = v.split('-').map(Number)
+    const y = parts[0] ?? 0
+    const m = (parts[1] ?? 1) - 1
+    const d = parts[2] ?? 1
+    return new Date(Date.UTC(y, m, d, 12, 0, 0, 0))
+  }
+  if (v instanceof Date) return v
+  return z.coerce.date().parse(v)
+}
+
 export const createProjectSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido').max(255),
   clientName: z.string().max(255).optional(),
@@ -9,13 +24,12 @@ export const createProjectSchema = z.object({
     (v) => (v === '' || v === undefined ? undefined : v),
     z.coerce.number().positive().optional().nullable()
   ),
-  startDate: z.preprocess(
-    (v) => (v === '' || v === undefined ? undefined : v),
-    z.coerce.date().optional().nullable()
-  ),
+  startDate: z.preprocess(parseDateOnly, z.date().optional().nullable()),
 })
 
 export type CreateProjectInput = z.infer<typeof createProjectSchema>
+
+const PROJECT_PHASE_ENUM = z.enum(['PRE_CONSTRUCTION', 'CONSTRUCTION', 'CLOSEOUT', 'COMPLETE'])
 
 export const updateProjectSchema = z.object({
   name: z.string().min(1).max(255).optional(),
@@ -24,8 +38,13 @@ export const updateProjectSchema = z.object({
   location: z.string().max(255).optional().nullable(),
   m2: z.coerce.number().positive().optional().nullable(),
   status: z.string().max(50).optional(),
-  startDate: z.coerce.date().optional().nullable(),
-  plannedEndDate: z.coerce.date().optional().nullable(),
+  // Mismo tratamiento que status: preprocess vacío → undefined para no fallar; enum igual que Prisma
+  phase: z.preprocess(
+    (v) => (v === '' || v === undefined ? undefined : v),
+    PROJECT_PHASE_ENUM.optional()
+  ),
+  startDate: z.preprocess(parseDateOnly, z.date().optional().nullable()),
+  plannedEndDate: z.preprocess(parseDateOnly, z.date().optional().nullable()),
   active: z.boolean().optional(),
 })
 

@@ -23,7 +23,7 @@ export function VersionList({
   const t = useTranslations('budget')
   if (versions.length === 0) {
     return (
-      <div className="rounded-lg border border-gray-200 bg-white py-12 text-center text-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400">
+      <div className="erp-card py-12 text-center text-muted-foreground">
         {t('noBudgetVersionsYet')}
       </div>
     )

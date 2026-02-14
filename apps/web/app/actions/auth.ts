@@ -60,7 +60,7 @@ async function resolveEmailFromLogin(value: string): Promise<string | null> {
 
 const CREDENTIALS_ERROR = { _form: ['Usuario o contraseña incorrectos'] as const }
 
-/** Login exclusivo para Super Admin: usuario y contraseña obligatorios, sin sugerencias. */
+/** Valida credenciales Super Admin y devuelve el email si son correctas. El cliente hace signIn para que la sesión se establezca bien a la primera. */
 export async function superAdminLogin(username: string, password: string) {
   const trimmedUser = username?.trim()
   const trimmedPassword = password?.trim()
@@ -96,21 +96,15 @@ export async function superAdminLogin(username: string, password: string) {
         data: { isSuperAdmin: true },
       })
     }
-    const result = await signIn('credentials', {
-      email: user.email,
-      password: trimmedPassword,
-      redirect: false,
-    })
-    if (result?.error || !result?.ok) {
-      return { error: CREDENTIALS_ERROR }
-    }
-    return redirectTo('/super-admin')
+    // Devolver éxito con email para que el cliente llame a signIn (evita fallo de sesión en primer intento)
+    return { ok: true, email: user.email }
   } catch (err) {
     console.error('[auth] superAdminLogin error:', err)
     return { error: CREDENTIALS_ERROR }
   }
 }
 
+/** Valida credenciales y devuelve email + isSuperAdmin si son correctas. El cliente hace signIn para que la sesión se establezca bien a la primera. */
 export async function login(credentials: LoginFormInput) {
   const parsed = loginFormSchema.safeParse(credentials)
   if (!parsed.success) {
@@ -122,7 +116,6 @@ export async function login(credentials: LoginFormInput) {
     if (!email) {
       return { error: CREDENTIALS_ERROR }
     }
-    // Validar contra la DB aquí; si falla, no llamar a signIn (evita bugs de Auth.js con server actions)
     const user = await prisma.user.findFirst({
       where: { email, active: true },
       select: { id: true, passwordHash: true, isSuperAdmin: true },
@@ -134,15 +127,8 @@ export async function login(credentials: LoginFormInput) {
     if (!valid) {
       return { error: CREDENTIALS_ERROR }
     }
-    // Credenciales correctas: iniciar sesión vía Auth.js
-    const result = await signIn('credentials', { email, password, redirect: false })
-    if (result?.error || !result?.ok) {
-      return { error: CREDENTIALS_ERROR }
-    }
-    if (user.isSuperAdmin) {
-      return redirectTo('/super-admin')
-    }
-    return redirectTo('/dashboard')
+    // Devolver éxito para que el cliente llame a signIn (evita fallo de sesión en primer intento)
+    return { ok: true, email, isSuperAdmin: user.isSuperAdmin === true }
   } catch (err) {
     console.error('[auth] login error:', err)
     return { error: CREDENTIALS_ERROR }

@@ -25,6 +25,20 @@ type PageProps = {
   params: Promise<{ id: string }>
 }
 
+/** Formatea una fecha solo-día usando componentes UTC para no desfasarse un día en otras zonas horarias */
+function formatDateOnly(d: Date): string {
+  const y = d.getUTCFullYear()
+  const m = d.getUTCMonth()
+  const day = d.getUTCDate()
+  return new Date(y, m, day).toLocaleDateString('es-AR', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  })
+}
+
+export const dynamic = 'force-dynamic'
+
 export default async function ProjectDetailPage({ params }: PageProps) {
   const session = await getSession()
   if (!session?.user?.id) return notFound()
@@ -110,17 +124,17 @@ export default async function ProjectDetailPage({ params }: PageProps) {
           </div>
         </div>
 
-        {/* Client */}
+        {/* Status */}
         <div className="erp-card-elevated p-5">
           <div className="flex items-center gap-3">
             <div className="rounded-lg bg-blue-100 p-2">
-              <User className="h-5 w-5 text-blue-600" />
+              <CheckSquare className="h-5 w-5 text-blue-600" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">{t('client')}</p>
-              <p className="text-lg font-medium text-foreground truncate">
-                {project.clientName || '—'}
-              </p>
+              <p className="text-sm text-muted-foreground">{t('status')}</p>
+              <div className="mt-1">
+                <ProjectStatusBadge status={project.status} />
+              </div>
             </div>
           </div>
         </div>
@@ -135,11 +149,7 @@ export default async function ProjectDetailPage({ params }: PageProps) {
               <p className="text-sm text-muted-foreground">{t('startDate')}</p>
               <p className="text-lg font-medium text-foreground">
                 {project.startDate
-                  ? new Date(project.startDate).toLocaleDateString('es-AR', {
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric',
-                    })
+                  ? formatDateOnly(new Date(project.startDate))
                   : '—'}
               </p>
             </div>
@@ -153,6 +163,17 @@ export default async function ProjectDetailPage({ params }: PageProps) {
           Detalles del Proyecto
         </h2>
         <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {(project.clientName != null && project.clientName !== '') && (
+            <div className="flex items-start gap-3">
+              <User className="h-5 w-5 text-muted-foreground mt-0.5" />
+              <div>
+                <dt className="text-sm text-muted-foreground">{t('client')}</dt>
+                <dd className="text-sm font-medium text-foreground">
+                  {project.clientName}
+                </dd>
+              </div>
+            </div>
+          )}
           {project.location && (
             <div className="flex items-start gap-3">
               <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
@@ -181,11 +202,7 @@ export default async function ProjectDetailPage({ params }: PageProps) {
               <div>
                 <dt className="text-sm text-muted-foreground">{t('plannedEndDate')}</dt>
                 <dd className="text-sm font-medium text-foreground">
-                  {new Date(project.plannedEndDate).toLocaleDateString('es-AR', {
-                    year: 'numeric',
-                    month: 'short',
-                    day: 'numeric',
-                  })}
+                  {formatDateOnly(new Date(project.plannedEndDate))}
                 </dd>
               </div>
             </div>

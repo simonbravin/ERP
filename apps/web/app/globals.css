@@ -59,6 +59,16 @@
     --status-info: 210 42% 50%;
     --status-info-foreground: 210 60% 20%;
 
+    /* Phase (project phase badges) */
+    --phase-pre-construction: 263 70% 50%;
+    --phase-pre-construction-foreground: 263 45% 18%;
+    --phase-construction: 217 91% 60%;
+    --phase-construction-foreground: 217 70% 22%;
+    --phase-closeout: 215 16% 47%;
+    --phase-closeout-foreground: 222 25% 14%;
+    --phase-complete: 152 69% 40%;
+    --phase-complete-foreground: 152 45% 18%;
+
     /* Sidebar */
     --sidebar: 222 36% 20%;
     --sidebar-foreground: 210 22% 96%;
@@ -78,6 +88,11 @@
     --chart-3: 28 68% 50%;
     --chart-4: 6 52% 50%;
     --chart-5: 218 24% 38%;
+
+    /* Auth (login/register brand) */
+    --auth-primary: 241 68% 62%;
+    --auth-primary-hover: 241 39% 47%;
+    --auth-primary-foreground: 0 0% 100%;
   }
 
   .dark {
@@ -97,7 +112,7 @@
     --secondary-foreground: 213 22% 95%;
 
     --muted: 218 20% 16%;
-    --muted-foreground: 215 18% 64%;
+    --muted-foreground: 215 14% 72%;
 
     --accent: 28 70% 56%;
     --accent-foreground: 222 26% 9%;
@@ -129,6 +144,21 @@
     --status-neutral-foreground: 210 20% 96%;
     --status-info: 210 60% 60%;
     --status-info-foreground: 210 20% 96%;
+
+    /* Phase (project phase badges) */
+    --phase-pre-construction: 263 55% 58%;
+    --phase-pre-construction-foreground: 263 25% 92%;
+    --phase-construction: 217 80% 62%;
+    --phase-construction-foreground: 210 20% 96%;
+    --phase-closeout: 215 18% 55%;
+    --phase-closeout-foreground: 210 20% 96%;
+    --phase-complete: 152 55% 48%;
+    --phase-complete-foreground: 210 20% 96%;
+
+    /* Auth (login/register brand) */
+    --auth-primary: 241 76% 75%;
+    --auth-primary-hover: 241 55% 65%;
+    --auth-primary-foreground: 0 0% 100%;
 
     /* Sidebar */
     --sidebar: 217 22% 16%;
@@ -163,7 +193,7 @@
     --border: 220 22% 16%;
     --input: 220 22% 16%;
     --muted: 220 20% 14%;
-    --muted-foreground: 215 18% 62%;
+    --muted-foreground: 215 14% 72%;
     --primary: 210 25% 92%;
     --primary-foreground: 224 30% 8%;
     --secondary: 220 22% 14%;
@@ -193,7 +223,7 @@
     --border: 215 18% 20%;
     --input: 215 18% 20%;
     --muted: 215 16% 16%;
-    --muted-foreground: 215 14% 62%;
+    --muted-foreground: 215 14% 72%;
     --primary: 210 20% 92%;
     --primary-foreground: 215 22% 10%;
     --secondary: 215 18% 16%;
@@ -241,6 +271,15 @@
   --color-status-neutral-foreground: hsl(var(--status-neutral-foreground));
   --color-status-info: hsl(var(--status-info));
   --color-status-info-foreground: hsl(var(--status-info-foreground));
+
+  --color-phase-pre-construction: hsl(var(--phase-pre-construction));
+  --color-phase-pre-construction-foreground: hsl(var(--phase-pre-construction-foreground));
+  --color-phase-construction: hsl(var(--phase-construction));
+  --color-phase-construction-foreground: hsl(var(--phase-construction-foreground));
+  --color-phase-closeout: hsl(var(--phase-closeout));
+  --color-phase-closeout-foreground: hsl(var(--phase-closeout-foreground));
+  --color-phase-complete: hsl(var(--phase-complete));
+  --color-phase-complete-foreground: hsl(var(--phase-complete-foreground));
 
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
@@ -301,6 +340,10 @@
   --color-chart-3: hsl(var(--chart-3));
   --color-chart-4: hsl(var(--chart-4));
   --color-chart-5: hsl(var(--chart-5));
+
+  --color-auth-primary: hsl(var(--auth-primary));
+  --color-auth-primary-hover: hsl(var(--auth-primary-hover));
+  --color-auth-primary-foreground: hsl(var(--auth-primary-foreground));
 }
 
 @layer base {
@@ -328,6 +371,57 @@
 
   .erp-card-body {
     @apply px-6 py-4;
+  }
+
+  /* Clickable card (e.g. project card link): same as erp-card + hover + focus-visible */
+  .erp-card-interactive {
+    @apply rounded-lg border border-border bg-card shadow-[var(--shadow-card)];
+    transition: box-shadow var(--motion-base) var(--motion-ease), border-color var(--motion-base) var(--motion-ease);
+  }
+  .erp-card-interactive:hover {
+    box-shadow: var(--shadow-card-hover);
+    @apply border-border;
+  }
+  .erp-card-interactive:focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
+  /* Selectable card – selected state uses tokens so text stays readable in light and dark */
+  .erp-card-selected {
+    @apply border-primary bg-primary/10 ring-2 ring-primary dark:bg-primary/20;
+  }
+  .erp-card-selectable:hover {
+    @apply border-muted-foreground/50;
+  }
+
+  /* Section title + optional description block */
+  .erp-section-header {
+    @apply flex flex-col gap-1;
+  }
+
+  /* Wizard/stepper step labels and dots – use design tokens for light/dark contrast */
+  .erp-wizard-step-label {
+    @apply text-sm font-medium;
+  }
+  .erp-wizard-step-label-active {
+    @apply text-foreground;
+  }
+  .erp-wizard-step-label-disabled {
+    @apply text-muted-foreground;
+  }
+  .erp-wizard-step-dot-active {
+    @apply border-primary bg-primary text-primary-foreground;
+  }
+  .erp-wizard-step-dot-inactive {
+    @apply border-border bg-muted text-muted-foreground;
+  }
+  .erp-wizard-step-separator {
+    @apply text-muted-foreground;
+  }
+
+  /* Row hover (table or list row); use with shadcn TableRow or tr */
+  .erp-row-interactive {
+    @apply transition-colors hover:bg-muted/50;
   }
 
   /* ========================================
@@ -402,6 +496,31 @@
     @apply inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium;
   }
 
+  /* Phase badges (project phase; tokens for light/dark consistency) */
+  .badge-phase-pre-construction {
+    background-color: hsl(var(--phase-pre-construction) / 0.15);
+    color: hsl(var(--phase-pre-construction-foreground));
+    @apply inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium;
+  }
+
+  .badge-phase-construction {
+    background-color: hsl(var(--phase-construction) / 0.15);
+    color: hsl(var(--phase-construction-foreground));
+    @apply inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium;
+  }
+
+  .badge-phase-closeout {
+    background-color: hsl(var(--phase-closeout) / 0.2);
+    color: hsl(var(--phase-closeout-foreground));
+    @apply inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium;
+  }
+
+  .badge-phase-complete {
+    background-color: hsl(var(--phase-complete) / 0.15);
+    color: hsl(var(--phase-complete-foreground));
+    @apply inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium;
+  }
+
   /* ========================================
      WBS TREE SPECIFIC
      ======================================== */
@@ -468,14 +587,14 @@
      All forms use consistent min/max width for better UX
      ======================================== */
 
-  /* Modal/dialog forms - wider (768px max) */
+  /* Modal/dialog forms - wider (896px max) */
   .erp-form-modal {
-    @apply w-full min-w-[400px] max-w-3xl;
+    @apply w-full min-w-[400px] max-w-4xl;
   }
 
-  /* Page-level forms - standard width (672px max) */
+  /* Page-level forms - standard width (768px max) */
   .erp-form-page {
-    @apply w-full min-w-[400px] max-w-2xl;
+    @apply w-full min-w-[400px] max-w-3xl;
   }
 
   .erp-form-group {
@@ -490,9 +609,20 @@
     @apply block text-sm font-medium text-foreground;
   }
 
+  /* Search bar: flex row full width; input wrapper has min width so it never collapses */
+  .erp-search-row {
+    @apply flex w-full items-center gap-3;
+  }
+  .erp-search-input-wrap {
+    @apply flex-1 w-full min-w-[340px] md:min-w-[420px] md:max-w-none xl:max-w-none;
+  }
+  .erp-search-input {
+    @apply h-10 w-full;
+  }
+
   /* Settings forms - same as page forms */
   .erp-settings-form {
-    @apply w-full min-w-[400px] max-w-2xl;
+    @apply w-full min-w-[400px] max-w-3xl;
   }
 
 }
@@ -602,11 +732,8 @@
     background-color: hsl(var(--table-row-hover) / 0.6);
   }
 
-  /* Custom slate-150 for budget tree hierarchy (legacy; prefer muted) */
-  .bg-slate-150 {
-    background-color: hsl(215 16% 92%);
-  }
-  .dark .bg-slate-150 {
-    background-color: hsl(215 16% 18%);
+  /* Soft surface for hierarchy (e.g. budget tree); uses theme muted for light/dark */
+  .bg-surface-muted {
+    background-color: hsl(var(--muted));
   }
 }

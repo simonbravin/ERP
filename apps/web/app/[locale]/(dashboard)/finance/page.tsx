@@ -6,11 +6,9 @@ export default async function FinanceDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-semibold text-foreground">
-          Dashboard Financiero
-        </h2>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+      <div className="erp-section-header">
+        <h2 className="erp-section-title">Dashboard Financiero</h2>
+        <p className="erp-section-desc">
           Vista ejecutiva de la salud financiera de la empresa
         </p>
       </div>

@@ -141,7 +141,7 @@ export function WbsNodeFormDialog({
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="erp-form-modal">
         <DialogHeader>
           <DialogTitle>
             {nodeToEdit ? t('editNode', { defaultValue: 'Editar Nodo' }) : t('createNode', { defaultValue: 'Crear Nodo' })}
@@ -166,7 +166,7 @@ export function WbsNodeFormDialog({
                   {form.formState.errors.code.message}
                 </p>
               )}
-              <p className="mt-1 text-xs text-slate-500">{t('codeHint', { defaultValue: 'Formato: 1.1.1 (numérico, jerárquico)' })}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{t('codeHint', { defaultValue: 'Formato: 1.1.1 (numérico, jerárquico)' })}</p>
             </div>
 
             <div>

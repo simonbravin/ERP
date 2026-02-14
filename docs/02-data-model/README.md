@@ -15,6 +15,8 @@ packages/database/prisma/schema.prisma
 
 **No edites** `docs/02-data-model/schema.prisma` para cambiar el comportamiento del sistema; es una copia de referencia. Cualquier cambio de modelo debe hacerse en `packages/database/prisma/schema.prisma` y, si se desea, sincronizarse a `docs/02-data-model/` para documentación.
 
+**Flujo de cambios (ERD, migraciones, escalabilidad):** ver **[SCHEMA-AND-MIGRATIONS.md](SCHEMA-AND-MIGRATIONS.md)** — define cómo mantener schema, migraciones y ERD en sintonía.
+
 ---
 
 ## Documentos en esta carpeta
@@ -24,6 +26,7 @@ packages/database/prisma/schema.prisma
 | **schema.prisma** | Copia de referencia del schema (puede estar desactualizada respecto a `packages/database`). |
 | **schema-supplier-updates.md** | Cambios y diseño de las tablas de proveedores globales. |
 | **erd-complete.mmd** | ERD en Mermaid (51+ tablas). |
+| **SCHEMA-AND-MIGRATIONS.md** | Flujo y reglas: schema, migraciones, ERD; fix para migración fantasma. |
 
 ---
 

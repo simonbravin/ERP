@@ -18,14 +18,19 @@ const DOC_TYPES = [
   'OTHER',
 ] as const
 
+type ProjectOption = { id: string; name: string; projectNumber: string }
+
 type DocumentUploadModalProps = {
   projectId: string | null
+  projects?: ProjectOption[]
 }
 
-export function DocumentUploadModal({ projectId }: DocumentUploadModalProps) {
+export function DocumentUploadModal({ projectId, projects = [] }: DocumentUploadModalProps) {
   const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
+
+  const showProjectSelect = projectId === null && projects.length > 0
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -88,6 +93,26 @@ export function DocumentUploadModal({ projectId }: DocumentUploadModalProps) {
                   ))}
                 </select>
               </div>
+
+              {showProjectSelect && (
+                <div className="erp-form-group">
+                  <Label htmlFor="projectId" className="erp-form-label">
+                    Project (optional)
+                  </Label>
+                  <select
+                    id="projectId"
+                    name="projectId"
+                    className="mt-1 block w-full min-w-0 rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                  >
+                    <option value="">— None (organization document) —</option>
+                    {projects.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.projectNumber} – {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="erp-form-group">
                 <Label htmlFor="category" className="erp-form-label">Category (optional)</Label>

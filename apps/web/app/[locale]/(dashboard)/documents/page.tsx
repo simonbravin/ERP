@@ -3,7 +3,7 @@ import { getSession } from '@/lib/session'
 import { getOrgContext } from '@/lib/org-context'
 import { hasMinimumRole } from '@/lib/rbac'
 import { prisma } from '@repo/database'
-import { DocumentList } from '@/components/documents/document-list'
+import { DocumentsPageClient } from '@/components/documents/documents-page-client'
 import { DocumentUploadModal } from '@/components/documents/document-upload-modal'
 import type { DocumentRow } from '@/components/documents/document-list'
 
@@ -14,31 +14,41 @@ export default async function DocumentsPage() {
   const org = await getOrgContext(session.user.id)
   if (!org) return redirectToLogin()
 
-  const documents = await prisma.document.findMany({
-    where: { orgId: org.orgId, deleted: false, projectId: null },
-    orderBy: { createdAt: 'desc' },
-    include: {
-      createdBy: { select: { user: { select: { fullName: true } } } },
-      versions: {
-        orderBy: { versionNumber: 'desc' },
-        take: 1,
-        select: { versionNumber: true, fileName: true, sizeBytes: true },
+  const [documents, projects] = await Promise.all([
+    prisma.document.findMany({
+      where: { orgId: org.orgId, deleted: false },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        createdBy: { select: { user: { select: { fullName: true } } } },
+        project: {
+          select: { id: true, name: true, projectNumber: true },
+        },
+        versions: {
+          orderBy: { versionNumber: 'desc' },
+          take: 1,
+          select: { versionNumber: true, fileName: true, sizeBytes: true },
+        },
       },
-    },
-  })
+    }),
+    prisma.project.findMany({
+      where: { orgId: org.orgId },
+      select: { id: true, name: true, projectNumber: true },
+      orderBy: { projectNumber: 'asc' },
+    }),
+  ])
 
   const canUpload = hasMinimumRole(org.role, 'EDITOR')
 
   return (
-    <div className="p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
-          Organization Documents
-        </h1>
-        {canUpload && <DocumentUploadModal projectId={null} />}
+    <div className="erp-view-container space-y-6">
+      <div className="erp-header-row">
+        <h1 className="erp-page-title">Organization Documents</h1>
+        {canUpload && (
+          <DocumentUploadModal projectId={null} projects={projects} />
+        )}
       </div>
 
-      <DocumentList documents={documents as DocumentRow[]} />
+      <DocumentsPageClient documents={documents as DocumentRow[]} />
     </div>
   )
 }

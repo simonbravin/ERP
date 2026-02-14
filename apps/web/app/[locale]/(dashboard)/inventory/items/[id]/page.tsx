@@ -58,7 +58,7 @@ export default async function ItemDetailPage({ params }: PageProps) {
   ])
 
   const currentStock = Number(totalStock.toString())
-  const stockByLocation = stockByLocationRaw.map((s) => ({
+  const stockByLocation = stockByLocationRaw.map((s: { location: { id: string; name: string; type: string }; balance: { toString(): string } }) => ({
     id: s.location.id,
     name: s.location.name,
     type: s.location.type,

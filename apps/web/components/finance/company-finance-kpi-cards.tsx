@@ -69,7 +69,7 @@ export function CompanyFinanceKPICards({ data }: CompanyFinanceKPICardsProps) {
             <div className={`text-2xl font-bold ${card.value >= 0 ? variantClasses.success : variantClasses.destructive}`}>
               {formatCurrency(card.value, 'ARS')}
             </div>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            <p className="mt-1 text-xs text-muted-foreground">
               {card.description}
             </p>
           </CardContent>

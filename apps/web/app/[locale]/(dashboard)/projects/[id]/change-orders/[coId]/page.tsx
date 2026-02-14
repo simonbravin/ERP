@@ -13,6 +13,8 @@ import {
 } from '@/app/actions/change-orders'
 import { ApprovalTimeline, type ApprovalEntry } from '@/components/change-orders/approval-timeline'
 import { ChangeOrderDetailClient } from '@/components/change-orders/change-order-detail-client'
+import { BudgetImpactBadge } from '@/components/change-orders/budget-impact-badge'
+import { ChangeTypeLabel } from '@/components/change-orders/change-type-label'
 import { cn } from '@/lib/utils'
 
 type PageProps = {
@@ -36,23 +38,19 @@ function formatDate(d: Date): string {
 
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
-    DRAFT: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300',
-    SUBMITTED: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
-    APPROVED: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400',
-    REJECTED: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-    CHANGES_REQUESTED: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+    DRAFT: 'badge-neutral',
+    SUBMITTED: 'badge-warning',
+    APPROVED: 'badge-success',
+    REJECTED: 'badge-danger',
+    CHANGES_REQUESTED: 'badge-info',
   }
   return (
-    <span
-      className={cn(
-        'rounded px-2 py-0.5 text-xs font-medium',
-        styles[status] ?? 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
-      )}
-    >
+    <span className={cn('rounded px-2 py-0.5 text-xs font-medium', styles[status] ?? 'badge-neutral')}>
       {status.replace(/_/g, ' ')}
     </span>
   )
 }
+
 
 export default async function ChangeOrderDetailPage({ params }: PageProps) {
   const session = await getSession()
@@ -108,8 +106,9 @@ export default async function ChangeOrderDetailPage({ params }: PageProps) {
               Requested by {co.requestedBy.user.fullName} on {formatDate(co.requestDate)}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={co.status} />
+            <BudgetImpactBadge type={(co as { budgetImpactType?: string }).budgetImpactType ?? 'DEVIATION'} />
             {isEditable && (
               <Link
                 href={`/projects/${projectId}/change-orders/${coId}/edit`}
@@ -134,14 +133,20 @@ export default async function ChangeOrderDetailPage({ params }: PageProps) {
               </div>
             )}
             <div>
-              <dt className="text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Change type</dt>
-              <dd className="mt-0.5 text-sm text-gray-900 dark:text-white">{co.changeType}</dd>
+              <dt className="text-xs font-medium uppercase text-muted-foreground">Tipo de cambio</dt>
+              <dd className="mt-0.5 text-sm text-foreground">
+                <ChangeTypeLabel type={co.changeType} />
+              </dd>
             </div>
             <div>
-              <dt className="text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Cost impact</dt>
-              <dd className="mt-0.5 text-sm font-medium text-gray-900 dark:text-white">
+              <dt className="text-xs font-medium uppercase text-muted-foreground">Impacto en costo</dt>
+              <dd className="mt-0.5 text-sm font-medium text-foreground">
                 {formatCurrency(co.costImpact)}
               </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium uppercase text-muted-foreground">Días de impacto</dt>
+              <dd className="mt-0.5 text-sm text-foreground">{(co as { timeImpactDays?: number }).timeImpactDays ?? 0}</dd>
             </div>
           </dl>
           {co.status === 'REJECTED' && co.rejectionReason && (
@@ -178,7 +183,9 @@ export default async function ChangeOrderDetailPage({ params }: PageProps) {
                     <td className="whitespace-nowrap px-3 py-2 font-mono text-gray-700 dark:text-gray-300">
                       {line.wbsNode?.code ?? '—'} {line.wbsNode?.name ?? ''}
                     </td>
-                    <td className="px-3 py-2 text-gray-600 dark:text-gray-400">{line.changeType}</td>
+                    <td className="px-3 py-2 text-muted-foreground">
+                      <ChangeTypeLabel type={line.changeType} />
+                    </td>
                     <td className="px-3 py-2 text-gray-600 dark:text-gray-400">{line.justification}</td>
                     <td className="text-right tabular-nums text-gray-900 dark:text-white">
                       {formatCurrency(Number(line.deltaCost))}

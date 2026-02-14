@@ -89,10 +89,8 @@ export function RecentActivityFeed({ activities }: RecentActivityFeedProps) {
   }
 
   return (
-    <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
-      <h3 className="text-lg font-semibold text-foreground">
-        {t('recentActivityTitle')}
-      </h3>
+    <div className="erp-card p-6">
+      <h3 className="erp-section-title">{t('recentActivityTitle')}</h3>
 
       {activities.length === 0 ? (
         <div className="mt-4 flex flex-col items-center justify-center py-8">
@@ -114,7 +112,7 @@ export function RecentActivityFeed({ activities }: RecentActivityFeedProps) {
             return (
               <div
                 key={activity.id}
-                className="flex items-start gap-4 border-b border-slate-100 pb-4 last:border-0 last:pb-0"
+                className="erp-row-interactive flex items-start gap-4 border-b border-border pb-4 last:border-0 last:pb-0"
               >
                 <div
                   className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full ${color}`}

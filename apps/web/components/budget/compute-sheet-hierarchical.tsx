@@ -192,7 +192,7 @@ export function ComputeSheetHierarchical({
         <TableBody>
           {allRows.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={canEdit ? 6 : 5} className="py-12 text-center text-slate-500">
+              <TableCell colSpan={canEdit ? 6 : 5} className="py-12 text-center text-muted-foreground">
                 {t('noBudgetLinesYet')}
               </TableCell>
             </TableRow>

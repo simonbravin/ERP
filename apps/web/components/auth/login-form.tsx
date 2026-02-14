@@ -1,9 +1,11 @@
 'use client'
 
 import { useState } from 'react'
+import { signIn } from 'next-auth/react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslations } from 'next-intl'
+import { usePathname } from '@/i18n/navigation'
 import { loginFormSchema, type LoginFormInput } from '@repo/validators'
 import { login } from '@/app/actions/auth'
 import { Button } from '@/components/ui/button'
@@ -15,6 +17,8 @@ import { Eye, EyeOff } from 'lucide-react'
 
 export function LoginForm() {
   const t = useTranslations('auth')
+  const pathname = usePathname()
+  const locale = pathname?.match(/^\/(es|en)/)?.[1] ?? 'es'
   const [showPassword, setShowPassword] = useState(false)
   const [forgotOpen, setForgotOpen] = useState(false)
 
@@ -41,6 +45,19 @@ export function LoginForm() {
       if (err.password) setError('password', { message: err.password[0] })
       return
     }
+    if ('ok' in result && result.ok && result.email) {
+      const signInResult = await signIn('credentials', {
+        email: result.email,
+        password: data.password,
+        redirect: false,
+      })
+      if (signInResult?.ok) {
+        const path = result.isSuperAdmin ? '/super-admin' : '/dashboard'
+        window.location.href = `/${locale}${path}`
+        return
+      }
+    }
+    setError('root', { message: t('invalidCredentials', { defaultValue: 'Usuario o contraseña incorrectos' }) })
   }
 
   return (
@@ -102,14 +119,14 @@ export function LoginForm() {
         )}
         <Button
           type="submit"
-          className="w-full rounded-lg bg-[#5D5CDE] text-white hover:bg-[#4A49A8] dark:bg-[#5D5CDE] dark:hover:bg-[#4A49A8]"
+          className="w-full rounded-lg bg-auth-primary text-auth-primary-foreground hover:bg-auth-primary-hover"
           disabled={isSubmitting}
         >
           {isSubmitting ? t('signingIn') : t('signIn')}
         </Button>
         <button
           type="button"
-          className="text-center text-sm font-medium text-[#5D5CDE] hover:underline dark:text-[#8B8BEE]"
+          className="text-center text-sm font-medium text-auth-primary hover:underline"
           onClick={() => setForgotOpen(true)}
         >
           {t('forgotPassword')}

@@ -1,7 +1,9 @@
 'use client'
 
 import { useState } from 'react'
+import { signIn } from 'next-auth/react'
 import { useForm } from 'react-hook-form'
+import { usePathname } from '@/i18n/navigation'
 import { superAdminLogin } from '@/app/actions/auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,6 +14,8 @@ import { Eye, EyeOff } from 'lucide-react'
 type FormData = { username: string; password: string }
 
 export function SuperAdminLoginForm() {
+  const pathname = usePathname()
+  const locale = pathname?.match(/^\/(es|en)/)?.[1] ?? 'es'
   const [showPassword, setShowPassword] = useState(false)
   const {
     register,
@@ -29,6 +33,18 @@ export function SuperAdminLoginForm() {
       if (err._form) setError('root', { message: err._form[0] })
       return
     }
+    if ('ok' in result && result.ok && result.email) {
+      const signInResult = await signIn('credentials', {
+        email: result.email,
+        password: data.password,
+        redirect: false,
+      })
+      if (signInResult?.ok) {
+        window.location.href = `/${locale}/super-admin`
+        return
+      }
+    }
+    setError('root', { message: 'Usuario o contraseña incorrectos' })
   }
 
   return (

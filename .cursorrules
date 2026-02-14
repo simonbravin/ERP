@@ -21,6 +21,8 @@ Project conventions and context for the Construction ERP system. Follow these ru
 
 **Source of truth:** `packages/database/prisma/schema.prisma`. All DB access MUST use model and field names from this schema. Do not invent fields or tables.
 
+**Schema changes:** Edit only `packages/database/prisma/schema.prisma`, then create a migration with `prisma migrate dev --name short_description`. Never delete or edit already-applied migration files. In production use `prisma migrate deploy`. See `docs/02-data-model/SCHEMA-AND-MIGRATIONS.md` for full flow and ERD sync.
+
 1. **findUnique:** Only use fields with `@unique` (or compound `@@unique`) in `where`. For other filters (e.g. `active: true`), use `findUnique({ where: { uniqueField } })` then check in code, or use `findFirst({ where: { ... } })`.
 2. **Money and quantities:** ALWAYS use `Decimal`/`NUMERIC` (Prisma `Decimal`). Never use `Float` or `Double` for money, prices, or quantities.
 3. **Tenant isolation:** ALWAYS include `orgId` (or equivalent tenant key) in every query. Never return or filter data without tenant scope.

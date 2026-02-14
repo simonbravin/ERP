@@ -5,11 +5,13 @@ import { prisma, Prisma } from '@repo/database'
 import { requireRole, hasMinimumRole } from '@/lib/rbac'
 import { getAuthContext } from '@/lib/auth-helpers'
 import { type PrismaTransaction } from '@/lib/events/event-publisher'
+import { publishOutboxEvent } from '@/lib/events/event-publisher'
 import {
   createChangeOrderSchema,
   updateChangeOrderSchema,
   createChangeOrderLineSchema,
   updateChangeOrderLineSchema,
+  BUDGET_IMPACT_TYPE,
 } from '@repo/validators'
 import type {
   CreateChangeOrderInput,
@@ -64,7 +66,9 @@ export async function listChangeOrders(projectId: string, filters: ListChangeOrd
       number: true,
       title: true,
       status: true,
+      budgetImpactType: true,
       costImpact: true,
+      timeImpactDays: true,
       requestDate: true,
       requestedByOrgMemberId: true,
       requestedBy: { select: { user: { select: { fullName: true } } } },
@@ -118,24 +122,48 @@ export async function createChangeOrder(projectId: string, data: CreateChangeOrd
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
 
   const number = await getNextCONumber(projectId)
-  await prisma.changeOrder.create({
-    data: {
+  const budgetImpactType =
+    parsed.data.budgetImpactType && BUDGET_IMPACT_TYPE.includes(parsed.data.budgetImpactType as (typeof BUDGET_IMPACT_TYPE)[number])
+      ? parsed.data.budgetImpactType
+      : 'DEVIATION'
+  const costImpact = new Prisma.Decimal(parsed.data.costImpact ?? 0)
+  const requestDate = parsed.data.requestDate ?? new Date()
+  const implementedDate = parsed.data.implementedDate ?? undefined
+
+  const co = await prisma.$transaction(async (tx) => {
+    const created = await tx.changeOrder.create({
+      data: {
+        orgId: org.orgId,
+        projectId,
+        number,
+        title: parsed.data.title,
+        status: 'DRAFT',
+        changeType: parsed.data.changeType,
+        budgetImpactType,
+        reason: parsed.data.reason,
+        justification: parsed.data.justification ?? undefined,
+        costImpact,
+        timeImpactDays: parsed.data.timeImpactDays ?? 0,
+        requestDate,
+        implementedDate,
+        requestedByOrgMemberId: org.memberId,
+      },
+    })
+    await publishOutboxEvent(tx, {
       orgId: org.orgId,
-      projectId,
-      number,
-      title: parsed.data.title,
-      status: 'DRAFT',
-      changeType: parsed.data.changeType,
-      reason: parsed.data.reason,
-      justification: parsed.data.justification ?? undefined,
-      costImpact: new Prisma.Decimal(0),
-      requestedByOrgMemberId: org.memberId,
-    },
+      eventType: 'CHANGE_ORDER.CREATED',
+      entityType: 'ChangeOrder',
+      entityId: created.id,
+      payload: { projectId, number: created.number, title: created.title },
+    })
+    return created
   })
 
-  revalidatePath(`/projects/${projectId}/change-orders`)
   revalidatePath(`/projects/${projectId}`)
-  return { success: true }
+  revalidatePath(`/projects/${projectId}/change-orders`)
+  revalidatePath(`/projects/${projectId}/change-orders/${co.id}`)
+  revalidatePath(`/projects/${projectId}/change-orders/${co.id}/edit`)
+  return { success: true, changeOrderId: co.id }
 }
 
 async function recalcChangeOrderCostImpact(tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0], coId: string) {
@@ -201,8 +229,12 @@ export async function createChangeOrderLine(coId: string, data: CreateChangeOrde
   })
 
   const co2 = await prisma.changeOrder.findFirst({ where: { id: coId }, select: { projectId: true } })
-  revalidatePath(`/projects/${co2?.projectId}/change-orders`)
-  revalidatePath(`/projects/${co2?.projectId}/change-orders/${coId}`)
+  if (co2) {
+    revalidatePath(`/projects/${co2.projectId}`)
+    revalidatePath(`/projects/${co2.projectId}/change-orders`)
+    revalidatePath(`/projects/${co2.projectId}/change-orders/${coId}`)
+    revalidatePath(`/projects/${co2.projectId}/change-orders/${coId}/edit`)
+  }
   return { success: true }
 }
 
@@ -234,8 +266,10 @@ export async function updateChangeOrderLine(lineId: string, data: UpdateChangeOr
     await recalcChangeOrderCostImpact(tx, line.changeOrder.id)
   })
 
+  revalidatePath(`/projects/${line.changeOrder.projectId}`)
   revalidatePath(`/projects/${line.changeOrder.projectId}/change-orders`)
   revalidatePath(`/projects/${line.changeOrder.projectId}/change-orders/${line.changeOrder.id}`)
+  revalidatePath(`/projects/${line.changeOrder.projectId}/change-orders/${line.changeOrder.id}/edit`)
   return { success: true }
 }
 
@@ -255,7 +289,94 @@ export async function deleteChangeOrderLine(lineId: string) {
     await recalcChangeOrderCostImpact(tx, line.changeOrder.id)
   })
 
+  revalidatePath(`/projects/${line.changeOrder.projectId}`)
+  revalidatePath(`/projects/${line.changeOrder.projectId}/change-orders`)
   revalidatePath(`/projects/${line.changeOrder.projectId}/change-orders/${line.changeOrder.id}`)
+  revalidatePath(`/projects/${line.changeOrder.projectId}/change-orders/${line.changeOrder.id}/edit`)
+  return { success: true }
+}
+
+export type ChangeOrderLineInput = {
+  wbsNodeId: string
+  changeType: 'ADD' | 'MODIFY' | 'DELETE'
+  justification: string
+  deltaCost: number
+}
+
+/** Update change order header and replace all lines (for form submit with lines). */
+export async function updateChangeOrderWithLines(
+  coId: string,
+  data: UpdateChangeOrderInput,
+  lines: ChangeOrderLineInput[]
+) {
+  const { org } = await getAuthContext()
+  requireRole(org.role, 'EDITOR')
+
+  const co = await prisma.changeOrder.findFirst({
+    where: { id: coId, orgId: org.orgId },
+    select: { id: true, projectId: true, status: true },
+  })
+  if (!co) return { error: { _form: ['Change order not found'] } }
+  if (!isEditableCO(co.status)) return { error: { _form: ['Cannot edit this change order.'] } }
+
+  const parsed = updateChangeOrderSchema.safeParse(data)
+  if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
+
+  const raw = data as Record<string, unknown>
+  const budgetImpactValue = (parsed.data.budgetImpactType ?? raw.budgetImpactType) as string | undefined
+  const validBudgetImpact =
+    typeof budgetImpactValue === 'string' && BUDGET_IMPACT_TYPE.includes(budgetImpactValue as (typeof BUDGET_IMPACT_TYPE)[number])
+      ? budgetImpactValue
+      : undefined
+
+  const headerPayload: Prisma.ChangeOrderUpdateInput = {}
+  if (parsed.data.title !== undefined) headerPayload.title = parsed.data.title
+  if (parsed.data.reason !== undefined) headerPayload.reason = parsed.data.reason
+  if (parsed.data.justification !== undefined) headerPayload.justification = parsed.data.justification
+  if (parsed.data.changeType !== undefined) headerPayload.changeType = parsed.data.changeType
+  if (validBudgetImpact !== undefined) headerPayload.budgetImpactType = validBudgetImpact
+  if (parsed.data.costImpact !== undefined) headerPayload.costImpact = new Prisma.Decimal(parsed.data.costImpact)
+  if (parsed.data.timeImpactDays !== undefined) headerPayload.timeImpactDays = parsed.data.timeImpactDays
+  if (parsed.data.requestDate !== undefined) headerPayload.requestDate = parsed.data.requestDate
+  if (parsed.data.implementedDate !== undefined) headerPayload.implementedDate = parsed.data.implementedDate
+  if (parsed.data.partyId !== undefined) headerPayload.partyId = parsed.data.partyId
+
+  await prisma.$transaction(async (tx) => {
+    await tx.changeOrder.update({ where: { id: coId }, data: headerPayload })
+    await tx.changeOrderLine.deleteMany({ where: { changeOrderId: coId } })
+    let sortOrder = 0
+    for (const line of lines) {
+      const wbsNode = await tx.wbsNode.findFirst({
+        where: { id: line.wbsNodeId, projectId: co.projectId, orgId: org.orgId, active: true },
+        select: { id: true },
+      })
+      if (!wbsNode) continue
+      await tx.changeOrderLine.create({
+        data: {
+          orgId: org.orgId,
+          changeOrderId: coId,
+          wbsNodeId: line.wbsNodeId,
+          changeType: line.changeType,
+          justification: line.justification,
+          deltaCost: new Prisma.Decimal(line.deltaCost),
+          sortOrder: sortOrder++,
+        },
+      })
+    }
+    await recalcChangeOrderCostImpact(tx, coId)
+    await publishOutboxEvent(tx, {
+      orgId: org.orgId,
+      eventType: 'CHANGE_ORDER.UPDATED',
+      entityType: 'ChangeOrder',
+      entityId: coId,
+      payload: { projectId: co.projectId, updatedFields: [...Object.keys(headerPayload), 'lines'] },
+    })
+  })
+
+  revalidatePath(`/projects/${co.projectId}`)
+  revalidatePath(`/projects/${co.projectId}/change-orders`)
+  revalidatePath(`/projects/${co.projectId}/change-orders/${coId}`)
+  revalidatePath(`/projects/${co.projectId}/change-orders/${coId}/edit`)
   return { success: true }
 }
 
@@ -275,15 +396,43 @@ export async function updateChangeOrder(coId: string, data: UpdateChangeOrderInp
   const parsed = updateChangeOrderSchema.safeParse(data)
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
 
-  const payload: Record<string, unknown> = {}
+  const raw = data as Record<string, unknown>
+  const budgetImpactValue =
+    (parsed.data.budgetImpactType ?? raw.budgetImpactType) as string | undefined
+  const validBudgetImpact =
+    typeof budgetImpactValue === 'string' && BUDGET_IMPACT_TYPE.includes(budgetImpactValue as (typeof BUDGET_IMPACT_TYPE)[number])
+      ? budgetImpactValue
+      : undefined
+
+  const payload: Prisma.ChangeOrderUpdateInput = {}
   if (parsed.data.title !== undefined) payload.title = parsed.data.title
   if (parsed.data.reason !== undefined) payload.reason = parsed.data.reason
   if (parsed.data.justification !== undefined) payload.justification = parsed.data.justification
+  if (parsed.data.changeType !== undefined) payload.changeType = parsed.data.changeType
+  if (validBudgetImpact !== undefined) payload.budgetImpactType = validBudgetImpact
+  if (parsed.data.status !== undefined) payload.status = parsed.data.status
+  if (parsed.data.costImpact !== undefined) payload.costImpact = new Prisma.Decimal(parsed.data.costImpact)
+  if (parsed.data.timeImpactDays !== undefined) payload.timeImpactDays = parsed.data.timeImpactDays
+  if (parsed.data.requestDate !== undefined) payload.requestDate = parsed.data.requestDate
+  if (parsed.data.approvedDate !== undefined) payload.approvedDate = parsed.data.approvedDate
+  if (parsed.data.implementedDate !== undefined) payload.implementedDate = parsed.data.implementedDate
+  if (parsed.data.partyId !== undefined) payload.partyId = parsed.data.partyId
 
-  await prisma.changeOrder.update({ where: { id: coId }, data: payload })
+  await prisma.$transaction(async (tx) => {
+    await tx.changeOrder.update({ where: { id: coId }, data: payload })
+    await publishOutboxEvent(tx, {
+      orgId: org.orgId,
+      eventType: 'CHANGE_ORDER.UPDATED',
+      entityType: 'ChangeOrder',
+      entityId: coId,
+      payload: { projectId: co.projectId, updatedFields: Object.keys(payload) },
+    })
+  })
 
+  revalidatePath(`/projects/${co.projectId}`)
   revalidatePath(`/projects/${co.projectId}/change-orders`)
   revalidatePath(`/projects/${co.projectId}/change-orders/${coId}`)
+  revalidatePath(`/projects/${co.projectId}/change-orders/${coId}/edit`)
   return { success: true }
 }
 
@@ -407,6 +556,14 @@ export async function approveChangeOrder(coId: string) {
         approvedByOrgMemberId: org.memberId,
         approvedDate: new Date(),
       },
+    })
+
+    await publishOutboxEvent(tx, {
+      orgId: org.orgId,
+      eventType: 'CHANGE_ORDER.APPROVED',
+      entityType: 'ChangeOrder',
+      entityId: coId,
+      payload: { projectId: co.projectId, changeOrderNumber: co.number, title: co.title },
     })
 
     await tx.changeOrderApproval.create({

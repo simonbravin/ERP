@@ -6,6 +6,7 @@ import { getOrgContext } from '@/lib/org-context'
 import { getDownloadUrl } from '@/lib/r2-client'
 import { prisma } from '@repo/database'
 import { DashboardLayout } from '@/components/layouts/dashboard-layout'
+import { SignOutConfirmButton } from '@/components/auth/sign-out-confirm-button'
 
 function DashboardError({ message }: { message: string }) {
   return (
@@ -20,12 +21,11 @@ function DashboardError({ message }: { message: string }) {
         <p className="mt-4 text-xs text-red-600 dark:text-red-400">
           Comprueba DATABASE_URL en .env y que la base de datos esté en ejecución.
         </p>
-        <a
-          href="/api/auth/signout"
+        <SignOutConfirmButton
           className="mt-4 inline-block rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
         >
           Cerrar sesión
-        </a>
+        </SignOutConfirmButton>
       </div>
     </div>
   )
@@ -54,12 +54,12 @@ export default async function DashboardLayoutPage({
               Your account has no active organization. Please contact support or
               sign out and register again.
             </p>
-            <a
-              href="/api/auth/signout"
+            <SignOutConfirmButton
+              locale={locale}
               className="mt-4 inline-block rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:opacity-90"
             >
               Sign out
-            </a>
+            </SignOutConfirmButton>
           </div>
         </div>
       )

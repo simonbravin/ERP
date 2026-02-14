@@ -112,8 +112,8 @@ export function ProjectCreationWizard({
             <div
               className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 ${
                 step >= stepNumber
-                  ? 'border-primary bg-primary text-primary-foreground'
-                  : 'border-slate-300 bg-white text-slate-400'
+                  ? 'erp-wizard-step-dot-active'
+                  : 'erp-wizard-step-dot-inactive'
               }`}
             >
               {step > stepNumber ? (
@@ -124,8 +124,10 @@ export function ProjectCreationWizard({
             </div>
             <div className="ml-3">
               <p
-                className={`text-sm font-medium ${
-                  step >= stepNumber ? 'text-slate-900' : 'text-slate-500'
+                className={`erp-wizard-step-label ${
+                  step >= stepNumber
+                    ? 'erp-wizard-step-label-active'
+                    : 'erp-wizard-step-label-disabled'
                 }`}
               >
                 {stepNumber === 1 && 'Seleccionar Template'}
@@ -134,7 +136,7 @@ export function ProjectCreationWizard({
               </p>
             </div>
             {stepNumber < 3 && (
-              <ChevronRight className="mx-4 hidden h-5 w-5 text-slate-400 sm:block" />
+              <ChevronRight className="erp-wizard-step-separator mx-4 hidden h-5 w-5 sm:block" />
             )}
           </div>
         ))}
@@ -142,11 +144,11 @@ export function ProjectCreationWizard({
 
       {step === 1 && (
         <div className="space-y-4">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-900">
+          <div className="erp-section-header">
+            <h2 className="erp-section-title">
               Selecciona el tipo de proyecto
             </h2>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="erp-section-desc">
               El template determina la estructura WBS predefinida
             </p>
           </div>
@@ -159,18 +161,16 @@ export function ProjectCreationWizard({
               return (
                 <Card
                   key={template.id}
-                  className={`cursor-pointer transition-all ${
-                    isSelected
-                      ? 'border-blue-500 ring-2 ring-blue-500'
-                      : 'hover:border-slate-400'
+                  className={`cursor-pointer transition-all erp-card-selectable ${
+                    isSelected ? 'erp-card-selected' : ''
                   }`}
                   onClick={() => setSelectedTemplate(template.id)}
                 >
                   <CardHeader>
                     <div className="flex items-start justify-between">
-                      <Icon className="h-8 w-8 text-blue-600" />
+                      <Icon className="h-8 w-8 text-primary" />
                       {isSelected && (
-                        <CheckCircle2 className="h-5 w-5 text-blue-600" />
+                        <CheckCircle2 className="h-5 w-5 text-primary" />
                       )}
                     </div>
                     <CardTitle className="mt-2">{template.name}</CardTitle>
@@ -200,11 +200,11 @@ export function ProjectCreationWizard({
 
       {step === 2 && (
         <div className="space-y-4">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-900">
+          <div className="erp-section-header">
+            <h2 className="erp-section-title">
               Selecciona el sistema constructivo
             </h2>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="erp-section-desc">
               Puedes seleccionar múltiples sistemas. Esto filtrará los items del WBS.
             </p>
           </div>
@@ -216,10 +216,8 @@ export function ProjectCreationWizard({
               return (
                 <Card
                   key={system.id}
-                  className={`cursor-pointer transition-all ${
-                    isSelected
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'hover:border-slate-400'
+                  className={`cursor-pointer transition-all erp-card-selectable ${
+                    isSelected ? 'erp-card-selected' : ''
                   }`}
                   onClick={() => {
                     if (isSelected) {
@@ -237,7 +235,7 @@ export function ProjectCreationWizard({
                       </CardDescription>
                     </div>
                     {isSelected && (
-                      <CheckCircle2 className="h-5 w-5 shrink-0 text-blue-600" />
+                      <CheckCircle2 className="h-5 w-5 shrink-0 text-primary" />
                     )}
                   </CardHeader>
                 </Card>
@@ -245,10 +243,8 @@ export function ProjectCreationWizard({
             })}
 
             <Card
-              className={`cursor-pointer transition-all ${
-                selectedSystems.includes('generic')
-                  ? 'border-blue-500 bg-blue-50'
-                  : 'hover:border-slate-400'
+              className={`cursor-pointer transition-all erp-card-selectable ${
+                selectedSystems.includes('generic') ? 'erp-card-selected' : ''
               }`}
               onClick={() => {
                 if (selectedSystems.includes('generic')) {
@@ -266,7 +262,7 @@ export function ProjectCreationWizard({
                   </CardDescription>
                 </div>
                 {selectedSystems.includes('generic') && (
-                  <CheckCircle2 className="h-5 w-5 shrink-0 text-blue-600" />
+                  <CheckCircle2 className="h-5 w-5 shrink-0 text-primary" />
                 )}
               </CardHeader>
             </Card>
@@ -285,16 +281,16 @@ export function ProjectCreationWizard({
 
       {step === 3 && (
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-900">
+          <div className="erp-section-header">
+            <h2 className="erp-section-title">
               Completa los datos del proyecto
             </h2>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="erp-section-desc">
               Información básica para crear el proyecto
             </p>
           </div>
 
-          <div className="rounded-lg border border-slate-200 bg-white p-6">
+          <div className="rounded-lg border border-border bg-card p-6">
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               <div className="md:col-span-2">
                 <Label htmlFor="name">{t('projectName')} *</Label>
@@ -366,9 +362,9 @@ export function ProjectCreationWizard({
             </div>
           </div>
 
-          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
-            <h3 className="font-medium text-blue-900">Resumen de Configuración</h3>
-            <div className="mt-2 space-y-1 text-sm text-blue-800">
+          <div className="rounded-lg border border-border bg-muted/50 p-4">
+            <h3 className="font-medium text-foreground">Resumen de Configuración</h3>
+            <div className="mt-2 space-y-1 text-sm text-muted-foreground">
               <p>
                 <span className="font-medium">Template:</span>{' '}
                 {templates.find((t) => t.id === selectedTemplate)?.name}

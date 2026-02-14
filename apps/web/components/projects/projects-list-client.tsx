@@ -273,7 +273,7 @@ export function ProjectsListClient({ projects, canEdit, showExport = false }: Pr
 
   return (
     <>
-    <div className="space-y-4">
+    <div className="w-full space-y-4">
       {showExport && (
         <div className="flex justify-end">
           <Button variant="outline" size="sm" onClick={() => setShowExportDialog(true)}>
@@ -282,19 +282,19 @@ export function ProjectsListClient({ projects, canEdit, showExport = false }: Pr
           </Button>
         </div>
       )}
-      {/* Search arriba, botones en filas debajo */}
-      <div className="flex flex-col gap-4">
-        {/* Fila 1: Campo de búsqueda */}
-        <div className="w-full max-w-md">
-          <Input
-            placeholder={t('searchPlaceholder')}
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value)
-              updateFilters(e.target.value, statusFilter, phaseFilter)
-            }}
-            className="h-11 w-full text-base"
-          />
+      <div className="flex w-full flex-col gap-4">
+        <div className="erp-search-row">
+          <div className="erp-search-input-wrap">
+            <Input
+              placeholder={t('searchPlaceholder')}
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value)
+                updateFilters(e.target.value, statusFilter, phaseFilter)
+              }}
+              className="erp-search-input text-base"
+            />
+          </div>
         </div>
 
         {/* Fila 2: Filtro por estado */}
@@ -382,7 +382,7 @@ export function ProjectsListClient({ projects, canEdit, showExport = false }: Pr
 
       {/* Table or Grid view */}
       {viewMode === 'table' ? (
-        <div className="rounded-lg border border-slate-200 bg-white">
+        <div className="erp-table-wrap">
           <Table>
             <TableHeader>
               {table.getHeaderGroups().map((headerGroup) => (
@@ -406,7 +406,7 @@ export function ProjectsListClient({ projects, canEdit, showExport = false }: Pr
                   <TableRow
                     key={row.id}
                     data-state={row.getIsSelected() && 'selected'}
-                    className="cursor-pointer hover:bg-muted/50"
+                    className="erp-row-interactive cursor-pointer"
                     onClick={() => router.push(`/projects/${row.original.id}`)}
                   >
                     {row.getVisibleCells().map((cell) => (
@@ -427,7 +427,7 @@ export function ProjectsListClient({ projects, canEdit, showExport = false }: Pr
                   >
                     <div className="flex flex-col items-center justify-center py-8">
                       <FolderKanban className="h-12 w-12 text-muted-foreground" />
-                      <p className="mt-2 text-sm text-slate-500">
+                      <p className="mt-2 text-sm text-muted-foreground">
                         {t('noResults')}
                       </p>
                     </div>

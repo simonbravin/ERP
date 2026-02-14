@@ -38,39 +38,37 @@ export function ProjectCard({ project }: ProjectCardProps) {
   return (
     <Link
       href={`/projects/${project.id}`}
-      className="block rounded-lg border border-slate-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md"
+      className="erp-card-interactive block p-6"
     >
-      {/* Header */}
       <div className="flex items-start justify-between">
         <div className="min-w-0 flex-1">
-          <span className="text-xs font-medium text-slate-500">
+          <span className="text-xs font-medium text-muted-foreground">
             {project.projectNumber}
           </span>
-          <h3 className="mt-1 truncate text-lg font-semibold text-slate-900">
+          <h3 className="mt-1 truncate text-lg font-semibold text-foreground">
             {project.name}
           </h3>
         </div>
         <ProjectStatusBadge status={project.status} />
       </div>
 
-      {/* Details */}
       <div className="mt-4 space-y-2">
         {project.clientName && (
-          <div className="flex items-center gap-2 text-sm text-slate-600">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <User className="h-4 w-4 flex-shrink-0" />
             <span className="truncate">{project.clientName}</span>
           </div>
         )}
 
         {project.location && (
-          <div className="flex items-center gap-2 text-sm text-slate-600">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <MapPin className="h-4 w-4 flex-shrink-0" />
             <span className="truncate">{project.location}</span>
           </div>
         )}
 
         {project.startDate && (
-          <div className="flex items-center gap-2 text-sm text-slate-600">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Calendar className="h-4 w-4 flex-shrink-0" />
             <span>
               {new Date(project.startDate).toLocaleDateString('es-AR', {
@@ -83,12 +81,11 @@ export function ProjectCard({ project }: ProjectCardProps) {
         )}
       </div>
 
-      {/* Footer */}
-      <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
+      <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
         <ProjectPhaseBadge phase={project.phase} />
         <div className="text-right">
-          <p className="text-xs text-slate-500">{t('budget')}</p>
-          <p className="text-lg font-semibold text-slate-900">
+          <p className="text-xs text-muted-foreground">{t('budget')}</p>
+          <p className="text-lg font-semibold text-foreground">
             {formatCurrency(budget)}
           </p>
         </div>

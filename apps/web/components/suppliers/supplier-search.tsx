@@ -42,15 +42,17 @@ export function SupplierSearch({ initialResults }: SupplierSearchProps) {
   }
 
   return (
-    <div className="space-y-4">
-      <form onSubmit={handleSearch} className="flex gap-2">
-        <Input
-          type="search"
-          placeholder="Search by name or category..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="max-w-md"
-        />
+    <div className="w-full space-y-4">
+      <form onSubmit={handleSearch} className="erp-search-row">
+        <div className="erp-search-input-wrap">
+          <Input
+            type="search"
+            placeholder="Search by name or category..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="erp-search-input"
+          />
+        </div>
         <Button type="submit">Search</Button>
       </form>
 

@@ -1,7 +1,19 @@
 'use client'
 
+import { useState } from 'react'
+import { signOut } from 'next-auth/react'
 import { Link, usePathname } from '@/i18n/navigation'
 import { cn } from '@/lib/utils'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import {
   LayoutDashboard,
   Building2,
@@ -25,6 +37,14 @@ interface SuperAdminSidebarProps {
 export function SuperAdminSidebar({ userName }: SuperAdminSidebarProps) {
   const pathname = usePathname()
   const pathWithoutLocale = pathname?.replace(/^\/(es|en)/, '') ?? ''
+  const locale = pathname?.match(/^\/(es|en)/)?.[1] ?? 'es'
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
+
+  const handleSignOut = async () => {
+    setShowSignOutConfirm(false)
+    await signOut({ redirect: false })
+    window.location.pathname = `/${locale}/super-admin`
+  }
 
   return (
     <aside className="flex w-64 shrink-0 flex-col border-r border-amber-900/50 bg-slate-950">
@@ -61,14 +81,38 @@ export function SuperAdminSidebar({ userName }: SuperAdminSidebarProps) {
             {userName}
           </p>
         )}
-        <a
-          href="/api/auth/signout"
+        <button
+          type="button"
+          onClick={() => setShowSignOutConfirm(true)}
           className="mt-2 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
         >
           <LogOut className="h-5 w-5 shrink-0" />
           Sign out
-        </a>
+        </button>
       </div>
+
+      <AlertDialog open={showSignOutConfirm} onOpenChange={setShowSignOutConfirm}>
+        <AlertDialogContent className="erp-form-modal">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cerrar sesión</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Estás seguro de que querés cerrar sesión en el portal Super Admin?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault()
+                handleSignOut()
+              }}
+              className="bg-amber-600 hover:bg-amber-700"
+            >
+              Cerrar sesión
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </aside>
   )
 }

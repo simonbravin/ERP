@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(for dir in \"C:\\\\Dev\\\\ERP\\\\apps\\\\web\\\\components\"/*)",
+      "Bash(do:*)",
+      "Bash(find:*)",
+      "Bash(wc:*)",
+      "Bash(grep:*)",
+      "Bash(npx tsc:*)",
+      "Bash(pnpm --filter web dev:*)",
+      "Bash(powershell -Command:*)",
+      "Bash(powershell -NoProfile -Command:*)",
+      "Bash(curl:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nrefactor: major codebase cleanup — split finance module, extract shared auth, unify design tokens\n\n- Split finance.ts \\(2,435 lines\\) into 5 domain files: finance-transactions, finance-cashflow,\n  finance-overhead, finance-kpis, finance-helpers with barrel re-export for backward compat\n- Extract shared getAuthContext\\(\\) into lib/auth-helpers.ts \\(removed from 14 action files\\)\n- Consolidate PrismaTx type to shared PrismaTransaction from event-publisher.ts\n- Unify form error text colors: replace hardcoded text-red-600 with text-destructive token \\(42 components\\)\n- Delete dead files: gantt-timeline.tsx, lib/db.ts, check-user.ts, migrate scripts, seed-global-suppliers\n- Add new infrastructure: Inngest event system, message bus hook, serialization utils, coerce validators\n- Expand globals.css design tokens, UI component refinements, i18n updates \\(en/es\\)\n- Budget, schedule, export, super-admin, and project page enhancements\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")"
+    ]
+  }
+}

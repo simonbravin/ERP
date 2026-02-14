@@ -22,10 +22,10 @@ export default async function SettingsLayout({
   return (
     <div className="space-y-6 p-6">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">
+        <h1 className="erp-page-title">
           {t('settings')}
         </h1>
-        <p className="mt-1 text-sm text-slate-500">
+        <p className="mt-1 erp-section-desc">
           {t('settingsSubtitle', {
             defaultValue: 'Gestiona la configuración de tu organización y perfil',
           })}

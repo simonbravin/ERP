@@ -1,6 +1,6 @@
 'use client'
 
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
   createProjectSchema,
@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import Link from 'next/link'
+import { useRouter } from '@/i18n/navigation'
 import { updateProject } from '@/app/actions/projects'
 
 type ProjectFormProps = {
@@ -33,10 +34,13 @@ export function ProjectForm({
   onSubmit: onSubmitProp,
   onCancelHref,
 }: ProjectFormProps) {
+  const router = useRouter()
   const isCreate = mode === 'create'
   const schema = isCreate ? createProjectSchema : updateProjectSchema
   const {
     register,
+    control,
+    getValues,
     handleSubmit,
     setError,
     formState: { errors, isSubmitting },
@@ -64,9 +68,32 @@ export function ProjectForm({
       return
     }
 
+    // En modo edición: phase y status desde getValues() para no depender de data (evitar que serialización los omita)
+    const payload: UpdateProjectInput =
+      projectId != null
+        ? {
+            ...data,
+            ...(defaultValues && 'phase' in defaultValues
+              ? {
+                  phase:
+                    (getValues('phase') as UpdateProjectInput['phase']) ??
+                    (defaultValues as UpdateProjectInput).phase ??
+                    'PRE_CONSTRUCTION',
+                }
+              : {}),
+            ...(defaultValues && 'status' in defaultValues
+              ? {
+                  status:
+                    (getValues('status') as UpdateProjectInput['status']) ??
+                    (defaultValues as UpdateProjectInput).status,
+                }
+              : {}),
+          }
+        : (data as UpdateProjectInput)
+
     const result =
       projectId != null
-        ? await submit(projectId, data as UpdateProjectInput)
+        ? await submit(projectId, payload)
         : await submit(data)
     if (result?.error) {
       if (result.error._form) {
@@ -78,6 +105,11 @@ export function ProjectForm({
         }
       })
       return
+    }
+    // Navegar al resumen: refrescar caché y luego ir para que el resumen muestre datos actualizados (phase, estado)
+    if (projectId != null && result && 'success' in result && result.success) {
+      router.refresh()
+      router.push(`/projects/${projectId}`)
     }
   }
 
@@ -173,19 +205,52 @@ export function ProjectForm({
           </div>
         </div>
         {!isCreate && defaultValues && 'status' in defaultValues && (
-          <div className="space-y-2">
-            <Label htmlFor="status">Estado</Label>
-            <select
-              id="status"
-              {...register('status')}
-              className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
-            >
-              <option value="DRAFT">Borrador</option>
-              <option value="ACTIVE">Activo</option>
-              <option value="ON_HOLD">En pausa</option>
-              <option value="COMPLETE">Completado</option>
-            </select>
-          </div>
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="phase">Fase del proyecto</Label>
+              <Controller
+                name="phase"
+                control={control}
+                render={({ field }) => (
+                  <select
+                    id="phase"
+                    value={field.value ?? ''}
+                    onChange={(e) => field.onChange(e.target.value)}
+                    onBlur={field.onBlur}
+                    ref={field.ref}
+                    className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+                  >
+                    <option value="PRE_CONSTRUCTION">Pre-construcción</option>
+                    <option value="CONSTRUCTION">En construcción</option>
+                    <option value="CLOSEOUT">Cierre</option>
+                    <option value="COMPLETE">Completado</option>
+                  </select>
+                )}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="status">Estado</Label>
+              <Controller
+                name="status"
+                control={control}
+                render={({ field }) => (
+                  <select
+                    id="status"
+                    value={field.value ?? ''}
+                    onChange={(e) => field.onChange(e.target.value)}
+                    onBlur={field.onBlur}
+                    ref={field.ref}
+                    className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+                  >
+                    <option value="DRAFT">Borrador</option>
+                    <option value="ACTIVE">Activo</option>
+                    <option value="ON_HOLD">En pausa</option>
+                    <option value="COMPLETE">Completado</option>
+                  </select>
+                )}
+              />
+            </div>
+          </>
         )}
       </div>
       {errors.root && (

@@ -184,20 +184,20 @@ export function CashflowChartClient({ projectId, initialData }: Props) {
                     type="monotone"
                     dataKey="Ingresos"
                     stackId="1"
-                    stroke="hsl(150 30% 45%)"
-                    fill="hsl(150 30% 45% / 0.3)"
+                    stroke="hsl(var(--chart-2))"
+                    fill="hsl(var(--chart-2) / 0.3)"
                   />
                   <Area
                     type="monotone"
                     dataKey="Gastos"
                     stackId="2"
-                    stroke="hsl(10 55% 55%)"
-                    fill="hsl(10 55% 55% / 0.3)"
+                    stroke="hsl(var(--chart-4))"
+                    fill="hsl(var(--chart-4) / 0.3)"
                   />
                   <Area
                     type="monotone"
                     dataKey="Balance"
-                    stroke="hsl(210 30% 50%)"
+                    stroke="hsl(var(--chart-1))"
                     fill="transparent"
                     strokeDasharray="4 4"
                   />

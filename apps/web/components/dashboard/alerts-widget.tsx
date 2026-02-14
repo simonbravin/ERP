@@ -40,10 +40,8 @@ export function AlertsWidget({ alerts }: AlertsWidgetProps) {
   }
 
   return (
-    <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
-      <h3 className="text-lg font-semibold text-foreground">
-        {t('alertsTitle')}
-      </h3>
+    <div className="erp-card p-6">
+      <h3 className="erp-section-title">{t('alertsTitle')}</h3>
 
       {alerts.length === 0 ? (
         <div className="mt-4 flex flex-col items-center justify-center py-8">
@@ -81,7 +79,7 @@ export function AlertsWidget({ alerts }: AlertsWidgetProps) {
                 <Link
                   key={alert.id}
                   href={alert.link}
-                  className="block rounded-lg border border-border p-4 transition-colors hover:bg-muted"
+                  className="erp-row-interactive block rounded-lg border border-border p-4"
                 >
                   {content}
                 </Link>
@@ -89,10 +87,7 @@ export function AlertsWidget({ alerts }: AlertsWidgetProps) {
             }
 
             return (
-              <div
-                key={alert.id}
-                className="rounded-lg border border-border p-4"
-              >
+              <div key={alert.id} className="rounded-lg border border-border p-4">
                 {content}
               </div>
             )

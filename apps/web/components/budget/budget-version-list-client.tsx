@@ -58,14 +58,14 @@ export function BudgetVersionListClient({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-          {t('versions')}
-        </h2>
+      <div className="erp-header-row">
+        <h2 className="erp-section-title">{t('versions')}</h2>
         {canEdit && (
-          <Link href={`/projects/${projectId}/budget/new`}>
-            <Button type="button">{t('newVersion')}</Button>
-          </Link>
+          <div className="erp-header-actions">
+            <Link href={`/projects/${projectId}/budget/new`}>
+              <Button type="button">{t('newVersion')}</Button>
+            </Link>
+          </div>
         )}
       </div>
       <VersionList

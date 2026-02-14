@@ -198,8 +198,8 @@ export function BudgetLinesCompactTable({
     const bgColor = bgColors[Math.min(level, bgColors.length - 1)] ?? 'bg-muted/30'
 
     return (
-      <>
-        <TableRow className={`${bgColor} h-8 hover:bg-slate-200/50`}>
+      <React.Fragment key={node.wbsNode.id}>
+        <TableRow className={`${bgColor} h-8 hover:bg-muted/50`}>
           <TableCell
             style={{ paddingLeft: `${level * 16 + 8}px` }}
             className="px-2 py-1"
@@ -209,7 +209,7 @@ export function BudgetLinesCompactTable({
                 <button
                   type="button"
                   onClick={() => toggleNode(node.wbsNode.id)}
-                  className="rounded p-0.5 hover:bg-slate-300"
+                  className="rounded p-0.5 hover:bg-muted"
                 >
                   {isExpanded ? (
                     <ChevronDown className="h-3 w-3" />
@@ -218,10 +218,10 @@ export function BudgetLinesCompactTable({
                   )}
                 </button>
               )}
-              <span className="font-mono text-[10px] text-slate-600">
+              <span className="font-mono text-[10px] text-muted-foreground">
                 {node.wbsNode.code}
               </span>
-              <span className="text-xs font-medium text-slate-900">
+              <span className="text-xs font-medium text-foreground">
                 {node.wbsNode.name}
               </span>
             </div>
@@ -248,7 +248,7 @@ export function BudgetLinesCompactTable({
                   }
                   className="h-6 w-6 p-0"
                 >
-                  <Plus className="h-3 w-3 text-blue-600" />
+                  <Plus className="h-3 w-3 text-primary" />
                 </Button>
                 <Button
                   variant="ghost"
@@ -262,7 +262,7 @@ export function BudgetLinesCompactTable({
                   }
                   className="h-6 w-6 p-0"
                 >
-                  <Trash2 className="h-3 w-3 text-red-600" />
+                  <Trash2 className="h-3 w-3 text-destructive" />
                 </Button>
               </div>
             )}
@@ -278,10 +278,10 @@ export function BudgetLinesCompactTable({
                   style={{ paddingLeft: `${(level + 1) * 16 + 8}px` }}
                   className="px-2 py-1"
                 >
-                  <span className="text-xs text-slate-700">{line.description}</span>
+                  <span className="text-xs text-muted-foreground">{line.description}</span>
                 </TableCell>
                 <TableCell className="px-2 py-1">
-                  <span className="font-mono text-[10px] text-slate-600">
+                  <span className="font-mono text-[10px] text-muted-foreground">
                     {line.unit}
                   </span>
                 </TableCell>
@@ -306,7 +306,7 @@ export function BudgetLinesCompactTable({
                       <Calculator className="mr-1 h-3 w-3" />
                       APU
                       {hasAPU && (
-                        <span className="ml-1 rounded bg-white/20 px-1 text-[10px]">
+                        <span className="ml-1 rounded bg-primary/20 px-1 text-[10px]">
                           {line.resources.length}
                         </span>
                       )}
@@ -318,7 +318,7 @@ export function BudgetLinesCompactTable({
           })}
 
         {isExpanded && node.children.map((child) => renderNode(child, level + 1))}
-      </>
+      </React.Fragment>
     )
   }
 
@@ -335,23 +335,23 @@ export function BudgetLinesCompactTable({
         )}
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+      <div className="overflow-x-auto rounded-lg border border-border bg-card">
         <Table>
-          <TableHeader className="sticky top-0 z-10 bg-slate-800">
+          <TableHeader className="sticky top-0 z-10 bg-muted">
             <TableRow className="h-8">
-              <TableHead className="px-2 py-1 text-xs text-white">
+              <TableHead className="px-2 py-1 text-xs text-foreground">
                 {t('item')}
               </TableHead>
-              <TableHead className="w-[60px] px-2 py-1 text-xs text-white">
+              <TableHead className="w-[60px] px-2 py-1 text-xs text-foreground">
                 {t('unit')}
               </TableHead>
-              <TableHead className="w-[80px] px-2 py-1 text-right text-xs text-white">
+              <TableHead className="w-[80px] px-2 py-1 text-right text-xs text-foreground">
                 {t('quantity')}
               </TableHead>
-              <TableHead className="w-[120px] px-2 py-1 text-right text-xs text-white">
+              <TableHead className="w-[120px] px-2 py-1 text-right text-xs text-foreground">
                 {t('total')}
               </TableHead>
-              <TableHead className="w-[100px] px-2 py-1 text-xs text-white">
+              <TableHead className="w-[100px] px-2 py-1 text-xs text-foreground">
                 {tCommon('actions')}
               </TableHead>
             </TableRow>
@@ -448,7 +448,7 @@ export function BudgetLinesCompactTable({
                   <AlertDialogAction
                     onClick={() => confirmDelete(false)}
                     disabled={isPending}
-                    className="bg-slate-600 hover:bg-slate-700"
+                    className="bg-secondary text-secondary-foreground hover:bg-secondary/80"
                   >
                     {t('deleteChildrenFirst')}
                   </AlertDialogAction>

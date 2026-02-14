@@ -275,13 +275,26 @@ export async function updateProject(projectId: string, data: UpdateProjectInput)
     return { error: parsed.error.flatten().fieldErrors }
   }
 
+  const raw = data as Record<string, unknown>
+
   const updatePayload: Prisma.ProjectUpdateInput = {}
+  const VALID_PHASES = ['PRE_CONSTRUCTION', 'CONSTRUCTION', 'CLOSEOUT', 'COMPLETE'] as const
+
   if (parsed.data.name !== undefined) updatePayload.name = parsed.data.name
   if (parsed.data.clientName !== undefined) updatePayload.clientName = parsed.data.clientName
   if (parsed.data.description !== undefined) updatePayload.description = parsed.data.description
   if (parsed.data.location !== undefined) updatePayload.location = parsed.data.location
   if (parsed.data.m2 !== undefined) updatePayload.m2 = parsed.data.m2
   if (parsed.data.status !== undefined) updatePayload.status = parsed.data.status
+  // Fase: mismo criterio que status — usar parsed.data.phase primero; si no, raw.phase (por si Zod no lo incluyó)
+  if (parsed.data.phase !== undefined && VALID_PHASES.includes(parsed.data.phase as (typeof VALID_PHASES)[number])) {
+    updatePayload.phase = parsed.data.phase
+  } else {
+    const phaseFromRaw = raw.phase
+    if (typeof phaseFromRaw === 'string' && VALID_PHASES.includes(phaseFromRaw as (typeof VALID_PHASES)[number])) {
+      updatePayload.phase = phaseFromRaw
+    }
+  }
   if (parsed.data.startDate !== undefined) updatePayload.startDate = parsed.data.startDate
   if (parsed.data.plannedEndDate !== undefined) updatePayload.plannedEndDate = parsed.data.plannedEndDate
   if (parsed.data.active !== undefined) updatePayload.active = parsed.data.active
@@ -303,7 +316,8 @@ export async function updateProject(projectId: string, data: UpdateProjectInput)
   revalidatePath('/projects')
   revalidatePath(`/projects/${projectId}`)
   revalidatePath(`/projects/${projectId}/edit`)
-  return redirectTo(`/projects/${projectId}`)
+
+  return { success: true, projectId }
 }
 
 export async function deleteProject(projectId: string) {

@@ -6,6 +6,7 @@ import { getOrgContext } from '@/lib/org-context'
 import { hasMinimumRole } from '@/lib/rbac'
 import { getProject } from '@/app/actions/projects'
 import { createChangeOrder } from '@/app/actions/change-orders'
+import { getWbsNodesForProject } from '@/app/actions/daily-reports'
 import { COForm } from '@/components/change-orders/co-form'
 
 type PageProps = {
@@ -25,14 +26,13 @@ export default async function NewChangeOrderPage({ params }: PageProps) {
   const canEdit = hasMinimumRole(org.role, 'EDITOR')
   if (!canEdit) notFound()
 
+  const wbsOptions = await getWbsNodesForProject(projectId)
+
   async function onSubmit(data: Parameters<typeof createChangeOrder>[1]) {
     'use server'
     const result = await createChangeOrder(projectId, data)
-    if (result && 'success' in result) {
-      const list = await import('@/app/actions/change-orders').then((m) => m.listChangeOrders(projectId, {}))
-      const created = list?.find((o) => o.requestedBy?.user?.fullName) // find latest by number
-      const latest = list?.[0]
-      if (latest) return redirectTo(`/projects/${projectId}/change-orders/${latest.id}`)
+    if (result && 'success' in result && 'changeOrderId' in result && result.changeOrderId) {
+      return redirectTo(`/projects/${projectId}/change-orders/${result.changeOrderId}`)
     }
     return result
   }
@@ -42,16 +42,18 @@ export default async function NewChangeOrderPage({ params }: PageProps) {
       <div className="mb-6 flex items-center gap-4">
         <Link
           href={`/projects/${projectId}/change-orders`}
-          className="text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+          className="text-sm font-medium text-muted-foreground hover:text-foreground"
         >
-          ← Change orders
+          ← {project.name} — Órdenes de cambio
         </Link>
       </div>
-      <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
-        New change order
-      </h2>
+      <h1 className="erp-page-title mb-4">
+        Nueva orden de cambio
+      </h1>
       <COForm
         mode="create"
+        projectId={projectId}
+        wbsOptions={wbsOptions}
         onSubmit={onSubmit}
         onCancelHref={`/projects/${projectId}/change-orders`}
       />

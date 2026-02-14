@@ -103,19 +103,22 @@ export default async function InventoryDashboardPage() {
     if (last) totalValue += totalNum * last.unitCost
   }
 
+  const toNum = (v: unknown): number =>
+    v == null ? 0 : typeof v === 'number' ? v : (v as { toNumber?: () => number })?.toNumber?.() ?? 0
+
   const lowStockRows: Array<{
     id: string
     sku: string
     name: string
     unit: string
-    minStockQty: unknown
-    reorderQty: unknown
-    current_stock: unknown
+    minStockQty: number | null
+    reorderQty: number
+    current_stock: number
   }> = []
 
   for (const item of itemsWithMinStock) {
     const total = await calculateTotalStock(item.id, orgId)
-    const totalNum = typeof total === 'number' ? total : total?.toNumber?.() ?? 0
+    const totalNum = toNum(total)
     const minNum =
       item.minStockQty == null
         ? null
@@ -128,21 +131,23 @@ export default async function InventoryDashboardPage() {
         sku: item.sku,
         name: item.name,
         unit: item.unit,
-        minStockQty: item.minStockQty,
-        reorderQty: item.reorderQty,
-        current_stock: total,
+        minStockQty: minNum,
+        reorderQty: toNum(item.reorderQty),
+        current_stock: totalNum,
       })
     }
   }
 
-  lowStockRows.sort((a, b) => {
-    const aCur = typeof a.current_stock === 'number' ? a.current_stock : (a.current_stock as { toNumber?: () => number })?.toNumber?.() ?? 0
-    const bCur = typeof b.current_stock === 'number' ? b.current_stock : (b.current_stock as { toNumber?: () => number })?.toNumber?.() ?? 0
-    const aMin = typeof a.minStockQty === 'number' ? a.minStockQty : (a.minStockQty as { toNumber?: () => number })?.toNumber?.() ?? 0
-    const bMin = typeof b.minStockQty === 'number' ? b.minStockQty : (b.minStockQty as { toNumber?: () => number })?.toNumber?.() ?? 0
-    return aCur - aMin - (bCur - bMin)
-  })
+  lowStockRows.sort((a, b) => a.current_stock - (a.minStockQty ?? 0) - (b.current_stock - (b.minStockQty ?? 0)))
   const lowStockItems = lowStockRows.slice(0, 10)
+
+  const toNumMov = (v: unknown): number =>
+    v == null ? 0 : typeof v === 'number' ? v : (v as { toNumber?: () => number })?.toNumber?.() ?? 0
+  const recentMovementsPlain = recentMovements.map((m) => ({
+    ...m,
+    quantity: toNumMov(m.quantity),
+    totalCost: toNumMov(m.totalCost),
+  }))
 
   return (
     <div className="h-full">
@@ -174,7 +179,7 @@ export default async function InventoryDashboardPage() {
 
         <div className="grid gap-6 lg:grid-cols-2">
           <LowStockAlerts items={lowStockItems} />
-          <RecentMovements movements={recentMovements} />
+          <RecentMovements movements={recentMovementsPlain} />
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">

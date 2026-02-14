@@ -4,6 +4,7 @@ import { getSession } from '@/lib/session'
 import { getOrgContext } from '@/lib/org-context'
 import { hasMinimumRole } from '@/lib/rbac'
 import { listProjects } from '@/app/actions/projects'
+import { getApprovedOrBaselineBudgetTotal } from '@/app/actions/budget'
 import { ProjectsListClient } from '@/components/projects/projects-list-client'
 import { Link } from '@/i18n/navigation'
 import { Button } from '@/components/ui/button'
@@ -26,24 +27,26 @@ export default async function ProjectsPage({ searchParams }: PageProps) {
     phase: params.phase,
     search: params.search,
   })
+  // Enrich with approved/baseline budget total so list shows correct presupuesto
+  const budgetTotals = await Promise.all(
+    projects.map((p) => getApprovedOrBaselineBudgetTotal(p.id))
+  )
+  const projectsWithBudget = projects.map((p, i) => ({
+    ...p,
+    totalBudget:
+      budgetTotals[i] > 0 ? budgetTotals[i] : (p.totalBudget ? Number(p.totalBudget) : 0),
+  }))
   const canEdit = hasMinimumRole(org.role, 'EDITOR')
 
   return (
-    <div className="space-y-6 bg-background p-6">
-      {/* Page header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-foreground">
-            {t('title')}
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {t('subtitle')}
-          </p>
+    <div className="erp-view-container space-y-6 bg-background">
+      <div className="erp-header-row">
+        <div className="erp-section-header">
+          <h1 className="erp-page-title">{t('title')}</h1>
+          <p className="erp-section-desc">{t('subtitle')}</p>
         </div>
-
-        {/* New project and Import - only for EDITOR and above */}
         {canEdit && (
-          <div className="flex gap-2">
+          <div className="erp-header-actions">
             <Button asChild variant="outline">
               <Link href="/projects/import">
                 <FileSpreadsheet className="mr-2 h-4 w-4" />
@@ -61,7 +64,7 @@ export default async function ProjectsPage({ searchParams }: PageProps) {
       </div>
 
       {/* Projects list/grid */}
-      <ProjectsListClient projects={projects} canEdit={canEdit} showExport={true} />
+      <ProjectsListClient projects={projectsWithBudget} canEdit={canEdit} showExport={true} />
     </div>
   )
 }

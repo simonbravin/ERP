@@ -2,9 +2,10 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Link } from '@/i18n/navigation'
-import { Building2, Users, Shield, AlertTriangle, Activity } from 'lucide-react'
+import { Building2, Users, Shield, AlertTriangle, Activity, LayoutDashboard, Eye } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { SystemHealthWidget } from '@/components/debug/system-health-widget'
@@ -40,16 +41,25 @@ export function SuperAdminDashboardClient({ stats }: Props) {
         </p>
       </div>
 
-      <Tabs defaultValue="dashboard" className="space-y-4">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
-          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-          <TabsTrigger value="events">
-            <Activity className="mr-2 h-4 w-4" />
-            Event Monitor
+      <Tabs defaultValue="dashboard" className="w-full space-y-6">
+        <TabsList className="!flex h-14 w-full max-w-4xl flex-row gap-4 rounded-xl border border-border bg-muted/50 p-2 shadow-sm sm:gap-6">
+          <TabsTrigger
+            value="dashboard"
+            className="flex flex-1 items-center justify-center gap-3 rounded-lg px-8 py-3 text-base font-medium min-w-0"
+          >
+            <LayoutDashboard className="h-5 w-5 shrink-0" />
+            <span>Dashboard</span>
+          </TabsTrigger>
+          <TabsTrigger
+            value="events"
+            className="flex flex-1 items-center justify-center gap-3 rounded-lg px-8 py-3 text-base font-medium min-w-0"
+          >
+            <Activity className="h-5 w-5 shrink-0" />
+            <span>Event Monitor</span>
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="dashboard" className="space-y-6">
+        <TabsContent value="dashboard" className="mt-0 space-y-6">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -126,12 +136,12 @@ export function SuperAdminDashboardClient({ stats }: Props) {
                             locale: es,
                           })}
                         </span>
-                        <Link
-                          href={`/super-admin/organizations?org=${org.id}`}
-                          className="text-primary hover:underline"
-                        >
-                          View
-                        </Link>
+                        <Button asChild variant="outline" size="sm" className="shrink-0">
+                          <Link href={`/super-admin/organizations/${org.id}`}>
+                            <Eye className="mr-1.5 h-4 w-4" />
+                            Ver
+                          </Link>
+                        </Button>
                       </div>
                     </li>
                   ))}
@@ -141,7 +151,7 @@ export function SuperAdminDashboardClient({ stats }: Props) {
           </Card>
         </TabsContent>
 
-        <TabsContent value="events" className="space-y-4">
+        <TabsContent value="events" className="mt-0 space-y-4">
           <p className="text-sm text-muted-foreground">
             Últimos eventos del bus (útil para depuración). Los eventos se disparan al crear/actualizar/eliminar entidades.
           </p>

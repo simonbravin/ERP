@@ -3,7 +3,7 @@
 import { useTranslations } from 'next-intl'
 import { Link, usePathname } from '@/i18n/navigation'
 import { cn } from '@/lib/utils'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   LayoutDashboard,
   BarChart3,
@@ -51,9 +51,9 @@ export function ProjectSidebar({ projectId, orgName = 'Construction ERP', orgLog
       .then(data => setProjectName(data.name || data.projectNumber || 'Proyecto'))
       .catch(() => setProjectName('Proyecto'))
   }, [projectId])
-  
-  // Architecture: Dashboard Proyecto, Presupuesto, Cronograma, Finanzas, Certificaciones, Calidad (RFI), Libro de Obra, Documentos
-  const navigation: NavItem[] = [
+
+  // Memoize navigation so effect below doesn't see a new array every render (avoids update loops)
+  const navigation: NavItem[] = useMemo(() => [
     {
       name: t('overview'),
       href: `/projects/${projectId}`,
@@ -130,8 +130,8 @@ export function ProjectSidebar({ projectId, orgName = 'Construction ERP', orgLog
       href: `/projects/${projectId}/documents`,
       icon: FileText,
     },
-  ]
-  
+  ], [projectId, t])
+
   const toggleSection = (href: string) => {
     setExpandedSections(prev => {
       const next = new Set(prev)
@@ -144,15 +144,18 @@ export function ProjectSidebar({ projectId, orgName = 'Construction ERP', orgLog
     })
   }
   
-  // Auto-expand sections based on current path
+  // Auto-expand sections based on current path (only update when adding a new section to avoid loops)
   useEffect(() => {
-    const activeSection = navigation.find(item => 
+    const activeSection = navigation.find(item =>
       item.children && pathname.startsWith(item.href)
     )
     if (activeSection) {
-      setExpandedSections(prev => new Set(prev).add(activeSection.href))
+      setExpandedSections(prev => {
+        if (prev.has(activeSection.href)) return prev
+        return new Set(prev).add(activeSection.href)
+      })
     }
-  }, [pathname])
+  }, [pathname, navigation])
   
   return (
     <aside className="flex w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar">

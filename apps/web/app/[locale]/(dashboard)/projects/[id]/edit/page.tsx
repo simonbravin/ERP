@@ -10,6 +10,8 @@ type PageProps = {
   params: Promise<{ id: string }>
 }
 
+export const dynamic = 'force-dynamic'
+
 export default async function ProjectEditPage({ params }: PageProps) {
   const session = await getSession()
   if (!session?.user?.id) return notFound()
@@ -39,8 +41,17 @@ export default async function ProjectEditPage({ params }: PageProps) {
     location: project.location ?? undefined,
     m2: project.m2 ? Number(project.m2) : undefined,
     status: project.status,
-    startDate: project.startDate ?? undefined,
-    plannedEndDate: project.plannedEndDate ?? undefined,
+    phase: (project.phase ?? 'PRE_CONSTRUCTION') as UpdateProjectInput['phase'],
+    startDate: project.startDate
+      ? (project.startDate instanceof Date
+          ? project.startDate.toISOString().slice(0, 10)
+          : new Date(project.startDate).toISOString().slice(0, 10))
+      : undefined,
+    plannedEndDate: project.plannedEndDate
+      ? (project.plannedEndDate instanceof Date
+          ? project.plannedEndDate.toISOString().slice(0, 10)
+          : new Date(project.plannedEndDate).toISOString().slice(0, 10))
+      : undefined,
     active: project.active,
   }
 

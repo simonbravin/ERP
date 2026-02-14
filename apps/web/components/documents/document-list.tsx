@@ -9,6 +9,7 @@ export type DocumentRow = {
   docType: string
   category: string | null
   description: string | null
+  project: { id: string; name: string; projectNumber: string } | null
   createdAt: Date
   createdBy: { user: { fullName: string } }
   versions: { versionNumber: number; fileName: string; sizeBytes: number }[]
@@ -49,6 +50,9 @@ export function DocumentList({ documents }: DocumentListProps) {
               Type
             </th>
             <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">
+              Project
+            </th>
+            <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">
               Latest version
             </th>
             <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">
@@ -73,6 +77,9 @@ export function DocumentList({ documents }: DocumentListProps) {
                 </td>
                 <td className="px-3 py-2 text-gray-600 dark:text-gray-400">
                   {doc.docType.replace(/_/g, ' ')}
+                </td>
+                <td className="px-3 py-2 text-gray-600 dark:text-gray-400">
+                  {doc.project ? doc.project.name : '—'}
                 </td>
                 <td className="px-3 py-2 text-gray-600 dark:text-gray-400">
                   {latest
