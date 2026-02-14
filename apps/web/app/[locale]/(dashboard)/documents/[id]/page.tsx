@@ -43,7 +43,7 @@ export default async function DocumentDetailPage({ params }: PageProps) {
   const canUpload = hasMinimumRole(org.role, 'EDITOR')
   const canDelete = hasMinimumRole(org.role, 'ADMIN')
 
-  const versions: DocumentVersionRow[] = doc.versions.map((v) => ({
+  const versions: DocumentVersionRow[] = doc.versions.map((v: (typeof doc.versions)[number]) => ({
     id: v.id,
     versionNumber: v.versionNumber,
     fileName: v.fileName,
