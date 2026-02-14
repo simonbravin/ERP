@@ -1,5 +1,6 @@
 import { auth } from '@/lib/auth'
-import { redirect, notFound } from '@/i18n/navigation'
+import { redirect } from '@/i18n/navigation'
+import { notFound } from 'next/navigation'
 import { getLocale } from 'next-intl/server'
 import { getUserDetails } from '@/app/actions/super-admin'
 import { UserEditClient } from '@/components/super-admin/user-edit-client'

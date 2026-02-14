@@ -1,5 +1,48 @@
 import { Resend } from 'resend'
 
+/** Default expiry for password reset tokens (1 hour from now). */
+export function getResetTokenExpires(): Date {
+  const d = new Date()
+  d.setHours(d.getHours() + 1)
+  return d
+}
+
+export async function sendPasswordResetEmail(params: {
+  to: string
+  resetToken: string
+  resetUrl: string
+}): Promise<{ ok: true } | { ok: false; error: { message: string } }> {
+  const { to, resetToken, resetUrl } = params
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey?.trim()) {
+    console.warn('[email] RESEND_API_KEY is not set; password reset email skipped.')
+    return { ok: false, error: { message: 'Email not configured' } }
+  }
+  const resend = new Resend(apiKey)
+  const resetLink = `${resetUrl}?token=${resetToken}`
+  try {
+    const { data, error } = await resend.emails.send({
+      from: process.env.RESEND_FROM_EMAIL ?? 'ERP Construcción <onboarding@resend.dev>',
+      to: [to],
+      subject: 'Restablecer contraseña',
+      html: `
+        <p>Hola,</p>
+        <p>Recibimos una solicitud para restablecer tu contraseña.</p>
+        <p><a href="${resetLink}">Haz clic aquí para restablecer tu contraseña</a></p>
+        <p>Este enlace expira en 1 hora. Si no solicitaste este cambio, ignora este correo.</p>
+      `.trim(),
+    })
+    if (error) {
+      console.error('Password reset email error:', error)
+      return { ok: false, error }
+    }
+    return { ok: true }
+  } catch (error) {
+    console.error('Password reset email error:', error)
+    return { ok: false, error: { message: String(error) } }
+  }
+}
+
 export async function sendInvitationEmail(params: {
   to: string
   inviterName: string

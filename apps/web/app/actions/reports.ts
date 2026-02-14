@@ -367,6 +367,18 @@ export async function runCustomReport(reportId: string): Promise<ReportResult> {
   return result
 }
 
+/** Validates access to a saved report before client opens export URL. */
+export async function runSavedReport(
+  reportId: string,
+  _format: 'EXCEL' | 'CSV'
+): Promise<void> {
+  const { org } = await getAuthForReports()
+  const report = await prisma.customReport.findFirst({
+    where: { id: reportId, orgId: org.orgId },
+  })
+  if (!report) throw new Error('Reporte no encontrado')
+}
+
 // ==================== Listar reportes ====================
 
 export async function getCustomReports() {
