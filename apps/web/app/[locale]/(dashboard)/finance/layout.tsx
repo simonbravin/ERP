@@ -13,7 +13,7 @@ export default async function FinanceLayout({
   const locale = await getLocale()
   const userId = session?.user?.id
   if (!userId) redirect({ href: '/login', locale })
-  const org = await getOrgContext(userId)
+  const org = await getOrgContext(userId!)
   if (!org) redirect({ href: '/login', locale })
 
   return (
