@@ -18,17 +18,24 @@ export default async function NewMovementPage({ searchParams }: PageProps) {
 
   const params = await searchParams
 
-  const items = await prisma.inventoryItem.findMany({
+  const itemsRaw = await prisma.inventoryItem.findMany({
     where: { orgId: org.orgId, active: true },
     select: {
       id: true,
       sku: true,
       name: true,
       unit: true,
-      category: true,
+      category: { select: { name: true } },
     },
     orderBy: { name: 'asc' },
   })
+  const items = itemsRaw.map((item) => ({
+    id: item.id,
+    name: item.name,
+    unit: item.unit ?? '',
+    sku: item.sku,
+    category: item.category?.name ?? undefined,
+  }))
 
   const locations = await prisma.inventoryLocation.findMany({
     where: { orgId: org.orgId, active: true },
