@@ -29,6 +29,7 @@ export default async function NewMovementPage({ searchParams }: PageProps) {
     },
     orderBy: { name: 'asc' },
   })
+  // Transform category object to string for MovementWizard
   const items = itemsRaw.map((item) => ({
     id: item.id,
     name: item.name,
