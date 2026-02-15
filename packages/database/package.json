@@ -5,6 +5,7 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "prisma": {
+    "schema": "prisma/schema.prisma",
     "seed": "tsx src/seed.ts"
   },
   "scripts": {

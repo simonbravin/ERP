@@ -8,6 +8,7 @@ Multi-tenant Construction ERP SaaS — Turborepo monorepo.
    ```bash
    pnpm install
    ```
+   (After install, `postinstall` runs `pnpm run db:generate` so the Prisma client is generated. If you see a Prisma "schema not found" warning during install, you can ignore it or run `PRISMA_SKIP_POSTINSTALL_GENERATE=1 pnpm install` to suppress it.)
 
 2. **Copy environment**
    ```bash
