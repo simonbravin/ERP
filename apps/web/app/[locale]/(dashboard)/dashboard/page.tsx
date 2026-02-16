@@ -22,7 +22,16 @@ export default async function DashboardHomePage() {
   const t = await getTranslations('dashboard')
 
   // Fetch all dashboard data in parallel; on any error use safe defaults so page does not 500
-  let kpis = { activeProjects: 0, totalBudget: 0, pendingCertifications: 0, monthExpenses: 0 }
+  let kpis: Awaited<ReturnType<typeof getOrgKPIs>> = {
+    activeProjects: 0,
+    totalBudget: 0,
+    pendingCertifications: 0,
+    monthExpenses: 0,
+    accountsReceivable: 0,
+    accountsPayable: 0,
+    progressPct: null,
+    pendingChangeOrders: 0,
+  }
   let cashflowData: { month: string; income: number; expenses: number; net: number }[] = []
   let alerts: { id: string; type: 'warning' | 'error' | 'info'; title: string; message: string; link?: string }[] = []
   let recentActivity: { id: string; action: string; entityType: string; actorName: string; projectName?: string | null; createdAt: Date; details: unknown }[] = []
@@ -49,23 +58,23 @@ export default async function DashboardHomePage() {
         <p className="erp-section-desc">{t('subtitle')}</p>
       </div>
 
-      {/* KPI Cards */}
-      <KPICards kpis={kpis} />
+      {/* Main KPIs: 4 cards (proyectos, presupuesto, gastos, avance) */}
+      <KPICards kpis={kpis} variant="main" />
 
-      {/* Main content grid */}
+      {/* Flujo de caja + Alertas */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Cashflow chart - takes 2 columns; min-height so ResponsiveContainer gets valid dimensions */}
-        <div className="lg:col-span-2 min-h-[360px]">
+        <div className="min-h-[360px] lg:col-span-2">
           <CashflowChart data={cashflowData} />
         </div>
-
-        {/* Alerts widget */}
         <div>
           <AlertsWidget alerts={alerts} />
         </div>
       </div>
 
-      {/* Recent activity */}
+      {/* Certificaciones pendientes, Cuentas por cobrar, Cuentas por pagar, Órdenes de cambio */}
+      <KPICards kpis={kpis} variant="finance" />
+
+      {/* Actividad reciente */}
       <RecentActivityFeed activities={recentActivity} />
     </div>
   )

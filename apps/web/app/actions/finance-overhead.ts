@@ -144,6 +144,7 @@ export async function allocateOverhead(
 
 export type OverheadTransactionWithAllocations = {
   id: string
+  type: string
   transactionNumber: string
   description: string
   issueDate: Date
@@ -170,7 +171,7 @@ export async function getOverheadTransactions(): Promise<OverheadTransactionWith
     where: {
       orgId: org.orgId,
       projectId: null,
-      type: 'OVERHEAD',
+      type: { in: ['OVERHEAD', 'EXPENSE'] },
       deleted: false,
     },
     include: {
@@ -202,6 +203,7 @@ export async function getOverheadTransactions(): Promise<OverheadTransactionWith
 
     return {
       id: tx.id,
+      type: tx.type,
       transactionNumber: tx.transactionNumber,
       description: tx.description,
       issueDate: tx.issueDate,

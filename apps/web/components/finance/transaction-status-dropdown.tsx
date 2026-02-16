@@ -11,16 +11,9 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ChevronDown, Loader2 } from 'lucide-react'
 import { updateProjectTransaction } from '@/app/actions/finance'
+import { STATUS_LABELS } from '@/lib/finance-labels'
 import { toast } from 'sonner'
 import { TRANSACTION_STATUS } from '@repo/validators'
-
-const STATUS_LABELS: Record<string, string> = {
-  DRAFT: 'Borrador',
-  SUBMITTED: 'Enviado',
-  APPROVED: 'Aprobado',
-  PAID: 'Pagado',
-  VOIDED: 'Anulado',
-}
 
 interface TransactionStatusDropdownProps {
   transactionId: string

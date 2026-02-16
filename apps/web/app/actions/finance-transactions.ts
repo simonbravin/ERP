@@ -392,6 +392,7 @@ export async function updateFinanceTransaction(id: string, data: UpdateFinanceTr
     partyId: partyId !== undefined ? partyId : existing.partyId,
   }
   if (parsed.data.documentType !== undefined) payload.documentType = parsed.data.documentType
+  if (parsed.data.dueDate !== undefined) payload.dueDate = parsed.data.dueDate
   if (parsed.data.retentionAmount !== undefined) payload.retentionAmount = new Prisma.Decimal(parsed.data.retentionAmount)
   if (parsed.data.adjustmentAmount !== undefined) payload.adjustmentAmount = new Prisma.Decimal(parsed.data.adjustmentAmount)
   if (parsed.data.adjustmentNotes !== undefined) payload.adjustmentNotes = parsed.data.adjustmentNotes

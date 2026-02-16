@@ -329,38 +329,47 @@ export function UserEditClient({ user }: UserEditClientProps) {
       ))}
 
       <Dialog open={showResetPassword} onOpenChange={setShowResetPassword}>
-        <DialogContent className="max-w-xl">
+        <DialogContent className="erp-form-modal max-w-xl gap-6 py-6">
           <DialogHeader>
             <DialogTitle>Resetear contraseña</DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-foreground/80">
               Ingresá una nueva contraseña para {user.fullName ?? user.email}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="newPassword">Nueva contraseña</Label>
+          <div className="rounded-lg border border-border bg-muted/30 p-5 space-y-5">
+            <div className="space-y-2">
+              <Label htmlFor="newPassword" className="text-sm font-medium text-foreground">
+                Nueva contraseña
+              </Label>
               <Input
                 id="newPassword"
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Mínimo 8 caracteres"
-                className="mt-1"
+                placeholder="Ingresá la nueva contraseña"
+                className="mt-1 w-full min-w-0"
+                autoComplete="new-password"
               />
+              <p className="text-sm text-muted-foreground">
+                Mínimo 8 caracteres
+              </p>
             </div>
-            <div>
-              <Label htmlFor="confirmPassword">Confirmar contraseña</Label>
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword" className="text-sm font-medium text-foreground">
+                Reingresar contraseña
+              </Label>
               <Input
                 id="confirmPassword"
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Reingresar contraseña"
-                className="mt-1"
+                placeholder="Reingresá la contraseña"
+                className="mt-1 w-full min-w-0"
+                autoComplete="new-password"
               />
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="gap-2 sm:gap-0">
             <Button
               variant="outline"
               onClick={() => setShowResetPassword(false)}

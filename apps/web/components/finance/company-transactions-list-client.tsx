@@ -24,6 +24,7 @@ import {
 } from '@/app/actions/export'
 import { ExportDialog } from '@/components/export/export-dialog'
 import { TransactionFormDialog } from './transaction-form-dialog'
+import { DOCUMENT_TYPE_LABELS, TYPE_LABELS } from '@/lib/finance-labels'
 import { FileDown } from 'lucide-react'
 
 export type CompanyTransactionRow = {
@@ -53,21 +54,6 @@ const STATUS_VARIANT: Record<string, 'secondary' | 'default' | 'outline' | 'dang
   APPROVED: 'outline',
   PAID: 'default',
   VOIDED: 'danger',
-}
-
-const TYPE_LABELS: Record<string, string> = {
-  EXPENSE: 'Gasto',
-  INCOME: 'Ingreso',
-  PURCHASE: 'Compra',
-  SALE: 'Venta',
-  OVERHEAD: 'Overhead',
-}
-
-const DOCUMENT_TYPE_LABELS: Record<string, string> = {
-  INVOICE: 'Factura',
-  RECEIPT: 'Recibo',
-  CREDIT_NOTE: 'Nota de crédito',
-  DEBIT_NOTE: 'Nota de débito',
 }
 
 interface Props {

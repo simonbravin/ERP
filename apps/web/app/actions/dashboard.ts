@@ -7,6 +7,14 @@ export type KPIs = {
   totalBudget: number
   pendingCertifications: number
   monthExpenses: number
+  /** Cuentas por cobrar: ingresos/ventas aprobados no cobrados */
+  accountsReceivable: number
+  /** Cuentas por pagar: gastos/compras aprobados no pagados */
+  accountsPayable: number
+  /** Avance % ponderado por monto certificado (solo proyectos activos, última cert aprobada) */
+  progressPct: number | null
+  /** Órdenes de cambio pendientes (DRAFT o CHANGES_REQUESTED) */
+  pendingChangeOrders: number
 }
 
 export type CashflowDataPoint = {
@@ -80,27 +88,102 @@ export async function getOrgKPIs(orgId: string): Promise<KPIs> {
     _sum: { amountBaseCurrency: true },
   })
 
+  // Cuentas por cobrar: INCOME/SALE no cobrados
+  const receivables = await prisma.financeTransaction.aggregate({
+    where: {
+      orgId,
+      type: { in: ['INCOME', 'SALE'] },
+      status: { in: ['DRAFT', 'SUBMITTED', 'APPROVED'] },
+      deleted: false,
+    },
+    _sum: { amountBaseCurrency: true },
+  })
+
+  // Cuentas por pagar: EXPENSE/PURCHASE/OVERHEAD no pagados
+  const payables = await prisma.financeTransaction.aggregate({
+    where: {
+      orgId,
+      type: { in: ['EXPENSE', 'PURCHASE', 'OVERHEAD'] },
+      status: { in: ['DRAFT', 'SUBMITTED', 'APPROVED'] },
+      deleted: false,
+    },
+    _sum: { amountBaseCurrency: true },
+  })
+
+  // Avance %: última certificación aprobada por proyecto activo, promedio ponderado por totalAmount
+  const certificationsWithLines = await prisma.certification.findMany({
+    where: {
+      orgId,
+      status: 'APPROVED',
+      project: { status: 'ACTIVE', active: true },
+    },
+    include: {
+      lines: {
+        select: {
+          totalProgressPct: true,
+          totalAmount: true,
+        },
+      },
+    },
+    orderBy: [{ periodYear: 'desc' }, { periodMonth: 'desc' }],
+  })
+
+  let progressPct: number | null = null
+  const latestByProject = new Map<string, typeof certificationsWithLines[0]['lines']>()
+  for (const cert of certificationsWithLines) {
+    if (!latestByProject.has(cert.projectId)) {
+      latestByProject.set(cert.projectId, cert.lines)
+    }
+  }
+  let weightedSum = 0
+  let totalWeight = 0
+  for (const lines of latestByProject.values()) {
+    for (const line of lines) {
+      const pct = Number(line.totalProgressPct)
+      const amt = Number(line.totalAmount)
+      if (amt > 0) {
+        weightedSum += pct * amt
+        totalWeight += amt
+      }
+    }
+  }
+  if (totalWeight > 0) {
+    progressPct = Math.round((weightedSum / totalWeight) * 100) / 100
+  }
+
+  // Órdenes de cambio pendientes (no aprobadas)
+  const pendingChangeOrders = await prisma.changeOrder.count({
+    where: {
+      orgId,
+      status: { in: ['DRAFT', 'CHANGES_REQUESTED'] },
+    },
+  })
+
   return {
     activeProjects: activeProjectsCount,
     totalBudget: Number(totalBudget),
     pendingCertifications,
     monthExpenses: Number(monthExpenses._sum.amountBaseCurrency || 0),
+    accountsReceivable: Number(receivables._sum.amountBaseCurrency ?? 0),
+    accountsPayable: Number(payables._sum.amountBaseCurrency ?? 0),
+    progressPct,
+    pendingChangeOrders,
   }
 }
 
 /**
- * Get cashflow data for last 6 months
+ * Get cashflow data for the last N months (default 12 for dashboard toggle)
  */
-export async function getCashflowData(orgId: string): Promise<CashflowDataPoint[]> {
-  const sixMonthsAgo = new Date()
-  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
+export async function getCashflowData(orgId: string, months = 12): Promise<CashflowDataPoint[]> {
+  const startDate = new Date()
+  startDate.setMonth(startDate.getMonth() - months)
 
   // Income from approved certifications
   const certifications = await prisma.certification.findMany({
     where: {
       orgId,
       status: 'APPROVED',
-      approvedAt: { gte: sixMonthsAgo },
+      approvedAt: { gte: startDate },
     },
     include: {
       lines: {
@@ -116,7 +199,7 @@ export async function getCashflowData(orgId: string): Promise<CashflowDataPoint[
       orgId,
       type: { in: ['EXPENSE', 'PURCHASE'] },
       status: { in: ['APPROVED', 'PAID'] },
-      issueDate: { gte: sixMonthsAgo },
+      issueDate: { gte: startDate },
       deleted: false,
     },
     select: {
@@ -157,7 +240,7 @@ export async function getCashflowData(orgId: string): Promise<CashflowDataPoint[
   // If no data, generate empty months
   if (monthlyData.size === 0) {
     const now = new Date()
-    for (let i = 5; i >= 0; i--) {
+    for (let i = months - 1; i >= 0; i--) {
       const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
       monthlyData.set(monthKey, { income: 0, expenses: 0 })

@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import { getTranslations } from 'next-intl/server'
 import { getSession } from '@/lib/session'
 import { getOrgContext } from '@/lib/org-context'
 import { hasMinimumRole } from '@/lib/rbac'
@@ -32,26 +33,27 @@ export default async function FinanceTransactionEditPage({ params }: PageProps) 
   if (!canEdit) return notFound()
 
   const wbsOptions = tx.projectId ? await listWbsNodesForProject(tx.projectId) : []
+  const t = await getTranslations('finance')
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
+    <div className="erp-view-container space-y-6 p-6">
+      <div className="mb-4">
         <Link
           href={`/finance/transactions/${id}`}
-          className="text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+          className="text-sm font-medium text-muted-foreground hover:text-foreground"
         >
           ← {tx.transactionNumber}
         </Link>
-        <span className="mx-2 text-gray-400">|</span>
+        <span className="mx-2 text-muted-foreground">|</span>
         <Link
           href="/finance/transactions"
-          className="text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+          className="text-sm font-medium text-muted-foreground hover:text-foreground"
         >
-          Transactions
+          {t('backToTransactions')}
         </Link>
       </div>
-      <h1 className="mb-4 text-xl font-semibold text-gray-900 dark:text-white">
-        Edit transaction
+      <h1 className="text-xl font-semibold text-foreground">
+        {t('edit')} {tx.transactionNumber}
       </h1>
       <TransactionEditClient
         transactionId={id}

@@ -37,14 +37,7 @@ import { exportProjectTransactionsToExcel } from '@/app/actions/export'
 import { ExportDialog } from '@/components/export/export-dialog'
 import { toast } from 'sonner'
 import { FileDown } from 'lucide-react'
-
-const STATUS_LABELS: Record<string, string> = {
-  DRAFT: 'Borrador',
-  SUBMITTED: 'Enviado',
-  APPROVED: 'Aprobado',
-  PAID: 'Pagado',
-  VOIDED: 'Anulado',
-}
+import { STATUS_LABELS } from '@/lib/finance-labels'
 
 export type ProjectTransactionRow = {
   id: string

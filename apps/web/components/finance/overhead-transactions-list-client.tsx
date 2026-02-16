@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import {
   Select,
   SelectContent,
@@ -56,6 +57,10 @@ export function OverheadTransactionsListClient({
   const router = useRouter()
   const [transactions, setTransactions] = useState(initialTransactions)
   const [filterStatus, setFilterStatus] = useState<string>('all')
+  const [dateFrom, setDateFrom] = useState<string>('')
+  const [dateTo, setDateTo] = useState<string>('')
+  const [typeFilter, setTypeFilter] = useState<'all' | 'OVERHEAD' | 'EXPENSE'>('all')
+  const [search, setSearch] = useState<string>('')
   const [selectedTransaction, setSelectedTransaction] =
     useState<OverheadTransactionWithAllocations | null>(null)
   const [isAllocationDialogOpen, setIsAllocationDialogOpen] = useState(false)
@@ -80,10 +85,33 @@ export function OverheadTransactionsListClient({
     getOverheadTransactions().then(setTransactions)
   })
 
-  const filteredTransactions =
+  const filteredByStatus =
     filterStatus === 'all'
       ? transactions
       : transactions.filter((t) => t.status === filterStatus)
+
+  const filteredTransactions = filteredByStatus.filter((tx) => {
+    if (dateFrom) {
+      const d = tx.issueDate instanceof Date ? tx.issueDate : new Date(tx.issueDate)
+      const from = new Date(dateFrom)
+      from.setHours(0, 0, 0, 0)
+      if (d < from) return false
+    }
+    if (dateTo) {
+      const d = tx.issueDate instanceof Date ? tx.issueDate : new Date(tx.issueDate)
+      const to = new Date(dateTo)
+      to.setHours(23, 59, 59, 999)
+      if (d > to) return false
+    }
+    if (typeFilter !== 'all' && tx.type !== typeFilter) return false
+    const q = search.trim().toLowerCase()
+    if (q) {
+      const num = (tx.transactionNumber ?? '').toLowerCase()
+      const desc = (tx.description ?? '').toLowerCase()
+      if (!num.includes(q) && !desc.includes(q)) return false
+    }
+    return true
+  })
 
   const handleDeleteAllocation = async (allocationId: string) => {
     try {
@@ -165,7 +193,40 @@ export function OverheadTransactionsListClient({
             </Select>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted/30 p-3">
+            <span className="text-sm font-medium text-foreground">Filtros</span>
+            <Input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              placeholder="Desde"
+              className="max-w-[140px]"
+            />
+            <Input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              placeholder="Hasta"
+              className="max-w-[140px]"
+            />
+            <Select value={typeFilter} onValueChange={(v: 'all' | 'OVERHEAD' | 'EXPENSE') => setTypeFilter(v)}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                <SelectItem value="OVERHEAD">Overhead</SelectItem>
+                <SelectItem value="EXPENSE">Gasto</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input
+              placeholder="Buscar por número o descripción"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="max-w-[220px]"
+            />
+          </div>
           <div className="overflow-x-auto rounded-md border">
             <Table>
               <TableHeader>

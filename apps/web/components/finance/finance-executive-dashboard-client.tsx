@@ -46,9 +46,10 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 interface Props {
   data: FinanceExecutiveDashboard
+  alerts?: FinanceAlert[]
 }
 
-export function FinanceExecutiveDashboardClient({ data }: Props) {
+export function FinanceExecutiveDashboardClient({ data, alerts = [] }: Props) {
   const [isExporting, setIsExporting] = useState(false)
   const { captureChart, downloadFile } = useChartExport()
 

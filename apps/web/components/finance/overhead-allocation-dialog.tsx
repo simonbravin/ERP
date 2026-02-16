@@ -25,6 +25,7 @@ import { formatCurrency } from '@/lib/format-utils'
 import { allocateOverhead } from '@/app/actions/finance'
 import { toast } from 'sonner'
 import { Plus, Trash2, AlertCircle } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 const allocationSchema = z
   .object({
@@ -144,37 +145,50 @@ export function OverheadAllocationDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 text-sm">
-          <div className="grid grid-cols-2 gap-2 rounded-md border bg-muted/30 p-3">
-            <span className="text-muted-foreground">Descripción:</span>
-            <span className="font-medium">{transaction.description}</span>
-            <span className="text-muted-foreground">Total:</span>
-            <span className="tabular-nums font-medium">
-              {formatCurrency(transaction.total, transaction.currency)}
-            </span>
-            <span className="text-muted-foreground">Ya asignado:</span>
-            <span className="tabular-nums">{transaction.totalAllocatedPct.toFixed(2)}%</span>
-            <span className="text-muted-foreground">Por asignar:</span>
-            <span className="tabular-nums font-medium">
-              {formatCurrency(transaction.remainingAmount, transaction.currency)}
-            </span>
+        <div className="space-y-5 text-sm">
+          <div className="rounded-lg border border-border bg-muted/50 p-4">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+              <span className="text-sm font-medium text-muted-foreground">Descripción</span>
+              <span className="text-sm font-medium text-foreground">{transaction.description}</span>
+              <span className="text-sm font-medium text-muted-foreground">Total</span>
+              <span className="text-sm tabular-nums font-medium text-foreground">
+                {formatCurrency(transaction.total, transaction.currency)}
+              </span>
+              <span className="text-sm font-medium text-muted-foreground">Ya asignado</span>
+              <span className="text-sm tabular-nums text-foreground">
+                {transaction.totalAllocatedPct.toFixed(2)}% (1 transacción)
+              </span>
+              <span className="text-sm font-medium text-muted-foreground">Por asignar</span>
+              <span className="text-sm tabular-nums font-medium text-foreground">
+                {formatCurrency(transaction.remainingAmount, transaction.currency)}
+              </span>
+            </div>
           </div>
 
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-5">
             <div className="space-y-3">
               {fields.map((field, index) => (
                 <div
                   key={field.id}
-                  className="flex flex-wrap items-end gap-2 rounded border border-border/50 p-2"
+                  className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-card p-3"
                 >
-                  <div className="min-w-[180px] flex-1 space-y-1">
-                    <Label className="text-xs">Proyecto</Label>
+                  <div className="min-w-[200px] flex-1 space-y-2">
+                    <Label htmlFor={`project-${index}`} className="text-sm font-medium text-foreground">
+                      Proyecto
+                    </Label>
                     <Select
                       value={watchAllocations[index]?.projectId ?? ''}
                       onValueChange={(value) => form.setValue(`allocations.${index}.projectId`, value)}
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar proyecto" />
+                      <SelectTrigger
+                        id={`project-${index}`}
+                        className={cn(
+                          'h-10',
+                          form.formState.errors.allocations?.[index]?.projectId &&
+                            'border-destructive focus-visible:ring-destructive'
+                        )}
+                      >
+                        <SelectValue placeholder="Seleccionar..." />
                       </SelectTrigger>
                       <SelectContent>
                         {projects.map((project) => (
@@ -198,14 +212,21 @@ export function OverheadAllocationDialog({
                       </p>
                     )}
                   </div>
-                  <div className="w-24 space-y-1">
-                    <Label className="text-xs">Porcentaje</Label>
+                  <div className="w-24 space-y-2">
+                    <Label
+                      htmlFor={`pct-${index}`}
+                      className="text-sm font-medium text-foreground"
+                    >
+                      Porcentaje
+                    </Label>
                     <Input
+                      id={`pct-${index}`}
                       type="number"
                       step="0.01"
                       min={0}
                       max={100}
                       placeholder="0.00"
+                      className="h-10 text-right tabular-nums"
                       {...form.register(`allocations.${index}.allocationPct`, {
                         valueAsNumber: true,
                       })}
@@ -216,9 +237,9 @@ export function OverheadAllocationDialog({
                       </p>
                     )}
                   </div>
-                  <div className="w-28 shrink-0 text-right tabular-nums text-muted-foreground">
-                    <span className="text-xs">Monto</span>
-                    <div className="text-sm font-medium">
+                  <div className="w-28 shrink-0 space-y-2">
+                    <span className="text-sm font-medium text-muted-foreground">Monto</span>
+                    <div className="flex h-10 items-center justify-end rounded-md border border-border bg-muted/30 px-3 text-sm tabular-nums text-foreground">
                       {formatCurrency(
                         (transaction.total * (watchAllocations[index]?.allocationPct || 0)) / 100,
                         transaction.currency
@@ -229,6 +250,7 @@ export function OverheadAllocationDialog({
                     type="button"
                     variant="ghost"
                     size="icon"
+                    className="h-10 w-10 shrink-0"
                     onClick={() => remove(index)}
                     disabled={fields.length === 1}
                     title="Quitar fila"
@@ -242,6 +264,7 @@ export function OverheadAllocationDialog({
             <Button
               type="button"
               variant="outline"
+              size="default"
               className="w-full"
               onClick={() => append({ projectId: '', allocationPct: 0 })}
             >
@@ -249,20 +272,28 @@ export function OverheadAllocationDialog({
               Agregar Proyecto
             </Button>
 
-            <div className="flex items-center justify-between rounded-md border bg-muted/30 px-3 py-2">
-              <span className="font-medium">Total asignado:</span>
-              <span className="tabular-nums font-semibold">
+            <div
+              className={cn(
+                'flex items-center justify-between rounded-lg border px-4 py-3',
+                isValid
+                  ? 'border-border bg-muted/50'
+                  : 'border-destructive/50 bg-destructive/5'
+              )}
+            >
+              <span className="text-sm font-medium text-foreground">Total asignado</span>
+              <span className="flex items-center gap-2 text-sm tabular-nums font-medium">
                 {totalPct.toFixed(2)}%
                 {isValid ? (
-                  <span className="ml-2 text-success">✓ Válido</span>
+                  <span className="text-success">✓ Válido</span>
                 ) : (
-                  <span className="ml-2 text-destructive">
-                    <AlertCircle className="inline h-3.5 w-3.5" /> Falta {remainingPct.toFixed(2)}%
+                  <span className="flex items-center gap-1 text-destructive">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    Falta {remainingPct.toFixed(2)}%
                   </span>
                 )}
               </span>
             </div>
-            <div className="text-right text-sm text-muted-foreground">
+            <div className="rounded-lg border border-border bg-muted/30 px-4 py-2 text-right text-sm text-muted-foreground">
               Monto total asignado:{' '}
               <span className="font-medium text-foreground tabular-nums">
                 {formatCurrency((transaction.total * totalPct) / 100, transaction.currency)}
@@ -270,12 +301,12 @@ export function OverheadAllocationDialog({
             </div>
 
             {form.formState.errors.allocations?.root?.message && (
-              <p className="text-sm text-destructive">
+              <div className="rounded-lg border border-destructive/50 bg-destructive/5 px-3 py-2 text-sm text-destructive">
                 {form.formState.errors.allocations.root.message}
-              </p>
+              </div>
             )}
 
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-end gap-2 pt-1">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancelar
               </Button>

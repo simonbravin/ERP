@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useTranslations } from 'next-intl'
 import {
   updateFinanceTransactionSchema,
   type UpdateFinanceTransactionInput,
@@ -14,6 +15,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { CurrencyConverter } from './currency-converter'
 import { TransactionLineForm, type LineInput } from './transaction-line-form'
+import { DOCUMENT_TYPE_LABELS, TYPE_LABELS } from '@/lib/finance-labels'
 
 type WbsOption = { id: string; code: string; name: string }
 
@@ -22,10 +24,13 @@ type TransactionEditClientProps = {
   transaction: {
     id: string
     type: string
+    documentType?: string | null
     description: string
     issueDate: Date
+    dueDate?: Date | null
     projectId: string | null
     partyId: string | null
+    party?: { id: string; name: string } | null
     currency: string
     total: number
     amountBaseCurrency: number
@@ -60,6 +65,8 @@ export function TransactionEditClient({
   fetchWbs,
 }: TransactionEditClientProps) {
   const router = useRouter()
+  const t = useTranslations('finance')
+  const tCommon = useTranslations('common')
   const [wbsOptions, setWbsOptions] = useState<WbsOption[]>(initialWbs)
   const [exchangeRate, setExchangeRate] = useState(rateFromTx(transaction.exchangeRateSnapshot))
   const {
@@ -74,6 +81,8 @@ export function TransactionEditClient({
     defaultValues: {
       description: transaction.description,
       issueDate: transaction.issueDate.toISOString().slice(0, 10) as unknown as Date,
+      dueDate: transaction.dueDate ? new Date(transaction.dueDate).toISOString().slice(0, 10) as unknown as Date : undefined,
+      documentType: (transaction.documentType ?? 'INVOICE') as UpdateFinanceTransactionInput['documentType'],
       projectId: transaction.projectId ?? undefined,
       partyId: transaction.partyId ?? undefined,
       currencyCode: transaction.currency,
@@ -133,38 +142,54 @@ export function TransactionEditClient({
 
   return (
     <div className="erp-form-page space-y-6">
-      <form onSubmit={handleSubmit(onHeaderSubmit)} className="space-y-4 rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
-        <h3 className="text-sm font-medium text-gray-900 dark:text-white">Transaction</h3>
+      <form onSubmit={handleSubmit(onHeaderSubmit)} className="space-y-4 rounded-xl border border-border/60 bg-card p-5 shadow-sm">
+        <h3 className="text-base font-semibold text-foreground">{t('transactions')}</h3>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <Label className="text-xs text-gray-500 dark:text-gray-400">Type</Label>
-            <p className="text-sm font-medium text-gray-900 dark:text-white">
-              {transaction.type.replace(/_/g, ' ')}
+            <Label className="text-sm font-medium text-muted-foreground">{t('type')}</Label>
+            <p className="mt-1 text-sm font-medium text-foreground">
+              {TYPE_LABELS[transaction.type] ?? transaction.type.replace(/_/g, ' ')}
             </p>
           </div>
           <div>
-            <Label htmlFor="edit-date">Issue date</Label>
-            <Input id="edit-date" type="date" {...register('issueDate')} className="mt-0.5" />
+            <Label className="text-sm font-medium text-muted-foreground">
+              {transaction.type === 'INCOME' || transaction.type === 'SALE' ? t('client') : t('vendor')}
+            </Label>
+            <p className="mt-1 text-sm text-foreground">{transaction.party?.name ?? '—'}</p>
+          </div>
+          <div>
+            <Label className="text-sm font-medium text-muted-foreground">{t('documentType')}</Label>
+            <p className="mt-1 text-sm text-foreground">
+              {DOCUMENT_TYPE_LABELS[transaction.documentType ?? 'INVOICE'] ?? (transaction.documentType ?? 'INVOICE')}
+            </p>
+          </div>
+          <div>
+            <Label htmlFor="edit-date" className="text-sm font-medium text-muted-foreground">{t('date')}</Label>
+            <Input id="edit-date" type="date" {...register('issueDate')} className="mt-1 min-h-10" />
+          </div>
+          <div>
+            <Label htmlFor="edit-due" className="text-sm font-medium text-muted-foreground">{t('dueDate')}</Label>
+            <Input id="edit-due" type="date" {...register('dueDate')} className="mt-1 min-h-10" />
           </div>
           <div className="sm:col-span-2">
-            <Label htmlFor="edit-desc">Description</Label>
-            <Input id="edit-desc" {...register('description')} className="mt-0.5" />
+            <Label htmlFor="edit-desc" className="text-sm font-medium text-muted-foreground">{t('description')}</Label>
+            <Input id="edit-desc" {...register('description')} className="mt-1 min-h-10" />
             {errors.description && (
               <p className="mt-1 text-sm text-destructive">{errors.description.message}</p>
             )}
           </div>
           <div>
-            <Label htmlFor="edit-currency">Currency</Label>
+            <Label htmlFor="edit-currency" className="text-sm font-medium text-muted-foreground">{t('currency')}</Label>
             <select
               id="edit-currency"
               {...register('currencyCode')}
-              className="mt-0.5 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900"
+              className="mt-1 min-h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
             >
               <option value={transaction.currency}>{transaction.currency}</option>
             </select>
           </div>
           <div>
-            <Label htmlFor="edit-rate">Exchange rate to base (USD)</Label>
+            <Label htmlFor="edit-rate" className="text-sm font-medium text-muted-foreground">{t('baseCurrency')}</Label>
             <Input
               id="edit-rate"
               type="number"
@@ -172,8 +197,12 @@ export function TransactionEditClient({
               step={0.01}
               value={exchangeRate}
               onChange={(e) => setExchangeRate(Number(e.target.value) || 1)}
-              className="mt-0.5"
+              className="mt-1 min-h-10"
             />
+          </div>
+          <div className="sm:col-span-2">
+            <Label htmlFor="edit-ref" className="text-sm font-medium text-muted-foreground">{t('reference')}</Label>
+            <Input id="edit-ref" {...register('reference')} className="mt-1 min-h-10" />
           </div>
         </div>
         <div className="mt-4">
@@ -187,43 +216,44 @@ export function TransactionEditClient({
         </div>
         <div className="flex gap-2">
           <Button type="submit" disabled={isSubmitting || !isDirty}>
-            {isSubmitting ? 'Saving…' : 'Save'}
+            {isSubmitting ? t('saving') : tCommon('save')}
           </Button>
         </div>
       </form>
 
-      <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
-        <h3 className="mb-4 text-sm font-medium text-gray-900 dark:text-white">Lines</h3>
+      <div className="rounded-xl border border-border/60 bg-card p-5 shadow-sm">
+        <h3 className="mb-4 text-base font-semibold text-foreground">{t('lines')}</h3>
         <TransactionLineForm wbsOptions={wbsOptions} onAdd={onAddLine} />
         {transaction.lines.length > 0 && (
           <div className="mt-4">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-200 text-left text-gray-500 dark:border-gray-700 dark:text-gray-400">
-                  <th className="py-2">Description</th>
-                  <th className="py-2">WBS</th>
-                  <th className="py-2 text-right">Amount</th>
-                  <th className="w-20 py-2" />
+                <tr className="border-b border-border text-left">
+                  <th className="py-3 font-medium text-muted-foreground">{t('description')}</th>
+                  <th className="py-3 font-medium text-muted-foreground">WBS</th>
+                  <th className="py-3 text-right font-medium text-muted-foreground">{t('amount')}</th>
+                  <th className="w-24 py-3" />
                 </tr>
               </thead>
               <tbody>
                 {transaction.lines.map((line) => (
-                  <tr key={line.id} className="border-b border-gray-100 dark:border-gray-800">
-                    <td className="py-2 text-gray-900 dark:text-white">{line.description}</td>
-                    <td className="py-2 font-mono text-gray-600 dark:text-gray-400">
+                  <tr key={line.id} className="border-b border-border/50">
+                    <td className="py-2 text-foreground">{line.description}</td>
+                    <td className="py-2 font-mono text-muted-foreground">
                       {line.wbsNode ? `${line.wbsNode.code} ${line.wbsNode.name}` : '—'}
                     </td>
-                    <td className="py-2 text-right tabular-nums text-gray-700 dark:text-gray-300">
+                    <td className="py-2 text-right tabular-nums text-foreground">
                       {line.lineTotal.toFixed(2)}
                     </td>
                     <td className="py-2">
                       <Button
                         type="button"
                         variant="ghost"
-                        className="h-8 text-xs text-red-600 dark:text-red-400"
+                        size="sm"
+                        className="h-8 text-destructive hover:text-destructive"
                         onClick={() => onDeleteLine(line.id)}
                       >
-                        Remove
+                        {tCommon('remove')}
                       </Button>
                     </td>
                   </tr>

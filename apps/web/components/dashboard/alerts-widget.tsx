@@ -40,8 +40,8 @@ export function AlertsWidget({ alerts }: AlertsWidgetProps) {
   }
 
   return (
-    <div className="erp-card p-6">
-      <h3 className="erp-section-title">{t('alertsTitle')}</h3>
+    <div className="rounded-xl border border-border/60 bg-card p-6 shadow-sm">
+      <h3 className="text-lg font-semibold text-foreground">{t('alertsTitle')}</h3>
 
       {alerts.length === 0 ? (
         <div className="mt-4 flex flex-col items-center justify-center py-8">

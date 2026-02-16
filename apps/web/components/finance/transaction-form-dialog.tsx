@@ -29,6 +29,7 @@ import {
   createCompanyTransaction,
   getPartiesForProject,
 } from '@/app/actions/finance'
+import { DOCUMENT_TYPE_LABELS, STATUS_LABELS } from '@/lib/finance-labels'
 import { PartyCombobox } from './party-combobox'
 import { toast } from 'sonner'
 import {
@@ -58,14 +59,6 @@ const formSchema = z.object({
 })
 
 type FormData = z.infer<typeof formSchema>
-
-const STATUS_LABELS: Record<string, string> = {
-  DRAFT: 'Borrador',
-  SUBMITTED: 'Enviado',
-  APPROVED: 'Aprobado',
-  PAID: 'Pagado',
-  VOIDED: 'Anulado',
-}
 
 export type TransactionForEdit = {
   id: string

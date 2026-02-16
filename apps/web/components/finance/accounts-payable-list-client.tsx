@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 import { formatCurrency, formatDateShort } from '@/lib/format-utils'
 import {
   getCompanyAccountsPayable,
@@ -19,13 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-
-const DOCUMENT_TYPE_LABELS: Record<string, string> = {
-  INVOICE: 'Factura',
-  RECEIPT: 'Recibo',
-  CREDIT_NOTE: 'Nota de crédito',
-  DEBIT_NOTE: 'Nota de débito',
-}
+import { DOCUMENT_TYPE_LABELS } from '@/lib/finance-labels'
 
 interface Props {
   initialItems: AccountsPayableItem[]
@@ -40,7 +35,7 @@ export function AccountsPayableListClient({
   projectId = null,
   title = 'Cuentas por pagar',
 }: Props) {
-  const t = useTranslations('common')
+  const t = useTranslations('finance')
   const [items, setItems] = useState<AccountsPayableItem[]>(initialItems)
   const [isPending, startTransition] = useTransition()
   const [dueDateFrom, setDueDateFrom] = useState('')
@@ -71,7 +66,7 @@ export function AccountsPayableListClient({
       <h2 className="text-lg font-semibold text-foreground">{title}</h2>
 
       <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-3">
-        <span className="text-sm font-medium text-foreground">Filtros:</span>
+        <span className="text-sm font-medium text-foreground">{t('filters')}</span>
         {!isProjectScope && (
           <Select
             value={projectFilter}
@@ -81,10 +76,10 @@ export function AccountsPayableListClient({
             }}
           >
             <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Proyecto" />
+              <SelectValue placeholder={t('project')} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos los proyectos</SelectItem>
+              <SelectItem value="all">{t('allProjects')}</SelectItem>
               {filterOptions.projects.map((p) => (
                 <SelectItem key={p.id} value={p.id}>{p.projectNumber} – {p.name}</SelectItem>
               ))}
@@ -99,10 +94,10 @@ export function AccountsPayableListClient({
           }}
         >
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Proveedor" />
+            <SelectValue placeholder={t('supplier')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="all">{t('all')}</SelectItem>
             {filterOptions.parties.filter((p) => p.partyType === 'SUPPLIER').map((p) => (
               <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
             ))}
@@ -112,18 +107,18 @@ export function AccountsPayableListClient({
           type="date"
           value={dueDateFrom}
           onChange={(e) => setDueDateFrom(e.target.value)}
-          placeholder="Venc. desde"
+          placeholder={t('dueFrom')}
           className="max-w-[140px]"
         />
         <Input
           type="date"
           value={dueDateTo}
           onChange={(e) => setDueDateTo(e.target.value)}
-          placeholder="Venc. hasta"
+          placeholder={t('dueTo')}
           className="max-w-[140px]"
         />
         <Button type="button" variant="secondary" onClick={applyFilters} disabled={isPending}>
-          {isPending ? 'Filtrando...' : 'Aplicar'}
+          {isPending ? t('filtering') : t('apply')}
         </Button>
       </div>
 
@@ -131,22 +126,22 @@ export function AccountsPayableListClient({
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/50">
-              <th className="px-4 py-3 text-left font-medium text-foreground">Número</th>
-              <th className="px-4 py-3 text-left font-medium text-foreground">Emisión</th>
-              <th className="px-4 py-3 text-left font-medium text-foreground">Vencimiento</th>
-              <th className="px-4 py-3 text-left font-medium text-foreground">Tipo doc.</th>
-              {!isProjectScope && <th className="px-4 py-3 text-left font-medium text-foreground">Proyecto</th>}
-              <th className="px-4 py-3 text-left font-medium text-foreground">Proveedor</th>
-              <th className="px-4 py-3 text-left font-medium text-foreground">Descripción</th>
-              <th className="px-4 py-3 text-right font-medium text-foreground">Monto</th>
-              <th className="px-4 py-3 text-center font-medium text-foreground">Estado</th>
+              <th className="px-4 py-3 text-left font-medium text-foreground">{t('numberShort')}</th>
+              <th className="px-4 py-3 text-left font-medium text-foreground">{t('issueDate')}</th>
+              <th className="px-4 py-3 text-left font-medium text-foreground">{t('dueDateShort')}</th>
+              <th className="px-4 py-3 text-left font-medium text-foreground">{t('docType')}</th>
+              {!isProjectScope && <th className="px-4 py-3 text-left font-medium text-foreground">{t('project')}</th>}
+              <th className="px-4 py-3 text-left font-medium text-foreground">{t('supplier')}</th>
+              <th className="px-4 py-3 text-left font-medium text-foreground">{t('description')}</th>
+              <th className="px-4 py-3 text-right font-medium text-foreground">{t('amount')}</th>
+              <th className="px-4 py-3 text-center font-medium text-foreground">{t('status')}</th>
             </tr>
           </thead>
           <tbody>
             {items.length === 0 ? (
               <tr>
                 <td colSpan={isProjectScope ? 8 : 9} className="px-4 py-8 text-center text-muted-foreground">
-                  No hay cuentas por pagar con los filtros aplicados.
+                  {t('noPayableResults')}
                 </td>
               </tr>
             ) : (
@@ -172,7 +167,7 @@ export function AccountsPayableListClient({
                     <td className="px-4 py-2 text-center">
                       {daysUntilDue != null && (
                         <Badge variant={daysUntilDue <= 0 ? 'destructive' : daysUntilDue <= 7 ? 'secondary' : 'outline'}>
-                          {daysUntilDue <= 0 ? 'Vencido' : `${daysUntilDue} días`}
+                          {daysUntilDue <= 0 ? t('overdue') : t('daysUntilDue', { days: daysUntilDue })}
                         </Badge>
                       )}
                     </td>
@@ -185,7 +180,7 @@ export function AccountsPayableListClient({
       </div>
       {items.length > 0 && (
         <p className="text-sm text-muted-foreground">
-          Total: {formatCurrency(totalAmount)} ({items.length} ítem(s))
+          {t('totalItems')}: {formatCurrency(totalAmount)} ({t('itemsCount', { count: items.length })})
         </p>
       )}
     </div>

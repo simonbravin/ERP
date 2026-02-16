@@ -20,13 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-
-const DOCUMENT_TYPE_LABELS: Record<string, string> = {
-  INVOICE: 'Factura',
-  RECEIPT: 'Recibo',
-  CREDIT_NOTE: 'Nota de crédito',
-  DEBIT_NOTE: 'Nota de débito',
-}
+import { DOCUMENT_TYPE_LABELS } from '@/lib/finance-labels'
 
 interface Props {
   initialItems: AccountsReceivableItem[]

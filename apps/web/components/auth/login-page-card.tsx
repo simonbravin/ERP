@@ -65,7 +65,7 @@ export function LoginPageCard({ initialTab = 'login' }: LoginPageCardProps) {
             onClick={() => setTab('login')}
             className={`flex flex-1 items-center justify-center rounded-md py-2.5 text-sm font-medium transition ${
               tab === 'login'
-                ? 'border border-accent bg-accent/10 text-accent'
+                ? 'border border-primary bg-primary/10 text-primary'
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -76,7 +76,7 @@ export function LoginPageCard({ initialTab = 'login' }: LoginPageCardProps) {
             onClick={() => setTab('register')}
             className={`flex flex-1 items-center justify-center rounded-md py-2.5 text-sm font-medium transition ${
               tab === 'register'
-                ? 'border border-accent bg-accent/10 text-accent'
+                ? 'border border-primary bg-primary/10 text-primary'
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
