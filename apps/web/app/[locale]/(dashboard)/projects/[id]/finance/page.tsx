@@ -44,28 +44,46 @@ export default async function ProjectFinancePage({
         </p>
       </div>
       
-      <div className="rounded-lg border border-slate-200 bg-white p-8 text-center">
-        <p className="text-slate-500">
+      <div className="rounded-lg border border-slate-200 bg-white p-8 text-center dark:border-slate-700 dark:bg-slate-900">
+        <p className="text-slate-500 dark:text-slate-400">
           Resumen de finanzas del proyecto
         </p>
         <div className="mt-4 flex flex-wrap justify-center gap-4">
           <a 
             href={`/projects/${projectId}/finance/transactions`}
-            className="text-sm text-blue-600 hover:underline"
+            className="text-sm text-blue-600 hover:underline dark:text-blue-400"
           >
             Ver transacciones →
           </a>
           <a 
-            href={`/projects/${projectId}/certifications`}
-            className="text-sm text-blue-600 hover:underline"
+            href={`/projects/${projectId}/finance/accounts-payable`}
+            className="text-sm text-blue-600 hover:underline dark:text-blue-400"
           >
-            Ver certificaciones →
+            Cuentas por pagar →
+          </a>
+          <a 
+            href={`/projects/${projectId}/finance/accounts-receivable`}
+            className="text-sm text-blue-600 hover:underline dark:text-blue-400"
+          >
+            Cuentas por cobrar →
           </a>
           <a 
             href={`/projects/${projectId}/finance/cashflow`}
-            className="text-sm text-blue-600 hover:underline"
+            className="text-sm text-blue-600 hover:underline dark:text-blue-400"
           >
             Flujo de caja →
+          </a>
+          <a 
+            href={`/projects/${projectId}/finance/cash-projection`}
+            className="text-sm text-blue-600 hover:underline dark:text-blue-400"
+          >
+            Proyección de caja →
+          </a>
+          <a 
+            href={`/projects/${projectId}/certifications`}
+            className="text-sm text-blue-600 hover:underline dark:text-blue-400"
+          >
+            Ver certificaciones →
           </a>
         </div>
       </div>

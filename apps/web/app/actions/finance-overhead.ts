@@ -10,6 +10,7 @@ import { serializeTransaction } from './finance-helpers'
 
 export async function createCompanyTransaction(data: {
   type: 'EXPENSE' | 'INCOME' | 'OVERHEAD'
+  documentType?: string
   partyId?: string
   description: string
   issueDate: Date
@@ -19,6 +20,9 @@ export async function createCompanyTransaction(data: {
   taxTotal?: number
   total: number
   reference?: string
+  retentionAmount?: number
+  adjustmentAmount?: number
+  adjustmentNotes?: string
 }) {
   await requirePermission('FINANCE', 'create')
   const { org } = await getAuthContext()
@@ -54,6 +58,7 @@ export async function createCompanyTransaction(data: {
         orgId: org.orgId,
         projectId: null,
         type: data.type,
+        documentType: data.documentType ?? 'INVOICE',
         status: 'DRAFT',
         transactionNumber,
         partyId: data.partyId ?? undefined,
@@ -65,6 +70,9 @@ export async function createCompanyTransaction(data: {
         taxTotal: new Prisma.Decimal(data.taxTotal ?? 0),
         total: totalDec,
         amountBaseCurrency,
+        retentionAmount: new Prisma.Decimal(data.retentionAmount ?? 0),
+        adjustmentAmount: new Prisma.Decimal(data.adjustmentAmount ?? 0),
+        adjustmentNotes: data.adjustmentNotes ?? undefined,
         exchangeRateSnapshot: { rate: rateToArs, baseCurrency: 'ARS' } as object,
         reference: data.reference ?? undefined,
         createdByOrgMemberId: org.memberId,

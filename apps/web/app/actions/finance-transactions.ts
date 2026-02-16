@@ -120,6 +120,8 @@ export async function getFinanceTransaction(id: string) {
     amountBaseCurrency: Number(tx.amountBaseCurrency),
     subtotal: Number(tx.subtotal),
     taxTotal: Number(tx.taxTotal),
+    retentionAmount: Number(tx.retentionAmount ?? 0),
+    adjustmentAmount: Number(tx.adjustmentAmount ?? 0),
     lines: tx.lines.map((l) => ({
       ...l,
       lineTotal: Number(l.lineTotal),
@@ -206,6 +208,7 @@ export async function createFinanceTransaction(data: CreateFinanceTransactionInp
       data: {
         orgId: org.orgId,
         type: parsed.data.type,
+        documentType: parsed.data.documentType ?? 'INVOICE',
         status: 'DRAFT',
         transactionNumber,
         issueDate,
@@ -214,6 +217,9 @@ export async function createFinanceTransaction(data: CreateFinanceTransactionInp
         taxTotal: new Prisma.Decimal(0),
         total,
         amountBaseCurrency: amountBase,
+        retentionAmount: new Prisma.Decimal(parsed.data.retentionAmount ?? 0),
+        adjustmentAmount: new Prisma.Decimal(parsed.data.adjustmentAmount ?? 0),
+        adjustmentNotes: parsed.data.adjustmentNotes ?? undefined,
         exchangeRateSnapshot: { rate: rateNum, baseCurrency: 'USD' } as object,
         description: rest.description,
         reference: rest.reference ?? undefined,
@@ -286,6 +292,7 @@ export async function createFinanceTransactionWithLines(
       data: {
         orgId: org.orgId,
         type: parsed.data.type,
+        documentType: parsed.data.documentType ?? 'INVOICE',
         status: 'DRAFT',
         transactionNumber,
         issueDate,
@@ -294,6 +301,9 @@ export async function createFinanceTransactionWithLines(
         taxTotal: new Prisma.Decimal(0),
         total,
         amountBaseCurrency: amountBase,
+        retentionAmount: new Prisma.Decimal(parsed.data.retentionAmount ?? 0),
+        adjustmentAmount: new Prisma.Decimal(parsed.data.adjustmentAmount ?? 0),
+        adjustmentNotes: parsed.data.adjustmentNotes ?? undefined,
         exchangeRateSnapshot: { rate: rateNum ?? 1, baseCurrency: 'USD' } as object,
         description: rest.description,
         reference: rest.reference ?? undefined,
@@ -381,6 +391,10 @@ export async function updateFinanceTransaction(id: string, data: UpdateFinanceTr
     projectId: projectId !== undefined ? projectId : existing.projectId,
     partyId: partyId !== undefined ? partyId : existing.partyId,
   }
+  if (parsed.data.documentType !== undefined) payload.documentType = parsed.data.documentType
+  if (parsed.data.retentionAmount !== undefined) payload.retentionAmount = new Prisma.Decimal(parsed.data.retentionAmount)
+  if (parsed.data.adjustmentAmount !== undefined) payload.adjustmentAmount = new Prisma.Decimal(parsed.data.adjustmentAmount)
+  if (parsed.data.adjustmentNotes !== undefined) payload.adjustmentNotes = parsed.data.adjustmentNotes
 
   await prisma.$transaction(async (db) => {
     await db.financeTransaction.update({
@@ -843,6 +857,7 @@ export async function createProjectTransaction(
         orgId: org.orgId,
         projectId,
         type: parsed.data.type,
+        documentType: parsed.data.documentType ?? 'INVOICE',
         status: 'DRAFT',
         transactionNumber,
         partyId: parsed.data.partyId ?? undefined,
@@ -854,6 +869,9 @@ export async function createProjectTransaction(
         taxTotal: new Prisma.Decimal(parsed.data.taxTotal ?? 0),
         total: totalDec,
         amountBaseCurrency,
+        retentionAmount: new Prisma.Decimal(parsed.data.retentionAmount ?? 0),
+        adjustmentAmount: new Prisma.Decimal(parsed.data.adjustmentAmount ?? 0),
+        adjustmentNotes: parsed.data.adjustmentNotes ?? undefined,
         exchangeRateSnapshot: { rate: rateToArs, baseCurrency: 'ARS' } as object,
         reference: parsed.data.reference ?? undefined,
         createdByOrgMemberId: org.memberId,
@@ -919,6 +937,7 @@ export async function updateProjectTransaction(id: string, data: ProjectTransact
   if (parsed.data.partyId !== undefined) payload.partyId = parsed.data.partyId ?? null
   if (canEditFull) {
     if (parsed.data.description !== undefined) payload.description = parsed.data.description
+    if (parsed.data.documentType !== undefined) payload.documentType = parsed.data.documentType
     if (parsed.data.issueDate !== undefined) payload.issueDate = parsed.data.issueDate
     if (parsed.data.dueDate !== undefined) payload.dueDate = parsed.data.dueDate
     if (parsed.data.paidDate !== undefined) payload.paidDate = parsed.data.paidDate
@@ -927,6 +946,9 @@ export async function updateProjectTransaction(id: string, data: ProjectTransact
     if (parsed.data.subtotal !== undefined) payload.subtotal = new Prisma.Decimal(parsed.data.subtotal)
     if (parsed.data.taxTotal !== undefined) payload.taxTotal = new Prisma.Decimal(parsed.data.taxTotal)
     if (parsed.data.total !== undefined) payload.total = new Prisma.Decimal(parsed.data.total)
+    if (parsed.data.retentionAmount !== undefined) payload.retentionAmount = new Prisma.Decimal(parsed.data.retentionAmount)
+    if (parsed.data.adjustmentAmount !== undefined) payload.adjustmentAmount = new Prisma.Decimal(parsed.data.adjustmentAmount)
+    if (parsed.data.adjustmentNotes !== undefined) payload.adjustmentNotes = parsed.data.adjustmentNotes
     const currencyCode = (parsed.data.currency as string | undefined) ?? existing.currency
     const totalNum = parsed.data.total ?? Number(existing.total)
     const needBaseAmount = parsed.data.currency !== undefined || parsed.data.total !== undefined || parsed.data.exchangeRate !== undefined

@@ -9,17 +9,29 @@ import { Label } from '@/components/ui/label'
 import { CurrencyConverter } from './currency-converter'
 import { cn } from '@/lib/utils'
 
+const DOCUMENT_TYPE_LABELS: Record<string, string> = {
+  INVOICE: 'Factura',
+  RECEIPT: 'Recibo',
+  CREDIT_NOTE: 'Nota de crédito',
+  DEBIT_NOTE: 'Nota de débito',
+}
+
 export type TransactionDetailData = {
   id: string
   transactionNumber: string
   type: string
+  documentType?: string
   status: string
   issueDate: Date
+  dueDate?: Date | null
   description: string
   reference: string | null
   currency: string
   total: number
   amountBaseCurrency: number
+  retentionAmount?: number
+  adjustmentAmount?: number
+  adjustmentNotes?: string | null
   exchangeRateSnapshot: unknown
   project: { id: string; name: string } | null
   party: { id: string; name: string } | null
@@ -132,6 +144,20 @@ export function TransactionDetail({
             <dt className="text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Description</dt>
             <dd className="mt-0.5 text-sm text-gray-900 dark:text-white">{transaction.description}</dd>
           </div>
+          {transaction.documentType && (
+            <div>
+              <dt className="text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Tipo de documento</dt>
+              <dd className="mt-0.5 text-sm text-gray-900 dark:text-white">
+                {DOCUMENT_TYPE_LABELS[transaction.documentType] ?? transaction.documentType}
+              </dd>
+            </div>
+          )}
+          {transaction.dueDate && (
+            <div>
+              <dt className="text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Fecha de vencimiento</dt>
+              <dd className="mt-0.5 text-sm text-gray-900 dark:text-white">{formatDate(transaction.dueDate)}</dd>
+            </div>
+          )}
           {transaction.reference && (
             <div>
               <dt className="text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Reference</dt>
@@ -148,6 +174,28 @@ export function TransactionDetail({
             <div>
               <dt className="text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Vendor</dt>
               <dd className="mt-0.5 text-sm text-gray-900 dark:text-white">{transaction.party.name}</dd>
+            </div>
+          )}
+          {(transaction.retentionAmount != null && transaction.retentionAmount !== 0) && (
+            <div>
+              <dt className="text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Retención</dt>
+              <dd className="mt-0.5 text-sm text-gray-900 dark:text-white">
+                {formatCurrency(transaction.retentionAmount, transaction.currency)}
+              </dd>
+            </div>
+          )}
+          {(transaction.adjustmentAmount != null && transaction.adjustmentAmount !== 0) && (
+            <div>
+              <dt className="text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Ajuste</dt>
+              <dd className="mt-0.5 text-sm text-gray-900 dark:text-white">
+                {formatCurrency(transaction.adjustmentAmount, transaction.currency)}
+              </dd>
+            </div>
+          )}
+          {transaction.adjustmentNotes && (
+            <div className="sm:col-span-2">
+              <dt className="text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Notas de ajuste</dt>
+              <dd className="mt-0.5 text-sm text-gray-900 dark:text-white">{transaction.adjustmentNotes}</dd>
             </div>
           )}
         </dl>

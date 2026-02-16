@@ -81,6 +81,7 @@ model Organization {
   resources           Resource[]
   customReports       CustomReport[]
   invitations         Invitation[]
+  bankAccounts        BankAccount[]
 
   @@index([slug])
   @@index([active])
@@ -137,9 +138,10 @@ model User {
   sessions          Session[]
   refreshTokens      RefreshToken[]
   idempotencyKeys   IdempotencyKey[]
-  auditLogs         AuditLog[]
-  notifications     Notification[]
-  customReports     CustomReport[]
+  auditLogs           AuditLog[]
+  notifications       Notification[]
+  notificationsActed Notification[] @relation("NotificationActor")
+  customReports       CustomReport[]
   invitationsSent   Invitation[]
   orgPreference     UserOrgPreference?
 
@@ -1260,7 +1262,9 @@ model FinanceTransaction {
   orgId                 String   @map("org_id")
   projectId             String?  @map("project_id")
   partyId               String?  @map("party_id")
+  certificationId       String?  @map("certification_id")
   type                  String   // EXPENSE|INCOME|PURCHASE|SALE|OVERHEAD
+  documentType          String   @default("INVOICE") @map("document_type") // INVOICE|RECEIPT|CREDIT_NOTE|DEBIT_NOTE
   status                String   @default("DRAFT")
   transactionNumber     String   @map("transaction_number")
   issueDate             DateTime @map("issue_date") @db.Date
@@ -1271,6 +1275,9 @@ model FinanceTransaction {
   taxTotal              Decimal  @default(0) @map("tax_total") @db.Decimal(15, 2)
   total                 Decimal  @db.Decimal(15, 2)
   amountBaseCurrency    Decimal  @map("amount_base_currency") @db.Decimal(15, 2)
+  retentionAmount       Decimal  @default(0) @map("retention_amount") @db.Decimal(15, 2)
+  adjustmentAmount      Decimal  @default(0) @map("adjustment_amount") @db.Decimal(15, 2)
+  adjustmentNotes       String?  @map("adjustment_notes") @db.Text
   exchangeRateSnapshot  Json?    @map("exchange_rate_snapshot")
   description           String
   reference             String?
@@ -1284,12 +1291,13 @@ model FinanceTransaction {
 
   // Relations
   organization         Organization          @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  project              Project?              @relation(fields: [projectId], references: [id])
+  project              Project?             @relation(fields: [projectId], references: [id])
   party                Party?                @relation(fields: [partyId], references: [id])
-  currencyRel          Currency              @relation(fields: [currency], references: [code])
-  createdBy            OrgMember             @relation("FinanceTransactionCreatedBy", fields: [createdByOrgMemberId], references: [id])
-  deletedBy            OrgMember?            @relation("FinanceTransactionDeletedBy", fields: [deletedByOrgMemberId], references: [id])
-  dailyReport          DailyReport?          @relation(fields: [dailyReportId], references: [id])
+  certification        Certification?        @relation(fields: [certificationId], references: [id])
+  currencyRel          Currency             @relation(fields: [currency], references: [code])
+  createdBy            OrgMember            @relation("FinanceTransactionCreatedBy", fields: [createdByOrgMemberId], references: [id])
+  deletedBy            OrgMember?          @relation("FinanceTransactionDeletedBy", fields: [deletedByOrgMemberId], references: [id])
+  dailyReport          DailyReport?        @relation(fields: [dailyReportId], references: [id])
   lines                FinanceLine[]
   payments             Payment[]
   overheadAllocations  OverheadAllocation[]
@@ -1299,7 +1307,9 @@ model FinanceTransaction {
   @@index([orgId, projectId])
   @@index([orgId, type, status])
   @@index([issueDate])
+  @@index([dueDate])
   @@index([dailyReportId])
+  @@index([certificationId])
   @@map("finance_transactions")
   @@schema("finance")
 }
@@ -1329,6 +1339,7 @@ model Payment {
   id                   String   @id @default(uuid())
   orgId                String   @map("org_id")
   transactionId        String   @map("transaction_id")
+  bankAccountId        String?  @map("bank_account_id")
   paymentNumber        String   @map("payment_number")
   paidOn               DateTime @map("paid_on") @db.Date
   amount               Decimal  @db.Decimal(15, 2)
@@ -1339,12 +1350,34 @@ model Payment {
   createdAt            DateTime @default(now()) @map("created_at")
 
   // Relations
-  transaction FinanceTransaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
-  createdBy   OrgMember          @relation(fields: [createdByOrgMemberId], references: [id])
+  transaction   FinanceTransaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  bankAccount   BankAccount?       @relation(fields: [bankAccountId], references: [id])
+  createdBy     OrgMember          @relation(fields: [createdByOrgMemberId], references: [id])
 
   @@index([transactionId])
   @@index([paidOn])
+  @@index([bankAccountId])
   @@map("payments")
+  @@schema("finance")
+}
+
+// For future bank reconciliation: link statements and payments to accounts
+model BankAccount {
+  id             String   @id @default(uuid())
+  orgId          String   @map("org_id")
+  name           String
+  accountNumber  String?  @map("account_number")
+  currencyCode   String   @default("USD") @map("currency_code")
+  openingBalance Decimal  @default(0) @map("opening_balance") @db.Decimal(15, 2)
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  payments     Payment[]
+
+  @@index([orgId])
+  @@map("bank_accounts")
   @@schema("finance")
 }
 
@@ -1459,6 +1492,7 @@ model Certification {
   issuedBy      OrgMember?          @relation("CertificationIssuedBy", fields: [issuedByOrgMemberId], references: [id])
   approvedBy    OrgMember?          @relation("CertificationApprovedBy", fields: [approvedByOrgMemberId], references: [id])
   lines         CertificationLine[]
+  financeTransactions FinanceTransaction[]
 
   @@unique([projectId, number])
   @@index([projectId, status])
@@ -2450,21 +2484,23 @@ model WebhookDelivery {
 // ============================================================
 
 model Notification {
-  id        String    @id @default(uuid())
-  orgId     String    @map("org_id")
-  userId    String    @map("user_id")
-  type      String    // EMAIL|IN_APP|SMS
-  category  String    // APPROVAL_REQUEST|DEADLINE|MENTION|etc
-  title     String
-  message   String
-  metadata  Json?
-  read      Boolean   @default(false)
-  readAt    DateTime? @map("read_at")
-  createdAt DateTime  @default(now()) @map("created_at")
+  id           String    @id @default(uuid())
+  orgId        String    @map("org_id")
+  userId       String    @map("user_id")
+  actorUserId  String?   @map("actor_user_id") // who triggered the action (e.g. approver); null = system
+  type         String    // EMAIL|IN_APP|SMS
+  category     String    // LOW_STOCK|APPROVAL_REQUEST|CERTIFICATION_ISSUED|etc
+  title        String
+  message      String
+  metadata     Json?
+  read         Boolean   @default(false)
+  readAt       DateTime? @map("read_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
 
   // Relations
   organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  actor        User?        @relation("NotificationActor", fields: [actorUserId], references: [id], onDelete: SetNull)
 
   @@index([userId, read])
   @@index([createdAt])

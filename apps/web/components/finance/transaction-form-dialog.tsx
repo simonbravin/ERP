@@ -34,11 +34,13 @@ import { toast } from 'sonner'
 import {
   PROJECT_TRANSACTION_TYPE,
   TRANSACTION_STATUS,
+  DOCUMENT_TYPE,
   type ProjectTransactionCreateInput,
 } from '@repo/validators'
 
 const formSchema = z.object({
   type: z.enum(PROJECT_TRANSACTION_TYPE),
+  documentType: z.enum(DOCUMENT_TYPE).optional().default('INVOICE'),
   partyId: z.string().uuid().optional().nullable(),
   description: z.string().min(3, 'Mínimo 3 caracteres'),
   issueDate: z.coerce.date(),
@@ -49,6 +51,9 @@ const formSchema = z.object({
   taxTotal: z.number().nonnegative().default(0),
   total: z.number().nonnegative(),
   reference: z.string().max(200).optional().nullable(),
+  retentionAmount: z.number().nonnegative().optional().default(0),
+  adjustmentAmount: z.number().optional().default(0),
+  adjustmentNotes: z.string().max(1000).optional().nullable(),
   status: z.enum(TRANSACTION_STATUS).optional(),
 })
 
@@ -113,6 +118,7 @@ export function TransactionFormDialog({
     resolver: zodResolver(formSchema),
     defaultValues: {
       type: 'EXPENSE',
+      documentType: 'INVOICE',
       partyId: null,
       description: '',
       issueDate: new Date(),
@@ -123,6 +129,9 @@ export function TransactionFormDialog({
       taxTotal: 0,
       total: 0,
       reference: '',
+      retentionAmount: 0,
+      adjustmentAmount: 0,
+      adjustmentNotes: null,
       status: 'DRAFT',
     },
   })
@@ -157,6 +166,7 @@ export function TransactionFormDialog({
     if (transaction) {
       form.reset({
         type: transaction.type as FormData['type'],
+        documentType: (transaction.documentType ?? 'INVOICE') as FormData['documentType'],
         partyId: transaction.partyId ?? transaction.party?.id ?? null,
         description: transaction.description,
         issueDate: new Date(transaction.issueDate),
@@ -167,11 +177,15 @@ export function TransactionFormDialog({
         taxTotal: transaction.taxTotal != null ? toNum(transaction.taxTotal) : 0,
         total: toNum(transaction.total),
         reference: transaction.reference ?? '',
+        retentionAmount: transaction.retentionAmount != null ? toNum(transaction.retentionAmount) : 0,
+        adjustmentAmount: transaction.adjustmentAmount != null ? toNum(transaction.adjustmentAmount) : 0,
+        adjustmentNotes: transaction.adjustmentNotes ?? null,
         status: (transaction.status ?? 'DRAFT') as FormData['status'],
       })
     } else {
       form.reset({
         type: 'EXPENSE',
+        documentType: 'INVOICE',
         partyId: null,
         description: '',
         issueDate: new Date(),
@@ -182,6 +196,9 @@ export function TransactionFormDialog({
         taxTotal: 0,
         total: 0,
         reference: '',
+        retentionAmount: 0,
+        adjustmentAmount: 0,
+        adjustmentNotes: null,
         status: 'DRAFT',
       })
     }
@@ -202,6 +219,7 @@ export function TransactionFormDialog({
       if (isEditing) {
         const result = await updateProjectTransaction(transaction.id, {
           description: data.description,
+          documentType: data.documentType,
           status: data.status,
           partyId: data.partyId ?? undefined,
           currency: data.currency,
@@ -212,6 +230,9 @@ export function TransactionFormDialog({
           subtotal: data.subtotal,
           taxTotal: data.taxTotal,
           total: data.total,
+          retentionAmount: data.retentionAmount,
+          adjustmentAmount: data.adjustmentAmount,
+          adjustmentNotes: data.adjustmentNotes ?? undefined,
         })
         if (result && 'error' in result && result.error) {
           const err = result.error as Record<string, string[]>
@@ -235,6 +256,7 @@ export function TransactionFormDialog({
         }
         const result = await createCompanyTransaction({
           type: companyType,
+          documentType: data.documentType ?? 'INVOICE',
           partyId: data.partyId ?? undefined,
           description: data.description,
           issueDate: data.issueDate,
@@ -244,6 +266,9 @@ export function TransactionFormDialog({
           taxTotal: data.taxTotal,
           total: data.total,
           reference: data.reference ?? undefined,
+          retentionAmount: data.retentionAmount ?? 0,
+          adjustmentAmount: data.adjustmentAmount ?? 0,
+          adjustmentNotes: data.adjustmentNotes ?? undefined,
         })
         if (result && 'error' in result && result.error) {
           toast.error(String(result.error))
@@ -257,6 +282,7 @@ export function TransactionFormDialog({
       } else {
         const payload: ProjectTransactionCreateInput = {
           type: data.type,
+          documentType: data.documentType ?? 'INVOICE',
           partyId: data.partyId ?? undefined,
           description: data.description,
           issueDate: data.issueDate,
@@ -267,6 +293,9 @@ export function TransactionFormDialog({
           taxTotal: data.taxTotal,
           total: data.total,
           reference: data.reference ?? undefined,
+          retentionAmount: data.retentionAmount ?? 0,
+          adjustmentAmount: data.adjustmentAmount ?? 0,
+          adjustmentNotes: data.adjustmentNotes ?? undefined,
         }
         if (!projectId) return
         const result = await createProjectTransaction(projectId, payload)
@@ -334,6 +363,22 @@ export function TransactionFormDialog({
               {form.formState.errors.type && (
                 <p className="text-sm text-destructive">{form.formState.errors.type.message}</p>
               )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="documentType">Tipo de documento</Label>
+              <Select
+                value={form.watch('documentType') ?? 'INVOICE'}
+                onValueChange={(v) => form.setValue('documentType', v as FormData['documentType'])}
+              >
+                <SelectTrigger id="documentType">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(DOCUMENT_TYPE_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             {(showPartyAsSupplier || showPartyAsClient) && (
               <PartyCombobox
@@ -479,6 +524,35 @@ export function TransactionFormDialog({
             </div>
           </div>
 
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="retentionAmount">Retención (monto)</Label>
+              <Input
+                id="retentionAmount"
+                type="number"
+                step="0.01"
+                min={0}
+                {...form.register('retentionAmount', { valueAsNumber: true })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="adjustmentAmount">Ajuste (monto)</Label>
+              <Input
+                id="adjustmentAmount"
+                type="number"
+                step="0.01"
+                {...form.register('adjustmentAmount', { valueAsNumber: true })}
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="adjustmentNotes">Notas de ajuste (opcional)</Label>
+            <Input
+              id="adjustmentNotes"
+              {...form.register('adjustmentNotes')}
+              placeholder="Motivo del ajuste"
+            />
+          </div>
           <div className="space-y-2">
             <Label htmlFor="reference">Referencia (opcional)</Label>
             <Input

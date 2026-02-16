@@ -287,7 +287,7 @@ async function getNextCertTransactionNumber(orgId: string): Promise<string> {
 }
 
 export async function issueCertification(certId: string) {
-  const { org } = await getAuthContext()
+  const { session, org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
 
   const cert = await prisma.certification.findFirst({
@@ -332,7 +332,9 @@ export async function issueCertification(certId: string) {
       data: {
         orgId: org.orgId,
         projectId: cert.projectId,
+        certificationId: cert.id,
         type: 'INCOME',
+        documentType: 'INVOICE',
         status: 'SUBMITTED',
         transactionNumber,
         issueDate: issuedDate,
@@ -356,6 +358,23 @@ export async function issueCertification(certId: string) {
       payload: { projectId: cert.projectId, number: cert.number },
     })
   })
+
+  const admins = await prisma.orgMember.findMany({
+    where: { orgId: org.orgId, active: true, role: { in: ['ADMIN', 'OWNER'] } },
+    select: { userId: true },
+  })
+  const adminUserIds = admins.map((a) => a.userId).filter((id) => id !== session.user.id)
+  if (adminUserIds.length > 0) {
+    const { createInAppNotificationsForUsers } = await import('@/app/actions/notifications')
+    await createInAppNotificationsForUsers(adminUserIds, {
+      orgId: org.orgId,
+      actorUserId: session.user.id,
+      category: 'CERTIFICATION_ISSUED',
+      title: 'Certificación emitida',
+      message: `Certificación #${cert.number} - ${cert.project.name} pendiente de aprobación.`,
+      metadata: { link: `/projects/${cert.projectId}/finance/certifications/${certId}` },
+    })
+  }
 
   revalidatePath(`/projects/${cert.projectId}/certifications`)
   revalidatePath(`/projects/${cert.projectId}/certifications/${certId}`)
@@ -426,12 +445,12 @@ export async function getPrevProgressForBudgetLines(
 
 export async function approveCertification(certId: string) {
   await requirePermission('CERTIFICATIONS', 'approve')
-  const { org } = await getAuthContext()
+  const { session, org } = await getAuthContext()
   requireRole(org.role, 'ADMIN')
 
   const cert = await prisma.certification.findFirst({
     where: { id: certId, orgId: org.orgId, status: 'ISSUED' },
-    select: { id: true, projectId: true, number: true },
+    select: { id: true, projectId: true, number: true, issuedByOrgMemberId: true },
   })
 
   if (!cert) throw new Error('Certification not found or not issued')
@@ -464,6 +483,25 @@ export async function approveCertification(certId: string) {
       payload: { projectId: cert.projectId, number: cert.number },
     })
   })
+
+  if (cert.issuedByOrgMemberId && cert.issuedByOrgMemberId !== org.memberId) {
+    const issuer = await prisma.orgMember.findUnique({
+      where: { id: cert.issuedByOrgMemberId },
+      select: { userId: true },
+    })
+    if (issuer) {
+      const { createInAppNotification } = await import('@/app/actions/notifications')
+      await createInAppNotification({
+        orgId: org.orgId,
+        userId: issuer.userId,
+        actorUserId: session.user.id,
+        category: 'CERTIFICATION_APPROVED',
+        title: 'Certificación aprobada',
+        message: `Certificación #${cert.number} fue aprobada.`,
+        metadata: { link: `/projects/${cert.projectId}/finance/certifications/${certId}` },
+      })
+    }
+  }
 
   revalidatePath(`/projects/${cert.projectId}/certifications`)
   revalidatePath(`/projects/${cert.projectId}/certifications/${certId}`)

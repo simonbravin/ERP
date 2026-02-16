@@ -95,3 +95,22 @@ export type {
   CompanyFinanceDashboard,
   FinanceExecutiveDashboard,
 } from './finance-kpis'
+
+// AP/AR & Cash projection & Alerts
+export {
+  getCompanyAccountsPayable,
+  getProjectAccountsPayable,
+  getCompanyAccountsReceivable,
+  getProjectAccountsReceivable,
+  getCompanyCashProjection,
+  getProjectCashProjection,
+  getCompanyFinanceAlerts,
+} from './finance-ap-ar'
+export type {
+  AccountsPayableFilters,
+  AccountsPayableItem,
+  AccountsReceivableFilters,
+  AccountsReceivableItem,
+  CashProjectionResult,
+  FinanceAlert,
+} from './finance-ap-ar'

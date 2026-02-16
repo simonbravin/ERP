@@ -50,6 +50,7 @@ export type ProjectTransactionRow = {
   id: string
   transactionNumber: string
   type: string
+  documentType?: string
   status: string
   issueDate: Date
   description: string
@@ -60,6 +61,9 @@ export type ProjectTransactionRow = {
   amountBaseCurrency: number
   currency: string
   reference?: string | null
+  retentionAmount?: number
+  adjustmentAmount?: number
+  adjustmentNotes?: string | null
   party: { id: string; name: string } | null
   lines: unknown[]
   payments: unknown[]

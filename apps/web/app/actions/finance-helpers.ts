@@ -17,14 +17,23 @@ export function toNum(v: unknown): number {
 }
 
 /** Serialized transaction row: monetary fields as number for client/JSON. */
-export type SerializedTransactionRow<T> = Omit<T, 'total' | 'subtotal' | 'taxTotal' | 'amountBaseCurrency'> & {
+export type SerializedTransactionRow<T> = Omit<T, 'total' | 'subtotal' | 'taxTotal' | 'amountBaseCurrency' | 'retentionAmount' | 'adjustmentAmount'> & {
   total: number
   subtotal: number
   taxTotal: number
   amountBaseCurrency: number
+  retentionAmount?: number
+  adjustmentAmount?: number
 }
 
-export function serializeTransaction<T extends { total?: unknown; subtotal?: unknown; taxTotal?: unknown; amountBaseCurrency?: unknown }>(
+export function serializeTransaction<T extends {
+  total?: unknown
+  subtotal?: unknown
+  taxTotal?: unknown
+  amountBaseCurrency?: unknown
+  retentionAmount?: unknown
+  adjustmentAmount?: unknown
+}>(
   t: T
 ): SerializedTransactionRow<T> {
   return {
@@ -33,5 +42,7 @@ export function serializeTransaction<T extends { total?: unknown; subtotal?: unk
     subtotal: toNum(t.subtotal),
     taxTotal: toNum(t.taxTotal),
     amountBaseCurrency: toNum(t.amountBaseCurrency),
+    ...(('retentionAmount' in t && t.retentionAmount != null) ? { retentionAmount: toNum(t.retentionAmount) } : {}),
+    ...(('adjustmentAmount' in t && t.adjustmentAmount != null) ? { adjustmentAmount: toNum(t.adjustmentAmount) } : {}),
   } as SerializedTransactionRow<T>
 }

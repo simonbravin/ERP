@@ -1,8 +1,11 @@
-import { getFinanceExecutiveDashboard } from '@/app/actions/finance'
+import { getFinanceExecutiveDashboard, getCompanyFinanceAlerts } from '@/app/actions/finance'
 import { FinanceExecutiveDashboardClient } from '@/components/finance/finance-executive-dashboard-client'
 
 export default async function FinanceDashboardPage() {
-  const dashboardData = await getFinanceExecutiveDashboard()
+  const [dashboardData, alerts] = await Promise.all([
+    getFinanceExecutiveDashboard(),
+    getCompanyFinanceAlerts(),
+  ])
 
   return (
     <div className="space-y-6">
@@ -13,7 +16,7 @@ export default async function FinanceDashboardPage() {
         </p>
       </div>
 
-      <FinanceExecutiveDashboardClient data={dashboardData} />
+      <FinanceExecutiveDashboardClient data={dashboardData} alerts={alerts} />
     </div>
   )
 }

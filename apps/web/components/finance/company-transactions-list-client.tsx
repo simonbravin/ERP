@@ -31,6 +31,7 @@ export type CompanyTransactionRow = {
   transactionNumber: string
   issueDate: Date | string
   type: string
+  documentType?: string
   status: string
   description: string
   total: number
@@ -60,6 +61,13 @@ const TYPE_LABELS: Record<string, string> = {
   PURCHASE: 'Compra',
   SALE: 'Venta',
   OVERHEAD: 'Overhead',
+}
+
+const DOCUMENT_TYPE_LABELS: Record<string, string> = {
+  INVOICE: 'Factura',
+  RECEIPT: 'Recibo',
+  CREDIT_NOTE: 'Nota de crédito',
+  DEBIT_NOTE: 'Nota de débito',
 }
 
 interface Props {
@@ -289,6 +297,7 @@ export function CompanyTransactionsListClient({
               <th className="px-4 py-3 text-left font-medium text-foreground">Fecha</th>
               <th className="px-4 py-3 text-left font-medium text-foreground">Número</th>
               <th className="px-4 py-3 text-left font-medium text-foreground">Tipo</th>
+              <th className="px-4 py-3 text-left font-medium text-foreground">Tipo doc.</th>
               <th className="px-4 py-3 text-left font-medium text-foreground">Proyecto</th>
               <th className="px-4 py-3 text-left font-medium text-foreground">Descripción</th>
               <th className="px-4 py-3 text-left font-medium text-foreground">Proveedor/Cliente</th>
@@ -300,7 +309,7 @@ export function CompanyTransactionsListClient({
           <tbody>
             {transactions.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">
+                <td colSpan={10} className="px-4 py-8 text-center text-muted-foreground">
                   No hay transacciones que coincidan con los filtros.
                 </td>
               </tr>
@@ -313,6 +322,9 @@ export function CompanyTransactionsListClient({
                     <Badge variant="outline" className="text-xs">
                       {TYPE_LABELS[tx.type] ?? tx.type}
                     </Badge>
+                  </td>
+                  <td className="px-4 py-2 text-muted-foreground text-xs">
+                    {DOCUMENT_TYPE_LABELS[tx.documentType ?? 'INVOICE'] ?? tx.documentType ?? '—'}
                   </td>
                   <td className="px-4 py-2 text-muted-foreground">
                     {tx.project ? (

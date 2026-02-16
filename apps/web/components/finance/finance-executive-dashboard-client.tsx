@@ -28,7 +28,7 @@ import { Link } from '@/i18n/navigation'
 import { toast } from 'sonner'
 import { useChartExport } from '@/hooks/use-chart-export'
 import { exportFinanceDashboardToPDF } from '@/app/actions/export'
-import type { FinanceExecutiveDashboard } from '@/app/actions/finance'
+import type { FinanceExecutiveDashboard, FinanceAlert } from '@/app/actions/finance'
 
 const COLORS = [
   'hsl(var(--chart-1))',
@@ -124,6 +124,31 @@ export function FinanceExecutiveDashboardClient({ data }: Props) {
   return (
     <div className="space-y-6">
       <CompanyFinanceKPICards data={kpisData} />
+
+      {alerts.length > 0 && (
+        <div className="space-y-2">
+          {alerts.map((alert) => (
+            <Alert
+              key={alert.id}
+              variant={alert.severity === 'danger' ? 'destructive' : 'default'}
+              className={alert.severity === 'danger' ? '' : 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30'}
+            >
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>{alert.title}</AlertTitle>
+              <AlertDescription>
+                <span className="block text-sm">{alert.message}</span>
+                {alert.link && (
+                  <Link href={alert.link} className="mt-2 inline-block">
+                    <Button variant="outline" size="sm">
+                      Ver detalle
+                    </Button>
+                  </Link>
+                )}
+              </AlertDescription>
+            </Alert>
+          ))}
+        </div>
+      )}
 
       {data.overheadSummary.unallocated > 0 && (
         <Alert

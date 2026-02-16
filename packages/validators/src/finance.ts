@@ -18,6 +18,9 @@ export const TRANSACTION_STATUS = [
 ] as const
 export type TransactionStatus = (typeof TRANSACTION_STATUS)[number]
 
+export const DOCUMENT_TYPE = ['INVOICE', 'RECEIPT', 'CREDIT_NOTE', 'DEBIT_NOTE'] as const
+export type DocumentType = (typeof DOCUMENT_TYPE)[number]
+
 const TYPE_PREFIX: Record<TransactionType, string> = {
   INVOICE_RECEIVED: 'INV',
   PAYMENT_MADE: 'PAY',
@@ -52,6 +55,7 @@ export type CreateFinanceTransactionInput = z.infer<typeof createFinanceTransact
 
 export const updateFinanceTransactionSchema = z.object({
   description: z.string().min(1).max(2000).optional(),
+  documentType: z.enum(DOCUMENT_TYPE).optional(),
   issueDate: z.coerce.date().optional(),
   dueDate: z.coerce.date().optional().nullable(),
   projectId: z
@@ -67,6 +71,9 @@ export const updateFinanceTransactionSchema = z.object({
   currencyCode: z.string().length(3).optional(),
   exchangeRateSnapshot: z.coerce.number().positive().optional(),
   reference: z.string().max(200).optional().nullable(),
+  retentionAmount: z.coerce.number().nonnegative().optional(),
+  adjustmentAmount: z.coerce.number().optional(),
+  adjustmentNotes: z.string().max(1000).optional().nullable(),
 })
 export type UpdateFinanceTransactionInput = z.infer<typeof updateFinanceTransactionSchema>
 
@@ -102,6 +109,7 @@ export type ProjectTransactionType = (typeof PROJECT_TRANSACTION_TYPE)[number]
 
 export const projectTransactionCreateSchema = z.object({
   type: z.enum(PROJECT_TRANSACTION_TYPE),
+  documentType: z.enum(DOCUMENT_TYPE).optional().default('INVOICE'),
   partyId: z.string().uuid().optional().nullable(),
   description: z.string().min(3, 'Mínimo 3 caracteres'),
   issueDate: z.coerce.date(),
@@ -112,6 +120,9 @@ export const projectTransactionCreateSchema = z.object({
   taxTotal: z.number().nonnegative().default(0),
   total: z.number().nonnegative(),
   reference: z.string().max(200).optional().nullable(),
+  retentionAmount: z.coerce.number().nonnegative().optional().default(0),
+  adjustmentAmount: z.coerce.number().optional().default(0),
+  adjustmentNotes: z.string().max(1000).optional().nullable(),
   lines: z
     .array(
       z.object({
@@ -129,6 +140,7 @@ export type ProjectTransactionCreateInput = z.infer<typeof projectTransactionCre
 
 export const projectTransactionUpdateSchema = z.object({
   description: z.string().min(3).optional(),
+  documentType: z.enum(DOCUMENT_TYPE).optional(),
   status: z.enum(TRANSACTION_STATUS).optional(),
   partyId: z.string().uuid().optional().nullable(),
   currency: z.string().length(3).optional(),
@@ -140,5 +152,8 @@ export const projectTransactionUpdateSchema = z.object({
   subtotal: z.number().nonnegative().optional(),
   taxTotal: z.number().nonnegative().optional(),
   total: z.number().nonnegative().optional(),
+  retentionAmount: z.coerce.number().nonnegative().optional(),
+  adjustmentAmount: z.coerce.number().optional(),
+  adjustmentNotes: z.string().max(1000).optional().nullable(),
 })
 export type ProjectTransactionUpdateInput = z.infer<typeof projectTransactionUpdateSchema>
