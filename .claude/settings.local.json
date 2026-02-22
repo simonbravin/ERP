@@ -12,7 +12,14 @@
       "Bash(powershell -NoProfile -Command:*)",
       "Bash(curl:*)",
       "Bash(git add:*)",
-      "Bash(git commit -m \"$\\(cat <<''EOF''\nrefactor: major codebase cleanup — split finance module, extract shared auth, unify design tokens\n\n- Split finance.ts \\(2,435 lines\\) into 5 domain files: finance-transactions, finance-cashflow,\n  finance-overhead, finance-kpis, finance-helpers with barrel re-export for backward compat\n- Extract shared getAuthContext\\(\\) into lib/auth-helpers.ts \\(removed from 14 action files\\)\n- Consolidate PrismaTx type to shared PrismaTransaction from event-publisher.ts\n- Unify form error text colors: replace hardcoded text-red-600 with text-destructive token \\(42 components\\)\n- Delete dead files: gantt-timeline.tsx, lib/db.ts, check-user.ts, migrate scripts, seed-global-suppliers\n- Add new infrastructure: Inngest event system, message bus hook, serialization utils, coerce validators\n- Expand globals.css design tokens, UI component refinements, i18n updates \\(en/es\\)\n- Budget, schedule, export, super-admin, and project page enhancements\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")"
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nrefactor: major codebase cleanup — split finance module, extract shared auth, unify design tokens\n\n- Split finance.ts \\(2,435 lines\\) into 5 domain files: finance-transactions, finance-cashflow,\n  finance-overhead, finance-kpis, finance-helpers with barrel re-export for backward compat\n- Extract shared getAuthContext\\(\\) into lib/auth-helpers.ts \\(removed from 14 action files\\)\n- Consolidate PrismaTx type to shared PrismaTransaction from event-publisher.ts\n- Unify form error text colors: replace hardcoded text-red-600 with text-destructive token \\(42 components\\)\n- Delete dead files: gantt-timeline.tsx, lib/db.ts, check-user.ts, migrate scripts, seed-global-suppliers\n- Add new infrastructure: Inngest event system, message bus hook, serialization utils, coerce validators\n- Expand globals.css design tokens, UI component refinements, i18n updates \\(en/es\\)\n- Budget, schedule, export, super-admin, and project page enhancements\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(ls:*)",
+      "Bash(__NEW_LINE_9240e40f62861709__ echo \"\")",
+      "Bash(for f in budget certifications change-orders daily-reports dashboard documents export finance finance-transactions finance-cashflow finance-overhead finance-kpis finance-ap-ar global-suppliers import-budget inventory materials notifications predefined-reports project-dashboard projects quality reports resources schedule settings super-admin team wbs)",
+      "Bash(echo:*)",
+      "Bash(done)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ]
   }
 }
