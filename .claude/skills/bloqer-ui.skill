@@ -1,0 +1,177 @@
+# Bloqer UI — AI Operating Skill
+# Version: 1.0 | Source: globals.css, components/, tailwind.config.ts
+# Purpose: Enforce design system consistency and prevent visual regressions
+
+## DESIGN SYSTEM FOUNDATION
+- Tailwind CSS v4 (CSS-first, `@import 'tailwindcss'` in globals.css)
+- All tokens defined in `@layer base { :root { ... } }` as HSL CSS variables
+- Tailwind color aliases defined in `@theme { }` block — reference `:root` vars
+- Theme switching: `.dark` class on `<html>` (via next-themes)
+- Brand: navy (#222 36% 20%) + orange (#28 68% 50%)
+- 3 dark theme variants: default dark, `[data-theme='midnight']`, `[data-theme='slate']`
+
+## MANDATORY: USE CSS TOKENS, NOT HARDCODED VALUES
+- CORRECT: `className="bg-card text-foreground border-border"`
+- WRONG: `className="bg-white text-gray-900 border-gray-200"`
+- CORRECT: `style={{ color: 'hsl(var(--status-success))' }}`
+- WRONG: `style={{ color: '#10b981' }}`
+
+## COLOR SYSTEM
+```
+--primary / --primary-foreground      → Main action (navy)
+--accent / --accent-foreground        → Secondary action (orange)
+--muted / --muted-foreground          → Subtle text and backgrounds
+--destructive / --destructive-foreground → Danger/delete actions
+--border, --input, --ring             → Form and layout borders
+--sidebar / --sidebar-foreground etc. → Sidebar-specific tokens
+--table-head / --table-row-hover / --table-border → Table tokens
+```
+
+## STATUS BADGE CLASSES (semantic, use these — not raw colors)
+```html
+<span className="badge-success">Aprobado</span>
+<span className="badge-warning">Pendiente</span>
+<span className="badge-danger">Vencido</span>
+<span className="badge-neutral">Borrador</span>
+<span className="badge-info">En proceso</span>
+```
+
+## PROJECT PHASE BADGE CLASSES
+```html
+<span className="badge-phase-pre-construction">Pre-construcción</span>
+<span className="badge-phase-construction">Construcción</span>
+<span className="badge-phase-closeout">Cierre</span>
+<span className="badge-phase-complete">Completado</span>
+```
+
+## ERP LAYOUT UTILITY CLASSES
+All ERP layout should use these pre-built classes (defined in @layer components and @layer utilities):
+
+| Class                   | Purpose                                              |
+|-------------------------|------------------------------------------------------|
+| `erp-view-container`    | Page content container (max-w-7xl, responsive px)    |
+| `erp-container`         | Full-width container (max-w-screen-2xl)              |
+| `erp-card`              | Standard card (rounded-xl + border + shadow)         |
+| `erp-card-header`       | Card header row (border-b + px-6 py-4)               |
+| `erp-card-body`         | Card body (px-6 py-4)                                |
+| `erp-card-interactive`  | Clickable card (hover shadow)                        |
+| `erp-card-elevated`     | Card with hover lift animation                       |
+| `erp-section-header`    | Section title + desc block                           |
+| `erp-section-title`     | Section heading (text-lg font-semibold)              |
+| `erp-section-desc`      | Section subtitle (text-sm text-muted-foreground)     |
+| `erp-page-title`        | Page heading (text-2xl font-semibold)                |
+| `erp-header-row`        | Header with title + actions (responsive flex)        |
+| `erp-header-actions`    | Action buttons row (flex-wrap gap-2)                 |
+| `erp-stack`             | Vertical stack (space-y-4 md:space-y-6)              |
+| `erp-grid-cards`        | KPI card grid (1→2→4 columns responsive)             |
+| `erp-table-wrap`        | Table scroll container (overflow-x-auto + border)    |
+| `erp-table`             | Table base                                           |
+| `erp-table-cell`        | Standard cell (px-4 py-3 text-sm)                    |
+| `erp-table-cell-numeric`| Right-aligned monospace (numbers)                    |
+| `erp-table-cell-currency`| Currency cell (whitespace-nowrap min-w-[120px])     |
+| `erp-kpi-value`         | KPI number (overflow-hidden whitespace-nowrap)       |
+| `erp-form-modal`        | Form in dialog (max-w-4xl)                           |
+| `erp-form-page`         | Form on page (max-w-3xl)                             |
+| `erp-search-row`        | Search bar row                                       |
+| `numeric`               | Monospace tabular-nums                               |
+| `currency`              | Monospace tabular-nums (financial)                   |
+
+## WBS TREE CLASSES
+```html
+<div className="wbs-item" data-level="0">...</div>  <!-- root -->
+<div className="wbs-item" data-level="1">...</div>  <!-- level 1 indent -->
+<div className="wbs-item" data-level="2">...</div>  <!-- level 2 indent -->
+```
+Uses CSS `--spacing-indent-*` tokens for consistent indentation.
+
+## TYPOGRAPHY
+- Font sans: Inter (via `--font-inter` CSS var from next/font)
+- Font mono: Roboto Mono (via `--font-roboto-mono` — for financial numbers)
+- ALL monetary/percentage values MUST use `.font-mono` or `.numeric` class for alignment
+
+## SHADCN COMPONENT PATTERN
+- Primitives live in `components/ui/` (locally copied from shadcn pattern)
+- Import: `import { Button } from '@/components/ui/button'`
+- Do NOT import from `@repo/ui` for web app (package not fully developed)
+- `cn()` utility: `import { cn } from '@/lib/utils'` — use for conditional classes
+
+## FORM PATTERN (react-hook-form + Zod)
+```typescript
+// 1. Schema from @repo/validators
+import { mySchema } from '@repo/validators'
+
+// 2. Form setup
+const form = useForm({
+  resolver: zodResolver(mySchema),
+  defaultValues: { ... }
+})
+
+// 3. Submit calls Server Action directly
+const onSubmit = async (data) => {
+  const result = await myServerAction(data)
+  if (result.error) toast.error(result.error)
+  else toast.success('Guardado exitosamente')
+}
+
+// 4. Render with Form, FormField, FormItem, FormLabel, FormControl, FormMessage
+```
+
+## PAGE COMPONENT PATTERN (Server Component → Client Component)
+```typescript
+// page.tsx (Server Component) — fetches data
+export default async function MyPage() {
+  const data = await getMyData()  // Server Action call
+  return (
+    <div className="space-y-6">
+      <div className="erp-section-header">
+        <h2 className="erp-section-title">Título</h2>
+        <p className="erp-section-desc">Descripción</p>
+      </div>
+      <MyPageClient data={serializeForClient(data)} />
+    </div>
+  )
+}
+```
+
+## RESPONSIVE RULES
+- Sidebar: mobile = overlay drawer (hamburger button), desktop = collapsible icon-only
+- Breakpoint: 768px (MOBILE_BP constant in dashboard-shell.tsx)
+- Tables must be wrapped in `erp-table-wrap` for horizontal scroll on mobile
+- Forms: `erp-form-page` (page) or `erp-form-modal` (dialog) — never unconstrained width
+- Header rows: `erp-header-row` collapses to vertical on mobile
+
+## DARK MODE
+- Tested for both light and dark — all colors via CSS tokens
+- `next-themes` ThemeProvider in `components/providers.tsx`
+- Theme toggle in `components/theme-toggle.tsx`
+- `prefers-reduced-motion` is respected for card animations (see globals.css)
+
+## MOTION TOKENS
+```
+--motion-fast: 150ms   → hover micro-interactions
+--motion-base: 200ms   → standard transitions
+--motion-slow: 300ms   → modals/sheets open
+--motion-ease: cubic-bezier(0.4, 0, 0.2, 1)
+```
+
+## ICONS
+- Use only Lucide React: `import { IconName } from 'lucide-react'`
+- Size convention: `h-4 w-4` (default), `h-5 w-5` (medium), `h-6 w-6` (large)
+- Do NOT import from other icon libraries
+
+## TOAST NOTIFICATIONS
+- Use Sonner: `import { toast } from 'sonner'`
+- Patterns: `toast.success('...')`, `toast.error('...')`, `toast.loading('...')`
+- Toaster is mounted in root layout
+
+## SIDEBAR TOKENS (sidebar background is navy, not card)
+- Use `bg-sidebar text-sidebar-foreground` inside sidebar components
+- Sidebar muted text: `text-sidebar-muted`
+- Sidebar border: `border-sidebar-border`
+- Active/hover items: `bg-sidebar-accent`
+
+## WHAT MUST NEVER CHANGE
+- CSS variable names in :root — all components depend on them
+- The `erp-*` utility class names — referenced across 30+ components
+- The `badge-*` class names — used in domain components everywhere
+- Font loading in root layout (Inter + Roboto Mono)

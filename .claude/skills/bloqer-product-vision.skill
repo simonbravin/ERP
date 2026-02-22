@@ -1,0 +1,144 @@
+# Bloqer Product Vision — AI Operating Skill
+# Version: 1.0 | Source: inferred from codebase + docs/product/ structure
+# Purpose: Guide AI agents to make product-aligned decisions
+
+## PRODUCT POSITIONING
+Bloqer is an ERP for Latin American construction companies, designed to replace fragmented tools (Excel, WhatsApp, local accounting software) with an integrated platform.
+
+**Target market:** Small-to-medium construction firms (5-200 employees) in Latin America.
+**Primary language:** Spanish (es-419 style, LatAm construction vocabulary).
+**Philosophy:** Practical simplicity over academic completeness. Field workers must be able to use it on phones. Accountants need full financial visibility. Owners want executive dashboards.
+
+## PRODUCT PRINCIPLES (evidenced in code)
+
+### 1. Mobile-first for field operations
+- Sidebar collapses to icon-only on desktop, overlay drawer on mobile (768px breakpoint)
+- No top navigation bar — space preserved for content
+- DailyReport module designed for field use (weather, labor counts, photos)
+- Responsive tables use horizontal scroll wrappers (erp-table-wrap)
+
+### 2. Progressive disclosure
+- Dashboard → Project list → Project detail → WBS → Budget lines
+- Module activation per org (`ModuleActivation`) — only show what's purchased
+- Roles restrict UI automatically — Viewers never see create buttons
+
+### 3. Data integrity over convenience
+- Budget has version control (DRAFT/BASELINE/APPROVED) — you cannot accidentally change approved budgets
+- Certifications have integrity seals — tamper detection
+- Finance transactions are soft-deleted not hard-deleted
+- Audit log captures before/after snapshots for every significant mutation
+
+### 4. Construction-native concepts
+- WBS is the structural backbone — everything links to WBS nodes
+- Certifications are not generic invoices — they are progress billing tied to WBS completion percentages
+- Change orders distinguish between owner-caused deviations (DEVIATION) and scope changes (APPROVED_CHANGE)
+- Daily reports capture field reality: weather, workers by trade, equipment hours, materials consumed
+
+### 5. Financial control as a first-class feature
+- 4 dedicated finance sub-pages: transactions, AP/AR, cashflow, overhead
+- Cashflow projections are explicitly modeled (finance-cashflow.ts)
+- Overhead allocation allows shared costs to be apportioned across projects
+- Retention amounts are tracked on finance transactions
+
+## OPERATIONAL USER PERSONAS
+
+### Owner/Director
+- Needs: Executive KPI dashboard, project health overview, financial alerts
+- Uses: dashboard, finance/executive, reports
+- Concern: Budget overruns, late certifications, cash position
+
+### Project Manager
+- Needs: WBS management, budget tracking, change order approval
+- Uses: projects, budget, certifications, schedule, change-orders
+- Concern: Schedule delays, scope creep, WBS progress
+
+### Site Supervisor (Field)
+- Needs: Daily reports, WBS progress updates, inventory issues
+- Uses: daily-reports, inventory, quality (RFIs)
+- Device: Mobile (phone on construction site)
+- Concern: Recording work done, logging material usage
+
+### Accountant
+- Needs: AP/AR management, payment tracking, financial reports, certification approval
+- Uses: finance, certifications, reports
+- Role: ACCOUNTANT (has finance + certifications but not budget editing)
+- Concern: Cash flow, payment terms, tax documentation
+
+### Subcontractor/Supplier
+- External party, not a system user
+- Represented as `Party` with partyType SUPPLIER or SUBCONTRACTOR
+- May be linked to GlobalParty (verified supplier directory)
+
+## FEATURES EVIDENCED IN CODE (do not invent beyond these)
+
+### Implemented and active:
+- Multi-tenant org management (Organization, OrgMember, invitation flow)
+- Project CRUD with phases and team assignment
+- WBS hierarchical tree with drag-and-drop reordering
+- Budget versioning (DRAFT/BASELINE/APPROVED) with markup modes
+- Budget import from Excel (import-budget.ts + lib/excel/)
+- Certifications with cumulative progress tracking
+- Change orders with approval workflow
+- Daily reports (full: labor, equipment, materials, photos, WBS links)
+- Finance transactions (AP/AR, cashflow, overhead allocation)
+- Cash projection and AR/AP aging
+- Gantt schedule (ScheduleTask + TaskDependency)
+- Inventory management (items, locations, movements)
+- Quality module (RFI, Submittal, Inspection)
+- Document management with Cloudflare R2 storage
+- Custom + predefined reports with Excel/PDF export
+- Supplier directory (local Party + global GlobalParty with ratings)
+- Notifications system (real-time-ready via OutboxEvent + useMessageBus)
+- Dark mode + theme variants (midnight, slate)
+- i18n (Spanish + English)
+- RBAC with custom permissions per member
+- Super-admin panel (org blocking, subscription management)
+
+### NOT implemented (no code evidence):
+- Real-time WebSocket/SSE (useMessageBus is client-side bus only, prepared but not connected)
+- Mobile native app (web-only, but mobile-responsive)
+- Tenant-to-tenant data sharing
+- Public-facing client portals
+- Time tracking beyond daily report labor counts
+- Billing/invoicing engine (finance records transactions but not a billing system)
+- BIM integration
+- Email notifications beyond password reset (Resend is only used for auth)
+
+## SUBSCRIPTION TIERS
+`Organization.subscriptionPlan` and `Organization.subscriptionStatus` fields exist.
+`Organization.maxProjects` and `Organization.maxUsers` limits exist.
+SuperAdmin can block orgs via `Organization.isBlocked`.
+The enforcement logic for plan limits is NOT yet visible in the code (exists at data level only).
+
+**Known gap — plan enforcement not implemented:**
+Limits must be enforced server-side in `createProject()` and `createOrgMember()` actions.
+See `agent-behavior.skill` → SUBSCRIPTION ENFORCEMENT LOCATION for the correct implementation path.
+Do NOT add UI-only enforcement (a user could bypass it via direct action calls).
+
+## RATE LIMITING — REQUIRED BEFORE SCALE
+No rate limiting is currently implemented. The following must be in place before reaching
+significant multi-tenant load:
+- Per-org mutation rate limit: 60 requests/minute per org (prevents runaway imports/bots)
+- Per-user rate limit: 30 mutations/minute per user (prevents individual abuse)
+- Bulk import endpoints: 5 requests/minute per org
+- Recommended layer: Vercel Edge Middleware using Upstash Redis (fits the existing stack)
+- Do NOT add rate limiting inside Server Actions — it belongs in the middleware or an edge proxy
+
+## GLOBALIZATION STRATEGY
+- Spanish-first: all UI labels, error messages, and seed data are in Spanish
+- `messages/es.json` is the canonical translation file
+- English (`messages/en.json`) is secondary
+- Currency support: `Currency` model in finance schema, `ExchangeRate` for multi-currency
+- Default currency set per org in `OrgProfile.baseCurrency`
+
+## COMPETITIVE CONTEXT (inferred)
+Bloqer replaces: Procore (too expensive for LatAm SME), Excel-based tracking, local accounting tools.
+Key differentiator: WBS-centric cost control + certification workflow native to LatAm construction contracts.
+
+## AI AGENT BEHAVIOR GUIDANCE
+- Prioritize Spanish in all user-visible text
+- Prefer practical simplicity — do not add complexity for hypothetical future needs
+- When adding UI: use erp-* utility classes, never invent new patterns
+- When adding a module feature: follow the existing 11-module RBAC boundary
+- Field-facing features must work on mobile (test with 375px viewport assumption)
+- Financial features must use Decimal, never Float

@@ -1,0 +1,176 @@
+# Agent Behavior — AI Operating Skill for Bloqer
+# Version: 1.1
+# Purpose: Operational rules for any AI agent working on this codebase
+
+## SESSION STARTUP PROTOCOL
+1. Read `.claude/skills/` directory — load all *.skill files for context
+2. Check current branch and recent git log
+3. Identify affected domain (projects, finance, budget, etc.) from the task
+4. Load the relevant domain knowledge from bloqer-domain.skill before writing code
+
+## BEFORE WRITING ANY CODE
+- Read the existing file you're about to modify — never patch blindly
+- Check for existing patterns in the same domain folder
+- Verify the relevant Prisma model fields before referencing them
+- Confirm the permission module key for the feature you're adding
+
+## SERVER ACTION CHECKLIST (for every new action)
+- [ ] File has `'use server'` at top
+- [ ] Starts with `getAuthContext()` to get `{ session, org }`
+- [ ] Calls `requirePermission(MODULE, action)` before any mutation
+- [ ] Validates input with schema from `@repo/validators` (not inline Zod)
+- [ ] All mutations are inside `prisma.$transaction()`
+- [ ] `publishOutboxEvent(tx, ...)` called inside the transaction
+- [ ] Returns serialized data (Decimal → Number, Date → ISOString)
+- [ ] Calls `revalidatePath()` after the transaction
+- [ ] Error messages are in Spanish
+
+## PRISMA QUERY CHECKLIST
+- [ ] Every query has `orgId: org.orgId` in `where` clause
+- [ ] No `passwordHash` selected outside auth flow
+- [ ] Monetary fields stored as Decimal, never Float
+- [ ] Uses `select: {}` for list queries (not full model)
+- [ ] Date filters use JavaScript Date objects (not strings) in Prisma where clauses
+
+## COMPONENT CHECKLIST
+- [ ] Page components are Server Components (async function, no 'use client')
+- [ ] Interactive components have 'use client' at top
+- [ ] Client components named `*-client.tsx`
+- [ ] Form components use react-hook-form + zodResolver
+- [ ] Colors use CSS tokens (no hardcoded hex/rgb)
+- [ ] Layout uses erp-* utility classes
+- [ ] Numbers/currency rendered with `.numeric` or `.currency` class
+- [ ] Monetary display uses Roboto Mono font class
+
+## VALIDATOR CHECKLIST
+- [ ] New Zod schemas go in `packages/validators/src/[domain].ts`
+- [ ] Export from `packages/validators/src/index.ts`
+- [ ] Schema name matches entity: `createProjectSchema`, `updateProjectSchema`
+- [ ] Type exported alongside schema: `export type CreateProjectInput = z.infer<typeof createProjectSchema>`
+
+## NAMING CONVENTIONS
+- Server actions: camelCase verb-noun → `createBudgetVersion`, `listFinanceTransactions`
+- Components: PascalCase, domain-prefixed → `FinanceTransactionList`, `BudgetVersionForm`
+- Client components: suffix `-client` → `finance-transactions-list-client.tsx`
+- Dialog components: suffix `-dialog` → `create-party-dialog.tsx`
+- Page client wrappers: suffix `-page-client` → `finance-page-client.tsx`
+- Hook files: `use-` prefix → `use-permissions.ts`
+- Utility files: noun-utils → `finance-utils.ts`, `budget-utils.ts`
+
+## WHAT NOT TO DO
+- Do NOT add REST API routes for new CRUD operations — use Server Actions
+  (exception: `/api/v1/` public API routes are allowed for external integrations)
+- Do NOT put business logic in Client Components — keep it in Server Actions
+- Do NOT use `Float` for any monetary amount
+- Do NOT hardcode colors, use CSS tokens
+- Do NOT import `@/lib/auth` in `middleware.ts` (Edge runtime incompatibility)
+- Do NOT write OutboxEvents outside `prisma.$transaction()`
+- Do NOT define Zod schemas in action files — they belong in `@repo/validators`
+- Do NOT skip `orgId` scope in Prisma queries
+- Do NOT add new Prisma models without assigning `@@schema("...")`
+- Do NOT use `useEffect` for data fetching — use Server Components or React Query
+- Do NOT commit secrets or environment variables
+- Do NOT use `any` type — define proper TypeScript interfaces
+- Do NOT call `findMany()` without `take/skip` on high-volume tables (see PAGINATION in bloqer-api.skill)
+- Do NOT use `session.user.role` from JWT for authorization in mutations — use `requirePermission()`
+- Do NOT generate sequence numbers outside a transaction (race condition risk)
+- Do NOT implement `deleteOrganization` as a hard delete — always use `isBlocked=true` suspension
+- Do NOT run large export operations synchronously — use ExportRun + Inngest above 50 rows
+- Do NOT check module activation using `Organization.enabledModules` array for server-side logic
+  — use `ModuleActivation` table (it is the authoritative source)
+
+## WHEN ADDING A NEW MODULE
+1. Add module key to `MODULES` in `lib/permissions.ts`
+2. Add role permissions in `ROLE_PERMISSIONS` matrix in `lib/permissions.ts`
+3. Add route mapping in `ROUTE_TO_MODULE` in `middleware.ts`
+4. Add `canViewModule` entry in middleware `viewable` map
+5. Add route path to `protectedPaths` in `middleware.ts`
+6. Create `app/actions/[module].ts` with standard action template
+7. Create `components/[module]/` directory with domain components
+8. Add page at `app/[locale]/(dashboard)/[module]/page.tsx`
+9. Add navigation item in `components/layout/global-sidebar.tsx`
+10. Add translation keys to `messages/es.json` and `messages/en.json`
+
+## WHEN ADDING A NEW DATABASE MODEL
+1. Add to `packages/database/prisma/schema.prisma` with correct `@@schema()`
+2. Every model needs: `id String @id @default(uuid())`, `orgId`, `createdAt`
+3. Add `@@map("snake_case_table_name")`
+4. Run `pnpm db:generate` to regenerate Prisma client
+5. Run `pnpm db:migrate` (or `db:push` for development)
+6. Add Zod schema to `@repo/validators`
+7. Update relevant Server Actions
+
+## SERIALIZATION REMINDER
+When Server Actions return data containing `Prisma.Decimal` or `Date` fields:
+```typescript
+// Decimal → number
+total: Number(entity.total)
+// Date → ISO string
+createdAt: entity.createdAt.toISOString()
+// Or use the utility:
+import { serializeForClient } from '@/lib/utils/serialization'
+```
+
+## MULTI-LANGUAGE REMINDER
+- All user-visible text: add to `messages/es.json` and `messages/en.json`
+- Use `useTranslations()` in Client Components
+- Use `getTranslations()` in Server Components / Actions
+- Business comments in code: Spanish is fine and expected
+- Error messages thrown in Server Actions: Spanish (`throw new Error('No tienes permiso...')`)
+
+## GIT WORKFLOW
+- Branch prefix: `feature/`, `fix/`, `chore/`
+- Commit messages: English, imperative mood (`Add finance cashflow projection`)
+- Do NOT commit without explicit user request
+- Run `pnpm typecheck` and `pnpm lint` before committing
+
+## MIGRATION CHECKLIST (when changing the Prisma schema)
+- [ ] Migration is additive only (new column has a default, or is nullable)
+- [ ] If dropping/renaming: old column kept in migration 1, code updated, old column dropped in migration 2
+- [ ] New indexes created with `CREATE INDEX CONCURRENTLY` on large tables
+- [ ] If backfilling data: backfill is a separate background job, not in the migration file
+- [ ] Migration tested on a copy of production data before deploying
+
+## SUBSCRIPTION ENFORCEMENT LOCATION
+`Organization.maxProjects` and `Organization.maxUsers` limits exist in the data model but
+are not enforced in code yet. When implementing enforcement:
+- Add a `requireWithinPlanLimits(org, 'projects')` guard function in `lib/auth-helpers.ts`
+- Call it inside `createProject()` and `createOrgMember()` Server Actions
+- Return a user-facing error: `'Has alcanzado el límite de proyectos de tu plan'`
+- Do NOT enforce limits in middleware — only in Server Actions where the plan context is available
+
+## PERFORMANCE CONSIDERATIONS
+- Use `select:` to limit Prisma query payload in list actions
+- Use `Promise.all()` for independent parallel data fetches in page components
+- Avoid N+1 queries: use `include:` for relations needed in the same render
+- Pagination is MANDATORY (not optional) for high-volume tables — see bloqer-api.skill
+- Charts: use `html2canvas` + `use-chart-export` hook for screenshot-based PDF export
+- For pages calling multiple Server Actions, wrap `getAuthContext()` with `cache()` from React
+  to avoid repeated DB lookups within the same request
+- Dashboard/KPI aggregations are expensive — do not add new unindexed aggregation queries;
+  if a query scans more than one table without a compound index, document the index needed
+
+## TESTING DOCTRINE
+There is currently no test suite. Until one is established, follow these minimum rules:
+- Any new utility function in `lib/` that contains business logic (budget calculations,
+  certification percentages, finance KPI formulas) MUST have at least a basic unit test
+  co-located as `lib/[name].test.ts` using Vitest.
+- Server Actions containing complex conditional logic should have integration tests
+  that mock `prisma` using `vitest-mock-extended` or similar.
+- Do NOT ship new financial calculation logic without test coverage — money bugs at 10k orgs
+  are a support crisis, not a todo item.
+
+## WBS DEPTH LIMIT
+- CSS indent tokens (`--spacing-indent-*`) are only defined for levels 0–4.
+- WbsNode has no schema-level depth constraint.
+- Do NOT render WBS at depth > 4 without first extending the CSS tokens.
+- When creating WBS nodes: validate `depth <= 4` in the Zod schema or Server Action.
+  Use `getWbsDepth(parentId)` utility if one exists, or count ancestor hops.
+
+## COMMON GOTCHAS
+- `Prisma.Decimal` is NOT a JavaScript number — always call `Number()` before arithmetic or display
+- Date filter strings from client must be converted: `new Date(filters.dateFrom)`
+- `OrgMember.customPermissions` is `Json?` in Prisma — cast to `CustomPermissionsMap` type
+- The `auth()` function from NextAuth returns `null` on unauthenticated requests — always null-check
+- `revalidatePath` needs the locale prefix in the path pattern: `/[locale]/(dashboard)/finance`
+- `useSession()` in Client Components — use `status` field to handle loading state

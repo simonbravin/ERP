@@ -1,0 +1,107 @@
+# Bloqer Architecture — AI Operating Skill
+# Version: 1.1 | Source: reverse-engineered from codebase
+# Purpose: Prevent architectural drift in AI-generated code
+
+## STACK (exact versions matter)
+- Runtime: Next.js 15.2.8 App Router + React 19 + TypeScript 5.7
+- Monorepo: Turborepo 2.3 + pnpm 9.1 workspaces
+- Database: PostgreSQL (Neon serverless) via Prisma 5.22
+- Auth: NextAuth v5 beta (5.0.0-beta.25) — JWT strategy only
+- Styling: Tailwind CSS v4 (CSS-first config via @theme in globals.css)
+- Background: Inngest 3.15 (event-driven, 30s cron poll)
+- Storage: Cloudflare R2 (S3-compatible via @aws-sdk/client-s3)
+- i18n: next-intl 4.8 — locales: es (default), en
+
+## MONOREPO STRUCTURE
+```
+apps/
+  web/              → Next.js app (only deployable app)
+packages/
+  database/         → @repo/database — Prisma client + schema + seed scripts
+  ui/               → @repo/ui — shadcn component library (NOT YET DEVELOPED)
+  validators/       → @repo/validators — all Zod schemas, TypeScript types
+tooling/
+  typescript/       → shared tsconfig bases
+```
+
+## APP INTERNALS (apps/web/)
+```
+app/
+  actions/          → ALL server mutations live here ('use server')
+  api/              → minimal REST routes (4 total: NextAuth, Inngest, member-permissions, projects/id, reports/id)
+  [locale]/
+    (auth)/         → public routes: login, register, invite, super-admin
+    (dashboard)/    → protected routes: all ERP modules
+components/
+  ui/               → 23 primitive components (shadcn pattern)
+  layout/           → sidebar, breadcrumbs, header pieces
+  layouts/          → page shells (dashboard-layout, dashboard-shell, project-shell)
+  [domain]/         → domain components grouped by feature
+lib/                → utilities, auth helpers, permissions, org-context
+hooks/              → 3 hooks: use-chart-export, use-message-bus, use-permissions
+inngest/            → Inngest client + event-dispatcher function
+i18n/               → next-intl config + routing
+messages/           → es.json, en.json translation files
+types/              → next-auth.d.ts type extensions
+```
+
+## DATA FLOW (canonical path for every mutation)
+1. User triggers action in Client Component
+2. Client Component calls Server Action from `app/actions/[domain].ts`
+3. Server Action: `getAuthContext()` → validates session + org membership
+4. Server Action: `requirePermission(MODULE, permission)` → enforces RBAC
+5. Server Action: Zod parse from `@repo/validators`
+6. `prisma.$transaction([mutation + publishOutboxEvent(tx, ...)])` — atomic
+7. `revalidatePath()` to bust Next.js cache
+8. Inngest cron (30s) picks up `OutboxEvent` rows → dispatches downstream effects
+
+## DATA FLOW (read path)
+1. Page is a Server Component (async function)
+2. Calls Server Action or utility directly (no REST fetch for internal data)
+3. Passes serialized data to `*-client.tsx` Client Component as props
+4. `serializeForClient()` must be called before passing Decimal/Date to client
+
+## TENANT ISOLATION
+- Every Prisma model has `orgId: String` (FK to Organization, cascade delete)
+- `getAuthContext()` extracts orgId from JWT — it is NEVER taken from request params
+- Every query MUST include `orgId: org.orgId` in the `where` clause
+- Violation = security bug
+
+## TENANT ISOLATION — ADDITIONAL SCALE RULES
+- `GlobalParty`, `GlobalProduct`, `Currency`, `ExchangeRate` are cross-tenant (no orgId) — these
+  are shared reference data. Mutations to these must go through super-admin or a moderated queue.
+- The JWT role/orgId can be stale (minted at login). Do NOT use `session.user.role` for
+  authorization in mutations. Always re-query via `requirePermission()`.
+- Organization cascade delete permanently destroys data across all 4 schemas. Never implement
+  hard-delete for organizations. Use `isBlocked=true` for suspension in all user-facing flows.
+
+## CRITICAL RULES
+1. NEVER put Prisma queries directly in React components — use Server Actions
+2. NEVER import from `@/lib/auth` in middleware.ts — breaks Edge runtime (use getToken())
+3. NEVER hardcode colors — use CSS custom properties (HSL vars from globals.css)
+4. NEVER use floating point for money — Prisma.Decimal for all monetary fields
+5. NEVER skip `orgId` scope in Prisma queries
+6. NEVER add REST API routes for mutations — use Server Actions
+7. NEVER write to OutboxEvent outside a transaction — it must commit atomically with the mutation
+
+## MULTI-SCHEMA PRISMA
+- previewFeatures: ["multiSchema", "fullTextSearch"]
+- Schema mapping: `public` (core), `finance` (financial), `inventory` (stock), `quality` (QA)
+- Use `@@schema("finance")` etc. in model declarations
+- Run `pnpm db:push` or `pnpm db:migrate` from packages/database/
+
+## AUTHENTICATION FLOW
+- NextAuth JWT strategy: token contains { sub, email, name, isSuperAdmin, orgId, orgMemberId, role, orgName }
+- JWT is populated in `jwt` callback in lib/auth.ts
+- On server: `auth()` → session → `getAuthContext()`
+- On client: `useSession()` + `usePermissions()` hook
+- Middleware (Edge): uses `getToken()` directly, NEVER imports lib/auth.ts
+
+## OBSERVABILITY (required at scale)
+The current codebase uses `console.error()` for error reporting. Before reaching significant scale:
+- Add structured error reporting (Sentry or equivalent) in `apps/web/instrumentation.ts`
+- Server Action errors should be captured with org context: `Sentry.setTag('orgId', org.orgId)`
+- `createAuditLog()` silently swallows its own errors — this is a silent data loss risk;
+  add error reporting inside the catch block
+- Add a `/api/health` route that checks DB connectivity and returns 200/503
+- Inngest function failures must be monitored — configure Inngest alerting for FAILED events
