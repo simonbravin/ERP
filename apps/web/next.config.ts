@@ -1,5 +1,6 @@
 import type { NextConfig } from 'next'
 import createNextIntlPlugin from 'next-intl/plugin'
+import { withSentryConfig } from '@sentry/nextjs'
 
 process.env.SKIP_TYPE_CHECK = 'true'
 
@@ -45,4 +46,20 @@ const nextConfig: NextConfig = {
   },
 }
 
-export default withNextIntl(nextConfig)
+export default withSentryConfig(withNextIntl(nextConfig), {
+  // Sentry project settings. Set SENTRY_ORG and SENTRY_PROJECT in Vercel env.
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+
+  // Silences Sentry CLI output locally; CI will show it.
+  silent: !process.env.CI,
+
+  // Hide Sentry source maps from the deployed bundle.
+  hideSourceMaps: true,
+
+  // Disable SDK bundle logger to keep client bundle lean.
+  disableLogger: true,
+
+  // Automatically instrument Vercel Cron Monitors (optional, zero cost).
+  automaticVercelMonitors: true,
+})
