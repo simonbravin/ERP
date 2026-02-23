@@ -1,0 +1,194 @@
+# Bloqer Scalability — AI Operating Skill
+# Version: 1.0 | Created: 2026-02-22 (CTO scale review)
+# Purpose: Prevent scale-breaking decisions as Bloqer grows to 10,000+ orgs.
+# This skill consolidates all scale-specific rules that cut across other skills.
+
+## SCOPE
+This skill governs decisions that are harmless today but catastrophic at scale.
+Every rule here has a "why it breaks" explanation.
+Organized into: Database, API/Actions, Operations, Architecture, and Known Debts.
+
+---
+
+## DATABASE SCALE RULES
+
+### 1. Required Indexes — must exist in production
+See `bloqer-database.skill` → REQUIRED DATABASE INDEXES for the full list.
+When writing a new query with `WHERE` or `ORDER BY` on a high-volume table, ask:
+"Does a compound index exist for this filter + sort?" If not, add one in the migration.
+
+### 2. OutboxEvent cleanup — operational job required
+COMPLETED and FAILED OutboxEvents are never cleaned. This table will reach hundreds of
+millions of rows within a year at scale.
+- Implement an Inngest scheduled function (weekly or nightly) that deletes:
+  - COMPLETED rows older than 30 days
+  - FAILED rows older than 7 days
+- Job name: `outbox-event-cleanup`
+- Filter pattern: `{ status: { in: ['COMPLETED', 'FAILED'] }, createdAt: { lt: cutoffDate } }`
+- Delete in batches of 1,000 to avoid long-running transactions.
+
+### 3. AuditLog archiving
+AuditLog stores full JSON snapshots. Grows indefinitely.
+- After 2 years, rows should be exported to a cold archive (e.g. R2 as JSONL files per org)
+  and deleted from the live table.
+- Do NOT delete AuditLog rows without archiving first — this is customer compliance data.
+- Archiving job: Inngest monthly function, triggered per org that has rows > 2 years old.
+
+### 4. Sequence numbers are not concurrency-safe — known debt
+The `COUNT(*) + 1` pattern in `getNextTransactionNumber` has a race condition under concurrent
+load from the same org. Do not "fix" it by adding retries or application-level locks.
+The correct fix: a dedicated `OrgSequenceCounter` table with a Postgres `SELECT FOR UPDATE`
+lock on the `(orgId, type, year)` row.
+Until fixed: the bug is low-severity for small orgs (rare concurrency) but becomes
+observable above ~50 users/org doing bulk invoice entry.
+The 3-digit padding (`NNN`) also caps at 999/year/type. Fix together: use 5-digit padding.
+
+### 5. `GlobalParty` and `GlobalProduct` are unpartitioned shared tables
+These tables serve all 10,000 orgs. As GlobalParty grows (thousands of verified suppliers),
+queries that join from org-level entities to GlobalParty become cross-schema joins.
+When GlobalParty exceeds ~100,000 rows: consider full-text search via Postgres `tsvector`
+(already in previewFeatures) or an external search index (Typesense, Algolia).
+Do NOT add `LIKE '%query%'` pattern searches on GlobalParty — use `fullTextSearch`.
+
+---
+
+## API / SERVER ACTION SCALE RULES
+
+### 6. Pagination is mandatory, not advisory
+`findMany()` without `take/skip` on any of these tables is a production incident:
+`FinanceTransaction`, `DailyReport`, `AuditLog`, `InventoryMovement`, `WbsProgressUpdate`,
+`Notification`, `OutboxEvent` (internal), `BudgetLine`.
+
+Default page size: 50. Maximum page size: 200. Return `{ items, total, page, pageSize }`.
+Never return unbounded lists to the client, even if filtered by `orgId`.
+
+### 7. `getAuthContext()` must be memoized within a request
+Every Server Action calls `getAuthContext()` → `getOrgContext()` → DB query.
+A page component that calls 5 actions on load makes 5 identical `orgMember` lookups.
+Wrap with React's `cache()` (stable in Next.js 15) for read-only use in page components.
+Do NOT use cached version in mutation actions — they require fresh auth state.
+
+```typescript
+// lib/auth-helpers.ts
+import { cache } from 'react'
+export const getAuthContextCached = cache(getAuthContext)
+// Use in page.tsx components only. Never in action files that mutate data.
+```
+
+### 8. Export size threshold — enforce async path
+Synchronous PDF/Excel generation inside a Server Action will timeout on Vercel for large datasets.
+Threshold for async path: any export that queries more than 50 rows OR spans multiple fiscal periods.
+Use `ExportRun` + Inngest background processing. The infrastructure already exists — use it.
+
+### 9. revalidatePath granularity
+`revalidatePath('/[locale]/(dashboard)/finance')` invalidates every cached page under `/finance`
+for the requesting user. This is acceptable for mutations that affect a whole module.
+For mutations scoped to a single entity (e.g. editing one transaction), prefer:
+`revalidatePath('/[locale]/(dashboard)/finance/transactions/[id]')`
+Over-invalidating is not a correctness bug, but it wastes RSC re-render budget at scale.
+
+---
+
+## OPERATIONS RULES
+
+### 10. Rate limiting — required before significant user growth
+No rate limiting exists today. Before reaching 1,000 active orgs, add:
+- Per-org: 120 Server Action calls per minute (burst), 30 sustained
+- Per-user: 30 mutations per minute
+- Bulk import (`import-budget.ts`, `inventory.ts` movements): 5 calls/minute per org
+- Layer: Vercel Edge Middleware + Upstash Redis (`@upstash/ratelimit`)
+- Identify by: orgId from JWT (in middleware: `token.orgId`)
+- Rate limit exceeded: return HTTP 429 with `{ error: 'Demasiadas solicitudes. Intenta en un momento.' }`
+
+### 11. Health check endpoint
+Create `app/api/health/route.ts`:
+```typescript
+export async function GET() {
+  try {
+    await prisma.$queryRaw`SELECT 1`
+    return Response.json({ status: 'ok', db: 'connected' })
+  } catch {
+    return Response.json({ status: 'error', db: 'disconnected' }, { status: 503 })
+  }
+}
+```
+This endpoint must be unauthenticated and excluded from middleware protection.
+Add to middleware `matcher` exclusion pattern.
+
+### 12. Zero-downtime migration protocol
+Every database migration that ships to production must be backward-compatible with the
+code currently running. The sequence for any breaking schema change is:
+```
+Step 1: Migrate (additive — add new column/table with default/nullable)
+Step 2: Deploy code that writes both old and new columns
+Step 3: Backfill old rows via a background Inngest job
+Step 4: Deploy code that reads only the new column
+Step 5: Migrate (drop old column/table in a separate migration)
+```
+Never collapse steps 1+5 into a single migration. Dropping a column used by running code
+will cause 500s during the Vercel deployment window.
+
+### 13. Organization lifecycle — deactivation, not deletion
+The only safe deactivation path for a paying customer's org:
+```
+1. Set Organization.isBlocked = true (blocks all logins and Server Action access)
+2. Export all org data to a secure archive (R2, encrypted)
+3. After retention window (e.g. 90 days): schedule background hard delete
+4. Hard delete via super-admin background job only, never via user-facing action
+```
+No Server Action named `deleteOrganization` should exist that performs a Prisma `delete`.
+The cascade-on-delete is a database safety net, not an operational tool.
+
+### 14. Observability requirements
+Minimum observability required before reaching significant scale:
+- Error tracking: Sentry (or equivalent) configured in `apps/web/instrumentation.ts`
+- Tag every captured error with `orgId` and `userId` from context
+- Inngest function failures: configure Inngest alerting for FAILED events > threshold
+- DB query performance: enable Neon query insights or add `pg_stat_statements`
+- Deployment monitoring: Vercel Analytics + uptime monitoring hitting `/api/health`
+
+---
+
+## ARCHITECTURE KNOWN DEBTS
+
+### Debt 1: Single Inngest function for all event types
+`event-dispatcher.ts` routes all OutboxEvent types through one function. As event types grow
+(certification approvals, webhook delivery, email notifications, inventory reorder alerts),
+this serialized queue becomes a bottleneck.
+Migration path: split by `eventType` prefix using `inngest.createFunction` with event matching:
+```typescript
+export const certificationApprovedHandler = inngest.createFunction(
+  { id: 'certification-approved' },
+  { event: 'certification.approved' },
+  async ({ event }) => { ... }
+)
+```
+Register new domain handlers in `app/api/inngest/route.ts` alongside the existing dispatcher.
+
+### Debt 2: No public API despite ApiKey model existing
+`ApiKey` (keyHash, scopes) and `WebhookEndpoint` + `WebhookDelivery` models exist.
+These anticipate a public REST API. The internal "no REST for mutations" rule must not prevent
+this from ever being built.
+Path forward: `/api/v1/[resource]/route.ts` with Bearer token auth, scoped to ApiKey.scopes.
+This is explicitly exempt from the Server Actions rule.
+
+### Debt 3: JWT role staleness
+Role changes and membership revocations take effect only when the JWT expires.
+Short-term mitigation: keep JWT TTL short (15 minutes with refresh tokens).
+Long-term: implement session invalidation by storing a `sessionVersion` on OrgMember
+and embedding it in the JWT; increment on role change; re-validate in `requirePermission`.
+
+### Debt 4: Dashboard KPIs are not cached
+Every navigation to the dashboard recomputes heavy aggregations from raw data.
+At scale: move KPI computation to a materialized view or a scheduled Inngest job that
+writes pre-computed KPIs to a `OrgDashboardSnapshot` table. Read from snapshot, refresh async.
+Do not add this complexity until P95 dashboard load time exceeds 2 seconds in production.
+
+### Debt 5: `customPermissions` has no schema version
+When a new module is added, existing `customPermissions` JSON on OrgMember records won't
+have entries for it. The system correctly falls back to role base — this is safe.
+However, renaming a module key (e.g. `'certifications'` → `'billing'`) would silently break
+all custom permission sets. Document all module key renames as:
+1. Add new key, keep old key as alias in `getEffectivePermissions`
+2. Run a migration script to update `customPermissions` JSON across OrgMember rows
+3. Remove old key alias after all rows are updated

@@ -1,0 +1,301 @@
+# Bloqer API & Server Actions — AI Operating Skill
+# Version: 1.1 | Source: app/actions/, app/api/, lib/auth-helpers.ts
+# Purpose: Enforce correct patterns for all data operations
+
+## PRIMARY DATA ACCESS: SERVER ACTIONS
+Server Actions are the ONLY mutation path. REST API routes are for special cases only.
+
+## SERVER ACTION FILE STRUCTURE
+```
+apps/web/app/actions/
+  auth.ts                   → authentication actions
+  budget.ts                 → budget CRUD + calculations
+  certifications.ts         → certification flow
+  change-orders.ts          → change order workflow
+  daily-reports.ts          → daily report CRUD
+  daily-reports-tier2.ts    → daily report sub-entities (labor, equipment, etc.)
+  dashboard.ts              → executive dashboard KPIs
+  documents.ts              → document management + R2 upload
+  export.ts                 → PDF/Excel generation
+  export-purchases.ts       → purchase export
+  finance.ts                → barrel re-export (imports from finance-*)
+  finance-ap-ar.ts          → accounts payable/receivable
+  finance-cashflow.ts       → cash flow projection
+  finance-helpers.ts        → shared utilities (serializeTransaction, isEditableStatus, toNum)
+  finance-kpis.ts           → financial KPIs
+  finance-overhead.ts       → overhead allocation
+  finance-transactions.ts   → transaction CRUD
+  global-suppliers.ts       → global supplier directory
+  import-budget.ts          → Excel import for budget
+  inventory.ts              → inventory CRUD + movements
+  materials.ts              → materials catalog
+  notifications.ts          → notification CRUD
+  predefined-reports.ts     → standard report generation
+  project-dashboard.ts      → project-level dashboard
+  projects.ts               → project CRUD + members
+  quality.ts                → RFI, submittal, inspection CRUD
+  reports.ts                → custom reports
+  resources.ts              → resource catalog
+  schedule.ts               → Gantt schedule management
+  settings.ts               → org settings
+  super-admin.ts            → super admin operations
+  team.ts                   → team member management
+  wbs.ts                    → WBS CRUD + reorder
+```
+
+## CANONICAL SERVER ACTION TEMPLATE
+```typescript
+'use server'
+
+import { revalidatePath } from 'next/cache'
+import { prisma, Prisma } from '@repo/database'
+import { requirePermission, getAuthContext } from '@/lib/auth-helpers'
+import { publishOutboxEvent } from '@/lib/events/event-publisher'
+import { mySchema, type MyInput } from '@repo/validators'
+
+export async function createMyEntity(input: MyInput) {
+  // Step 1: Auth + org context
+  const { session, org } = await getAuthContext()
+
+  // Step 2: Permission check
+  await requirePermission('MODULE', 'create')
+
+  // Step 3: Validate input
+  const parsed = mySchema.parse(input)
+
+  // Step 4: Transactional mutation + outbox event
+  const entity = await prisma.$transaction(async (tx) => {
+    const result = await tx.myEntity.create({
+      data: {
+        orgId: org.orgId,
+        createdByMemberId: org.memberId,
+        ...parsed,
+      },
+    })
+    await publishOutboxEvent(tx, {
+      orgId: org.orgId,
+      eventType: 'myEntity.created',
+      entityType: 'MyEntity',
+      entityId: result.id,
+      payload: { ...parsed },
+    })
+    return result
+  })
+
+  // Step 5: Revalidate
+  revalidatePath('/[locale]/(dashboard)/my-module')
+
+  return { success: true, id: entity.id }
+}
+```
+
+## AUTH CONTEXT (always start with this)
+```typescript
+import { getAuthContext } from '@/lib/auth-helpers'
+const { session, org } = await getAuthContext()
+// org = { orgId, orgName, role, memberId }
+// session.user = { id, email, name, orgId, orgMemberId, role }
+```
+
+## AUTH CONTEXT CACHING (required for pages with multiple actions)
+`getAuthContext()` makes a DB query on every call. Use React's `cache()` to memoize within
+a single request lifecycle when a Server Component page calls multiple actions:
+
+```typescript
+// lib/auth-helpers.ts — wrap with cache() if not already done
+import { cache } from 'react'
+export const getAuthContextCached = cache(getAuthContext)
+```
+
+In page.tsx files that fetch 2+ data sources, use the cached version so the orgMember DB
+lookup happens once per request, not once per action call.
+Do NOT use the cached version in mutation actions — mutations need a fresh auth check.
+
+## JWT STALENESS — AUTHORIZATION RULE
+The JWT token embeds `role` and `orgId` at login time. These can become stale if:
+- A user's role is changed by an admin
+- A user's membership is revoked
+- A user switches organizations (UserOrgPreference)
+
+RULE: Never use `session.user.role` from the JWT for authorization decisions in mutations.
+Always use `requirePermission()` which re-queries the DB (`getMemberWithPermissions`).
+Reading `session.user.role` for display purposes (e.g. conditional UI rendering) is acceptable.
+
+## PERMISSION ENFORCEMENT
+```typescript
+import { requirePermission, requireAccess } from '@/lib/auth-helpers'
+
+// For mutations: requirePermission(MODULE_KEY, 'create'|'edit'|'delete'|'approve'|'export')
+await requirePermission('FINANCE', 'create')
+
+// For read-only: requireAccess is less strict (just checks 'view')
+await requireAccess('BUDGET')
+```
+
+## MODULE KEYS (use these exact strings in requirePermission)
+```
+'DASHBOARD' | 'PROJECTS' | 'BUDGET' | 'FINANCE' | 'CERTIFICATIONS' |
+'INVENTORY' | 'QUALITY' | 'DOCUMENTS' | 'REPORTS' | 'TEAM' | 'SETTINGS'
+```
+
+## VALIDATION (always from @repo/validators)
+```typescript
+import { mySchema } from '@repo/validators'
+// NEVER define Zod schemas inline in action files
+// All schemas live in packages/validators/src/
+```
+
+## REST API ROUTES (use only for these cases)
+```
+app/api/auth/[...nextauth]/route.ts  → NextAuth handlers (do not touch)
+app/api/inngest/route.ts             → Inngest serve endpoint (do not touch)
+app/api/member-permissions/[memberId]/route.ts → client hook data (keep this pattern)
+app/api/projects/[id]/route.ts       → breadcrumb data (lightweight GET)
+app/api/reports/[id]/route.ts        → breadcrumb data (lightweight GET)
+```
+
+## REST API ROUTE TEMPLATE (when genuinely needed)
+```typescript
+import { NextRequest, NextResponse } from 'next/server'
+import { getSession } from '@/lib/session'
+import { getOrgContext } from '@/lib/org-context'
+import { prisma } from '@repo/database'
+
+export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+  const session = await getSession()
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const org = await getOrgContext(session.user.id)
+  if (!org) return NextResponse.json({ error: 'No organization' }, { status: 403 })
+
+  const entity = await prisma.model.findFirst({
+    where: { id: params.id, orgId: org.orgId },
+    select: { id: true, name: true },
+  })
+  if (!entity) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  return NextResponse.json(entity)
+}
+```
+
+## DATA SERIALIZATION (before client boundary)
+```typescript
+import { serializeForClient } from '@/lib/utils/serialization'
+// OR manually:
+return {
+  ...entity,
+  total: Number(entity.total),          // Decimal → number
+  createdAt: entity.createdAt.toISOString(), // Date → string
+}
+```
+
+## ERROR HANDLING IN SERVER ACTIONS
+- Throw errors with Spanish messages: `throw new Error('No tienes permiso...')`
+- Return `{ success: false, error: message }` for user-facing errors
+- Let unexpected errors propagate (Next.js error boundaries catch them)
+- Do NOT swallow errors silently
+
+## FILTER PATTERN (list actions)
+```typescript
+export type MyFilters = {
+  status?: string
+  projectId?: string
+  dateFrom?: string  // YYYY-MM-DD strings (not Date objects for client passing)
+  dateTo?: string
+}
+
+export async function listMyEntities(filters: MyFilters = {}) {
+  const { org } = await getAuthContext()
+  const where: Record<string, unknown> = { orgId: org.orgId, deleted: false }
+  if (filters.status) where.status = filters.status
+  if (filters.projectId) where.projectId = filters.projectId
+  if (filters.dateFrom || filters.dateTo) {
+    where.date = {}
+    if (filters.dateFrom) (where.date as Record<string, Date>).gte = new Date(filters.dateFrom)
+    if (filters.dateTo) (where.date as Record<string, Date>).lte = new Date(filters.dateTo)
+  }
+  return prisma.myEntity.findMany({ where, orderBy: { createdAt: 'desc' } })
+}
+```
+
+## PAGINATION — MANDATORY, NOT OPTIONAL
+`findMany()` without `take/skip` is FORBIDDEN on any table that can exceed 100 rows per org.
+This is not a performance suggestion — it is a hard rule.
+
+Tables that require pagination: FinanceTransaction, DailyReport, AuditLog, InventoryMovement,
+OutboxEvent (internal), WbsNode (for flat lists), BudgetLine, Notification.
+
+Standard pagination signature:
+```typescript
+export async function listMyEntities(filters: MyFilters = {}, page = 1, pageSize = 50) {
+  const { org } = await getAuthContext()
+  const skip = (page - 1) * pageSize
+  const [items, total] = await prisma.$transaction([
+    prisma.myEntity.findMany({ where, orderBy: { createdAt: 'desc' }, take: pageSize, skip }),
+    prisma.myEntity.count({ where }),
+  ])
+  return { items, total, page, pageSize, totalPages: Math.ceil(total / pageSize) }
+}
+```
+
+Exception: lookup lists used to populate dropdowns (e.g. list of projects for a select) may use
+`findMany` without pagination but MUST use `select: { id, name }` and an explicit `take` limit (e.g. 200).
+```
+
+## REVALIDATION RULES
+- After mutations: revalidatePath with the locale-prefixed path
+- Pattern: `revalidatePath('/[locale]/(dashboard)/module')` — use the Next.js path pattern
+- Multiple revalidations if the mutation affects multiple pages
+
+## FINANCE ACTIONS ARCHITECTURE
+Finance is split across files to manage complexity:
+- `finance.ts` → barrel re-export only
+- `finance-transactions.ts` → CRUD for FinanceTransaction
+- `finance-cashflow.ts` → cashflow projections + period aggregations
+- `finance-overhead.ts` → overhead allocation CRUD + calculations
+- `finance-kpis.ts` → executive KPI calculations
+- `finance-ap-ar.ts` → accounts payable/receivable aging + summaries
+- `finance-helpers.ts` → `serializeTransaction()`, `isEditableStatus()`, `toNum()`
+When adding finance features: determine which file is responsible, add there.
+
+## INNGEST BACKGROUND JOBS
+- `inngest/client.ts` — Inngest client singleton
+- `inngest/functions/event-dispatcher.ts` — polls OutboxEvent every 30s, marks COMPLETED/FAILED
+- To add a new background handler: add a new function in `inngest/functions/` + register in `app/api/inngest/route.ts`
+- Do NOT put long-running work in Server Actions — use Inngest
+
+## EXPORT OPERATIONS — SIZE THRESHOLD RULE
+Synchronous exports (PDF/Excel generated inline in a Server Action) hit Vercel's serverless
+timeout at ~60 rows of data. The `ExportRun` model with QUEUED → PROCESSING → COMPLETED exists
+for async exports. Apply the following rule:
+
+- Small exports (< 50 rows, < 5 WBS levels): synchronous Server Action is acceptable.
+- Large exports (budget with full WBS, project history, multi-period cashflow): MUST use
+  the async `ExportRun` pattern:
+  1. Create `ExportRun` record (status: QUEUED)
+  2. Emit OutboxEvent `export.requested`
+  3. Inngest handler generates file, uploads to R2, marks ExportRun COMPLETED
+  4. Client polls `ExportRun` status and downloads when COMPLETED
+
+- PDF: jsPDF + jspdf-autotable in `app/actions/export.ts`
+- Excel: ExcelJS in `app/actions/export.ts` + `app/actions/export-purchases.ts`
+- File storage: Cloudflare R2 via `lib/r2-client.ts`
+
+## PUBLIC API / WEBHOOK EVOLUTION (future-facing rules)
+The Prisma schema contains `ApiKey` (orgId, name, keyHash, scopes) and `WebhookEndpoint` +
+`WebhookDelivery` models. These represent a planned public API and webhook delivery system.
+
+When implementing:
+- Public API routes: `/api/v1/[resource]` — versioned, never under `/api/[resource]`
+- Auth: `Authorization: Bearer <apiKey>` header, verify against `ApiKey.keyHash` (bcrypt)
+- Webhook delivery: Inngest function triggered by OutboxEvent, posts to `WebhookEndpoint.url`,
+  records result in `WebhookDelivery`
+- The "no REST for mutations" rule applies to the INTERNAL web app only.
+  External API endpoints (`/api/v1/`) are explicitly exempt from this rule.
+- Scopes on ApiKey must align with MODULES + Permission types (e.g. `finance:read`, `budget:write`)
+
+## CLIENT-SIDE DATA FETCHING
+- Use TanStack React Query for client-side refreshing/polling
+- Pattern: wrap Server Action in a query: `useQuery({ queryFn: () => myServerAction(filters) })`
+- QueryClient provided in `components/providers.tsx`
+- Do NOT use SWR or fetch() directly for internal data

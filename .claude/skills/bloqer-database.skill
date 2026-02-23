@@ -1,0 +1,218 @@
+# Bloqer Database — AI Operating Skill
+# Version: 1.1 | Source: packages/database/prisma/schema.prisma + lib/ patterns
+# Purpose: Prevent data model corruption and enforce DB conventions
+
+## DATABASE SETUP
+- PostgreSQL via Neon (serverless pooled)
+- Connection: DATABASE_URL (pooled) + DIRECT_URL (direct, for migrations)
+- ORM: Prisma 5.22
+- Schema package: packages/database/ (@repo/database)
+- Import: `import { prisma, Prisma } from '@repo/database'`
+
+## PRISMA MULTI-SCHEMA
+```prisma
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema", "fullTextSearch"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+  schemas   = ["public", "finance", "inventory", "quality"]
+}
+```
+
+## SCHEMA ASSIGNMENT RULES
+- `public`: all core entities (Organization, User, OrgMember, Project, WbsNode, Budget*, Certification*, Schedule*, DailyReport*, Party*, etc.)
+- `finance`: FinanceTransaction, FinanceLine, Payment, BankAccount, Currency, ExchangeRate, OverheadAllocation
+- `inventory`: InventoryItem, InventoryCategory, InventorySubcategory, InventoryLocation, InventoryMovement, InventoryConsumption
+- `quality`: RFI, RFIComment, Submittal, Inspection, InspectionItem
+- Every new model MUST have `@@schema("...")` at the bottom
+
+## ID CONVENTION
+- ALL ids: `id String @id @default(uuid())` — UUID v4 strings
+- NO autoincrement integer IDs
+- NO cuid()
+
+## COLUMN NAMING
+- Prisma fields: camelCase → database columns: snake_case (via `@map`)
+- Table names: PascalCase model → snake_case table (via `@@map`)
+- Example: `createdAt DateTime @map("created_at")`
+
+## MONETARY FIELDS
+- ALL money amounts use `Decimal` type: `@db.Decimal(15, 2)`
+- Example: `total Decimal @db.Decimal(15,2)`
+- NEVER use Float for money
+- On the server, convert to Number for JSON serialization: `Number(prisma_decimal)`
+- Use `serializeForClient()` utility before passing to Client Components
+
+## TENANT ISOLATION (MANDATORY)
+- Every entity model MUST have: `orgId String @map("org_id")`
+- `orgId` is a FK: `organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)`
+- Every Prisma query MUST include `where: { orgId: org.orgId }` — no exceptions
+- Do NOT pass orgId from the client — always extract from validated JWT session
+
+## SOFT DELETES
+- Finance: `deleted Boolean @default(false) @map("deleted")` — filter with `deleted: false`
+- Documents: `deleted Boolean @default(false)` — same pattern
+- Party/Resource: no soft delete — hard delete with cascade
+- Projects: no soft delete (phase/status based lifecycle)
+
+## TIMESTAMPS
+- Standard: `createdAt DateTime @default(now()) @map("created_at")`
+- Optional updates: `updatedAt DateTime @updatedAt @map("updated_at")`
+- Do NOT add @updatedAt to immutable records (AuditLog, OutboxEvent, etc.)
+
+## TRANSACTION PATTERN (REQUIRED for mutations)
+```typescript
+await prisma.$transaction(async (tx) => {
+  // 1. Main mutation
+  const entity = await tx.model.create({ data: { orgId, ...parsed } })
+
+  // 2. Side-effect: write outbox event (MUST be inside same transaction)
+  await publishOutboxEvent(tx, {
+    orgId,
+    eventType: 'entity.created',
+    entityType: 'Model',
+    entityId: entity.id,
+    payload: { ...relevantData },
+  })
+})
+// 3. Revalidate after transaction commits
+revalidatePath('/path')
+```
+
+## OUTBOX EVENT PATTERN
+- `OutboxEvent` table stores async events; Inngest cron polls every 30s
+- `publishOutboxEvent(tx, params)` MUST receive the transaction client, not `prisma` directly
+- eventType conventions: `entity.created`, `entity.updated`, `entity.deleted`, `entity.approved`
+- Status progression: PENDING → COMPLETED | FAILED
+
+## IDEMPOTENCY
+- Use `IdempotencyKey` model for operations that must not be duplicated
+- `InventoryMovement.idempotencyKey` — unique field, prevents duplicate stock movements
+- Pattern: generate key client-side or from action args, use `upsert` or check existence
+
+## AUDIT LOG
+- Call `createAuditLog()` AFTER significant mutations (not inside transaction — failure is non-blocking)
+- Fields: orgId, userId, action (verb like "created", "approved"), entity, entityId, beforeSnapshot, afterSnapshot
+- `beforeSnapshot` / `afterSnapshot` are `Json?` — store the relevant fields before and after
+
+## SEQUENCE NUMBERS
+- Finance transaction numbers: `getNextTransactionNumber(orgId, type, year)` — count existing + 1, formatted as `PREFIX-YYYY-NNN`
+- Project numbers: `PROJ-YYYY-NNN` — count existing per org per year
+- Version numbers: `V1, V2...` — count existing budget versions per project
+
+## SEQUENCE NUMBER RACE CONDITION — KNOWN SCALE RISK
+The current `COUNT(*) + 1` pattern in `getNextTransactionNumber` is NOT safe under concurrent load.
+Two simultaneous requests from the same org will both read count=5 and both generate `PREFIX-YYYY-006`.
+- Do NOT generate sequence numbers outside a transaction with a row lock.
+- Preferred fix when addressing this: use a dedicated `OrgSequenceCounter` table with
+  `SELECT FOR UPDATE` on the `(orgId, type, year)` row, increment atomically, then format.
+- Also: the `NNN` 3-digit padding breaks at 1,000+ records/year/type. A large finance team
+  can exceed this. When fixing the race condition, use 5-digit padding: `PREFIX-YYYY-00001`.
+
+## SELECT DISCIPLINE
+- Always use `select: { ... }` when you don't need the full model
+- NEVER fetch `passwordHash` outside of the auth flow
+- Include relations with `include` only when the component actually renders them
+- For list views: lightweight select (id, name, status, dates) — no deep includes
+
+## MIGRATION COMMANDS
+```bash
+# From packages/database/
+pnpm db:push       # schema push (dev/preview — no migration files)
+pnpm db:migrate    # generate + apply migration (prod)
+pnpm db:generate   # regenerate Prisma client
+pnpm db:studio     # open Prisma Studio
+pnpm seed          # run seed.ts
+```
+
+## JSON FIELDS
+- `customPermissions Json?` on OrgMember — typed as `CustomPermissionsMap` in TypeScript
+- `payload Json` on OutboxEvent — typed as `Record<string, unknown>`
+- `config Json` on CustomReport — schema varies by category
+- `specifications Json?` on GlobalProduct — freeform product specs
+- Cast from Prisma: `(field as unknown as TypedInterface)` — always define the interface first
+
+## DECIMAL SERIALIZATION (required before client boundary)
+```typescript
+// In server actions, before returning to client:
+return {
+  ...entity,
+  total: Number(entity.total),
+  amountBaseCurrency: Number(entity.amountBaseCurrency),
+  lines: entity.lines.map(l => ({ ...l, lineTotal: Number(l.lineTotal) })),
+}
+```
+
+## REQUIRED DATABASE INDEXES
+These indexes are load-bearing at scale. They must exist on the live database.
+If adding a new query pattern that matches one of these shapes, add the index in the migration.
+
+```sql
+-- OrgMember: used by getOrgContext() on every single Server Action
+CREATE INDEX IF NOT EXISTS idx_org_member_user_active ON public."org_member"(user_id, active);
+
+-- FinanceTransaction: used by every finance list + AP/AR + cashflow
+CREATE INDEX IF NOT EXISTS idx_finance_tx_org_type_date ON finance."finance_transaction"(org_id, type, issue_date, deleted);
+
+-- OutboxEvent: used by the 30s Inngest cron poller
+CREATE INDEX IF NOT EXISTS idx_outbox_status_created ON public."outbox_event"(status, created_at);
+
+-- WbsNode: used by tree rendering and progress queries
+CREATE INDEX IF NOT EXISTS idx_wbs_node_project_parent ON public."wbs_node"(project_id, parent_id);
+
+-- AuditLog: used by activity feed and entity history
+CREATE INDEX IF NOT EXISTS idx_audit_log_org_created ON public."audit_log"(org_id, created_at DESC);
+
+-- DailyReport: used by date-range queries and project dashboards
+CREATE INDEX IF NOT EXISTS idx_daily_report_project_date ON public."daily_report"(project_id, report_date DESC);
+```
+When writing a new query that filters/sorts a high-volume table, verify the index exists before shipping.
+
+## DATA RETENTION — KNOWN GROWTH RISKS
+The following tables grow unboundedly and need retention policies before reaching scale:
+
+- **AuditLog**: stores full JSON snapshots. Archive or delete rows older than 2 years.
+  Pattern: a nightly Inngest job that moves rows to a cold archive table or external store.
+- **OutboxEvent**: COMPLETED/FAILED rows are never cleaned. Add a TTL cleanup job:
+  delete COMPLETED rows older than 30 days, FAILED rows older than 7 days.
+- **DailyReport / WbsProgressUpdate**: consider archiving project data when project.phase = COMPLETE
+  and project has been closed for > 12 months.
+
+Document the retention policy in a `docs/data-retention.md` when implementing.
+
+## MIGRATION SAFETY RULES
+At 10,000+ orgs on a shared database, migrations must follow these rules:
+
+1. **Additive only for zero-downtime**: add columns with defaults, add tables, add indexes CONCURRENTLY.
+2. **Never drop or rename in a single step**: deprecate first (keep old column, populate new),
+   then deploy code using new column, then drop old column in a later migration.
+3. **Index creation on large tables**: use `CREATE INDEX CONCURRENTLY` to avoid table locks.
+4. **Backfill data separately**: if a migration requires backfilling existing rows (e.g. setting
+   a new non-null column), do it in batches via a background job, not inside the migration.
+5. **Test migrations on a production-size data clone** before applying to prod.
+
+## ORGANIZATION DELETION — HARD RULE
+- `Organization` cascade delete WILL permanently destroy ALL data across all 4 schemas.
+- NEVER implement a hard-delete `deleteOrganization` action accessible to any user or admin UI.
+- Org deletion in production must be: soft-suspend (isBlocked=true) → scheduled hard-delete
+  after a retention window (e.g., 30 days), executed only by a super-admin background job.
+- The `isBlocked` flag on Organization is the only safe deactivation mechanism.
+
+## MODULE ACTIVATION — AUTHORITATIVE SOURCE
+Two systems exist: `Organization.enabledModules` (array) and `ModuleActivation` (table).
+**`ModuleActivation` table is authoritative** for feature-level checks.
+`Organization.enabledModules` is a coarse plan-level list used for billing/marketing display only.
+- Server Actions that gate access to a module: check `ModuleActivation`, not the array field.
+- Do NOT mix the two in the same check — it creates inconsistency.
+
+## WHAT MUST NEVER CHANGE CASUALLY
+- The 4 schema assignments (public/finance/inventory/quality) — requires migration planning
+- `orgId` cascade delete on Organization — foundational to data isolation (but see ORG DELETION above)
+- `OrgMember.customPermissions` JSON structure — used by permission engine
+- JWT token field names (orgId, orgMemberId, role) in `types/next-auth.d.ts`
+- Index names listed in REQUIRED DATABASE INDEXES — other systems may depend on them

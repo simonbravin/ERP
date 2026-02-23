@@ -1,0 +1,137 @@
+# Bloqer Domain Model — AI Operating Skill
+# Version: 1.0 | Source: reverse-engineered from Prisma schema + actions
+# Purpose: Authoritative domain knowledge for construction ERP features
+
+## PRODUCT IDENTITY
+Bloqer is a multi-tenant SaaS ERP for Latin American construction companies.
+Primary language: Spanish (es). Secondary: English (en).
+Target users: construction company owners, project managers, site supervisors, accountants.
+Business comments and UI labels are predominantly in Spanish.
+
+## CORE DOMAIN HIERARCHY
+```
+Organization (tenant root)
+  └── Project (construction project)
+       ├── WbsNode (Work Breakdown Structure — hierarchical tasks)
+       │    ├── BudgetLine (cost items per WBS node)
+       │    │    └── BudgetResource (materials/labor/equipment per line)
+       │    ├── ScheduleTask (Gantt task per WBS node)
+       │    └── CertificationLine (progress billing line)
+       ├── BudgetVersion (budget snapshots: DRAFT/BASELINE/APPROVED)
+       ├── Certification (monthly progress billing)
+       ├── DailyReport (field activity log)
+       ├── ChangeOrder (approved/deviation scope changes)
+       └── FinanceTransaction (invoices, expenses, receipts)
+```
+
+## MODULE MAP (11 modules, each = permission scope)
+| Module key     | Purpose                                              | Key Entities                                  |
+|----------------|------------------------------------------------------|-----------------------------------------------|
+| dashboard      | Executive KPIs across org                            | computed from all modules                     |
+| projects       | Project lifecycle management                         | Project, ProjectMember, WbsNode               |
+| budget         | Cost estimation & budget control                     | BudgetVersion, BudgetLine, BudgetResource     |
+| finance        | AP/AR, transactions, cashflow, overhead              | FinanceTransaction, FinanceLine, Payment      |
+| certifications | Monthly progress billing                             | Certification, CertificationLine              |
+| inventory      | Materials stock & movements                          | InventoryItem, InventoryMovement, Location    |
+| quality        | RFIs, submittals, inspections                        | RFI, Submittal, Inspection                    |
+| documents      | File management (R2 storage)                         | Document, DocumentVersion                     |
+| reports        | Custom + predefined reports                          | SavedReport, CustomReport                     |
+| team           | Org member management & invitations                  | OrgMember, Invitation                         |
+| settings       | Org config, subscription, profile                    | Organization, OrgProfile, ModuleActivation    |
+
+## KEY CONSTRUCTION-SPECIFIC CONCEPTS
+
+### WBS (Work Breakdown Structure)
+- Hierarchical tree of work packages (self-referencing WbsNode)
+- Code format: "1.1.2" (dot-separated, up to 5 levels)
+- Each node tracks: plannedHours, actualHours, progressPct (0-100), healthStatus
+- WBS is the spine: budget lines, schedule tasks, certifications, and daily reports all link to WbsNode
+
+### Budget Versioning
+- Projects have multiple BudgetVersions (V1, V2, V3...)
+- Statuses: DRAFT → BASELINE → APPROVED
+- Only one BASELINE per project at a time
+- Budget includes: direct costs, overhead %, financial %, profit %, tax %, retention %
+- markupMode determines how overhead/profit are applied (additive or percentage of direct cost)
+
+### Certifications (Actas de Avance)
+- Monthly billing documents against the BASELINE budget
+- Tracks cumulative progress (totalProgressPct) and period progress (periodProgressPct) per WBS line
+- Has integritySeal field for document tamper detection
+- Status: DRAFT → SUBMITTED → APPROVED → PUBLISHED
+
+### Change Orders (Órdenes de Cambio)
+- budgetImpactType: DEVIATION (owner-caused) vs APPROVED_CHANGE (scope modification)
+- Require approval workflow (ChangeOrderApproval)
+- Link back to WBS lines for cost traceability
+
+### Finance Transactions
+- Unified model for all financial documents: EXPENSE, INCOME, PURCHASE, SALE, OVERHEAD
+- documentType: INVOICE, RECEIPT, CREDIT_NOTE, DEBIT_NOTE, ADVANCE, ESTIMATE, CONTRACT, PAYMENT_CERTIFICATE, OTHER
+- Numbered sequentially per type per year: `EXP-2025-001`, `INC-2025-001`, `TXN-000001`
+- Soft-deleted (`deleted: Boolean @default(false)`)
+- paidDate tracks when payment was received/sent (AP/AR aging)
+- retentionAmount: withholding retention amount
+
+### Daily Reports (Partes Diarios)
+- Field-level operational records: labor counts, equipment, materials consumed
+- Link to WbsNodes for progress updates (WbsProgressUpdate)
+- Track: weather, laborCountTotal, laborCosts, materialCosts, totalCost
+- Photos via DocumentLink to DailyReportPhoto
+- Status: DRAFT → SUBMITTED → APPROVED → PUBLISHED
+
+### Parties (Contrapartes)
+- Unified `Party` model: partyType = SUPPLIER | CLIENT | SUBCONTRACTOR
+- `GlobalParty` = shared supplier directory across all tenants (verified/rated)
+- `OrgPartyLink` = org-specific relationship to a GlobalParty (payment terms, credit limit)
+- Suppliers can be created locally (Party) or claimed from global directory (GlobalPartyClaim)
+
+### Inventory
+- Locations: CENTRAL_WAREHOUSE, PROJECT_SITE, SUPPLIER
+- Movement types: PURCHASE (in), TRANSFER (between locations), ISSUE (to project), ADJUSTMENT
+- Uses idempotencyKey to prevent duplicate movement processing
+- Consumes from DailyReport (InventoryConsumption)
+
+### Overhead Allocation
+- OverheadAllocation links finance transactions to projects by percentage
+- Allows shared costs (rent, utilities) to be apportioned across multiple projects
+
+## ROLES & CAPABILITIES
+| Role       | Primary User          | Key Restrictions                                    |
+|------------|-----------------------|-----------------------------------------------------|
+| OWNER      | Company owner         | Full access, all modules                            |
+| ADMIN      | Project manager/PM    | Full access except: cannot delete team settings    |
+| EDITOR     | Site supervisor/PM    | Create & edit, no delete or approve                 |
+| ACCOUNTANT | Finance staff         | Finance/certifications full, other modules view-only|
+| VIEWER     | Client / stakeholder  | Read-only all modules                               |
+
+Custom permissions: OrgMember.customPermissions (JSON) overrides role base per module.
+
+## PROJECT LIFECYCLE
+PRE_CONSTRUCTION → CONSTRUCTION → CLOSEOUT → COMPLETE
+- Phase-specific badge colors are defined via CSS tokens (--phase-* variables)
+- Budget is typically locked (BASELINE) before CONSTRUCTION phase begins
+
+## NUMBER FORMATS
+- Project numbers: `PROJ-YYYY-NNN` (e.g. PROJ-2025-001)
+- Budget versions: `V1`, `V2`, `V3`
+- Certification numbers: sequential per project
+- Finance transactions: `EXP-YYYY-NNN`, `INC-YYYY-NNN`, `PUR-YYYY-NNN`, `SAL-YYYY-NNN`, `TXN-NNNNNN`
+- RFI/Submittal/Inspection: sequential per project
+
+## ENTITY STATUS FLOWS
+```
+BudgetVersion:     DRAFT → BASELINE → APPROVED
+ChangeOrder:       DRAFT → PENDING → APPROVED | REJECTED
+Certification:     DRAFT → SUBMITTED → APPROVED → PUBLISHED
+DailyReport:       DRAFT → SUBMITTED → APPROVED → PUBLISHED
+Invitation:        PENDING → ACCEPTED | EXPIRED | CANCELLED
+FinanceTransaction: DRAFT → PENDING → APPROVED | PAID | OVERDUE | CANCELLED
+RFI:               OPEN → PENDING_RESPONSE → ANSWERED → CLOSED
+Inspection:        DRAFT → IN_PROGRESS → COMPLETED | FAILED
+```
+
+## MODULE ACTIVATION
+- `ModuleActivation` table: per-org toggle per module
+- `Organization.enabledModules` array field: coarse enablement list
+- Check before rendering module navigation
