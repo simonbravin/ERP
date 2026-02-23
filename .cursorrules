@@ -4,6 +4,28 @@ Project conventions and context for the Bloqer system. Follow these rules for al
 
 ---
 
+## Bloqer Project Context
+
+Before generating or modifying code, ALWAYS read:
+
+.claude/worktrees/beautiful-mirzakhani/docs/AI_CONTEXT.md
+
+This file is the single source of truth for:
+- architecture
+- domain model
+- database rules
+- scale constraints
+- operability requirements
+
+Behavior:
+- Follow AI_CONTEXT.md as authoritative.
+- Do NOT redesign architecture unless explicitly requested.
+- Prefer minimal incremental changes.
+- Preserve tenant isolation and Server Action patterns.
+- Warn if a change violates scale or operability rules.
+
+---
+
 ## Tech Stack
 
 - **Framework:** Next.js 15 (App Router + Server Actions)
