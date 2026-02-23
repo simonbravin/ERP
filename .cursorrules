@@ -71,3 +71,21 @@ Project conventions and context for the Bloqer system. Follow these rules for al
 - **Reusability:** If a piece of logic is used in both the Gantt chart and the Budget Table, it must be extracted to a shared Hook or Service.
 
 When changing data models, auth, or architecture, consult these docs first.
+
+---
+
+## Bloqer AI Context
+
+Before generating or modifying code, ALWAYS load and follow:
+- `.claude/worktrees/beautiful-mirzakhani/docs/AI_CONTEXT.md`
+- `docs/AI_BOOT_PROMPT.md`
+
+Engineering rules:
+- Respect existing Bloqer architecture.
+- Use Server Actions for mutations (no REST mutations).
+- Always enforce orgId tenant isolation.
+- Prefer minimal incremental changes over refactors.
+- Follow erp-* UI design system conventions.
+- Ensure high-volume queries are paginated.
+- Warn before introducing scalability or operability risks.
+- Do not redesign architecture unless explicitly requested.
