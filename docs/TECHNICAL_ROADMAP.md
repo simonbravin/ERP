@@ -15,20 +15,20 @@ This roadmap is organized around the `"Fix when"` thresholds established in AI_C
 
 ---
 
-## Current state snapshot (verified 2026-02-22)
+## Current state snapshot
 
 | Concern | Status | Notes |
 |---------|--------|-------|
-| `/api/health` endpoint | ❌ Missing | No uptime monitoring possible |
-| Error tracking (Sentry) | ❌ Missing | Silent failures in production |
+| `/api/health` endpoint | ✅ **Done** | `app/api/health/route.ts` — 2026-02-22 |
+| Error tracking (Sentry) | ✅ **Done** | `instrumentation.ts` + sentry configs — 2026-02-22 |
 | Rate limiting | ❌ Missing | No Upstash, no edge middleware rate limit |
-| OutboxEvent cleanup job | ❌ Missing | Events accumulate forever |
+| OutboxEvent cleanup job | ✅ **Done** | `inngest/functions/outbox-cleanup.ts` — 2026-02-22 |
 | AuditLog archiving | ❌ Missing | Unbounded JSON snapshot growth |
-| `idx_org_member_user_active` compound index | ❌ Missing | Auth context query unoptimized |
-| `idx_finance_tx_org_type_date` compound index | ❌ Missing | Finance list query unoptimized |
-| `idx_audit_log_org_created` compound index | ❌ Missing | Audit queries unoptimized |
-| `listFinanceTransactions` pagination | ❌ Missing | Unbounded `findMany` on high-volume table |
-| `listNotifications` pagination | ❌ Missing | Unbounded `findMany` |
+| `idx_org_member_user_active` compound index | ⚠️ SQL ready | `docs/sql/phase-now-indexes.sql` — **must be applied in Neon** |
+| `idx_finance_tx_org_type_date` compound index | ⚠️ SQL ready | Same file — **must be applied in Neon** |
+| `idx_audit_log_org_created` compound index | ⚠️ SQL ready | Same file — **must be applied in Neon** |
+| `listFinanceTransactions` pagination | ✅ **Done** | Capped at 100; new `listFinanceTransactionsPaginated` — 2026-02-22 |
+| `listNotifications` pagination | ✅ Already correct | `getNotifications()` cursor-paginated (limit default 20) |
 | `getAuthContextCached` | ❌ Missing | Duplicate DB round-trips per page load |
 | `OrgSequenceCounter` (sequence race fix) | ❌ Missing | COUNT+1 race condition exists |
 | JWT staleness fix (`sessionVersion`) | ❌ Missing | 15-min window after role revoke |
@@ -41,16 +41,14 @@ This roadmap is organized around the `"Fix when"` thresholds established in AI_C
 
 ---
 
-## Phase 1 — NOW
+## Phase 1 — NOW ✅ COMPLETE
 ### Required before onboarding any new paying company
-**Timeline: 1–4 weeks**
-
-These items have zero acceptable excuses for delay. They take less than a day each to implement, carry no architecture risk, and prevent production fires.
+**Completed: 2026-02-22** | All 5 items shipped in `claude/beautiful-mirzakhani`
 
 ---
 
-### 1.1 — Health check endpoint
-**Priority: P0 — do first**
+### 1.1 — Health check endpoint ✅
+**Shipped:** `apps/web/app/api/health/route.ts`
 
 **Why it matters:**
 Without a health endpoint, Vercel deployments can go fully down and no alert fires. Uptime monitoring tools, Vercel deployment health checks, and Inngest's own alerting all require a reachable endpoint. A silent database outage currently shows users a blank screen with no notification.
@@ -87,8 +85,9 @@ No authentication. No orgId. No RBAC. This endpoint is intentionally public.
 
 ---
 
-### 1.2 — Error tracking (Sentry)
-**Priority: P0**
+### 1.2 — Error tracking (Sentry) ✅
+**Shipped:** `instrumentation.ts`, `sentry.server.config.ts`, `sentry.client.config.ts`, `sentry.edge.config.ts`, `next.config.ts` (withSentryConfig), `package.json` (@sentry/nextjs ^8.50.0)
+**Pending action:** Set `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_ORG`, `SENTRY_PROJECT` in Vercel environment. Run `pnpm install` after merging PR.
 
 **Why it matters:**
 `audit-log.ts` silently swallows errors. `event-dispatcher.ts` logs to `console.log`. Server Actions throw errors that are never aggregated. Today, production failures are invisible unless a user reports them. This is unacceptable even at 1 org.
@@ -138,8 +137,9 @@ SENTRY_PROJECT=...
 
 ---
 
-### 1.3 — Add 3 missing compound database indexes
-**Priority: P0**
+### 1.3 — Add 3 missing compound database indexes ⚠️ SQL ready — needs Neon apply
+**Shipped:** `docs/sql/phase-now-indexes.sql` — `CREATE INDEX CONCURRENTLY IF NOT EXISTS` statements for all 3 indexes.
+**Pending action:** An engineer must run this SQL in Neon Console (outside a transaction). Verify with the query in the file's VERIFICATION section.
 
 **Why it matters:**
 Three of the six required compound indexes from AI_CONTEXT §17 are missing. The existing single-column indexes are insufficient for the specific filter+sort patterns used in Server Actions. These queries run on every page load for every user.
@@ -182,8 +182,11 @@ In `model AuditLog`:
 
 ---
 
-### 1.4 — Pagination on `listFinanceTransactions` and `listNotifications`
-**Priority: P0**
+### 1.4 — Pagination on `listFinanceTransactions` and `listNotifications` ✅
+**Shipped:**
+- `listFinanceTransactions()` — safety cap of `take: 100` added (backward-compatible, returns array)
+- `listFinanceTransactionsPaginated()` — new preferred function returning `{ data[], pagination }` (page/pageSize/total/totalPages/hasNext/hasPrev). Exported from `app/actions/finance.ts`.
+- `getNotifications()` — already cursor-paginated with `limit` (default 20). No changes needed; this item was already correct.
 
 **Why it matters:**
 `listFinanceTransactions` uses `findMany` with no `take/skip`. An org with 2 years of invoices could have thousands of rows returned in a single request. Similarly, `notifications.findMany` has no limit. These are the two highest-frequency unbounded queries.
@@ -246,8 +249,11 @@ export async function listFinanceTransactions(
 
 ---
 
-### 1.5 — OutboxEvent cleanup job
-**Priority: P1 — before 100 orgs**
+### 1.5 — OutboxEvent cleanup job ✅
+**Shipped:** `apps/web/inngest/functions/outbox-cleanup.ts` — registered in `app/api/inngest/route.ts`
+- Inngest function id: `outbox-event-cleanup` | Cron: `0 3 * * *` (daily 03:00 UTC)
+- Deletes `COMPLETED` rows older than 7 days in batches of 5,000 with 500ms pause between batches
+- FAILED rows kept intentionally (configure Inngest alerting for FAILED > threshold)
 
 **Why it matters:**
 `OutboxEvent` rows are never deleted. Every mutation writes a row. At 100 orgs × 50 users × 20 mutations/day = 100,000 rows/day = 36 million rows/year. The `event-dispatcher.ts` PENDING query gets slower as the table grows, even with the `(status, createdAt)` index.

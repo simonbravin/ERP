@@ -485,3 +485,48 @@ CREATE INDEX idx_daily_report_project_date ON public.daily_report(project_id, re
 ```
 
 For full scale guidance see: `.claude/skills/bloqer-scalability.skill`
+
+---
+
+## 18. OPERABILITY & HEALTH (added v1.2 — Phase NOW, 2026-02-22)
+
+### Health endpoint
+- `GET /api/health` — public, no auth, excluded from middleware matcher
+- Runs `prisma.$queryRaw\`SELECT 1\`` to verify DB connectivity
+- Response `200`: `{ status: "ok", db: "ok", timestamp: ISOString }`
+- Response `500`: `{ status: "error", db: "error", timestamp, message }`
+- Use for uptime monitors (UptimeRobot, Vercel Analytics) and post-deploy checks
+- File: `apps/web/app/api/health/route.ts`
+
+### Error monitoring (Sentry)
+- SDK: `@sentry/nextjs ^8.50.0` — server + edge + client all initialised
+- Entry point: `apps/web/instrumentation.ts` (Next.js 15 instrumentation hook)
+- Config files: `sentry.server.config.ts`, `sentry.client.config.ts`, `sentry.edge.config.ts`
+- `next.config.ts` wraps export with `withSentryConfig(...)`
+- Required env vars (add to Vercel project settings):
+  - `SENTRY_DSN` — server/edge DSN
+  - `NEXT_PUBLIC_SENTRY_DSN` — browser DSN (same value, must be `NEXT_PUBLIC_`)
+  - `SENTRY_ORG` + `SENTRY_PROJECT` — for source map uploads in CI
+- `onRequestError = Sentry.captureRequestError` auto-captures App Router request errors
+
+### Scale maintenance jobs
+- **OutboxEvent cleanup**: Inngest function `outbox-event-cleanup`
+  - Deletes `COMPLETED` rows older than 7 days in batches of 5,000
+  - Cron: `0 3 * * *` (daily at 03:00 UTC)
+  - Registered in `app/api/inngest/route.ts`; visible in Inngest dashboard → Functions
+  - FAILED rows are intentionally kept (require manual investigation)
+  - File: `apps/web/inngest/functions/outbox-cleanup.ts`
+
+### Required DB indexes (pending manual application)
+- 3 compound indexes must be applied once to the Neon production database
+- SQL file: `docs/sql/phase-now-indexes.sql` (uses `CREATE INDEX CONCURRENTLY IF NOT EXISTS`)
+- Indexes: `idx_org_member_user_active`, `idx_finance_tx_org_type_date`, `idx_audit_log_org_created`
+- Apply via Neon Console SQL editor or psql — outside a transaction block (CONCURRENTLY requirement)
+
+### Finance transaction pagination (SC1 compliance)
+- `listFinanceTransactions()`: now capped at `take: 100` (legacy compat, returns array)
+- `listFinanceTransactionsPaginated(filters, { page?, pageSize? })`: new preferred function
+  - Returns `{ data[], pagination: { page, pageSize, total, totalPages, hasNext, hasPrev } }`
+  - Default: `page=1`, `pageSize=25`, max `pageSize=100`
+  - Exported from `app/actions/finance.ts` barrel
+- `getNotifications()`: already cursor-paginated (limit default 20) — no changes needed
