@@ -15,11 +15,13 @@ export {
   serializeTransaction,
 } from './finance-helpers'
 export type { SerializedTransactionRow } from './finance-helpers'
+export type { PaginatedFinanceTransactions } from './finance-transactions'
 
 // Transactions
 export {
   getNextTransactionNumber,
   listFinanceTransactions,
+  listFinanceTransactionsPaginated,
   getFinanceTransaction,
   listProjectsForFinance,
   listPartiesForFinance,

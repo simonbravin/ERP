@@ -64,16 +64,14 @@ export type ListFinanceTransactionsFilters = {
   dateTo?: string // YYYY-MM-DD
 }
 
-export type GetProjectTransactionsFilters = {
-  dateFrom?: string // YYYY-MM-DD
-  dateTo?: string // YYYY-MM-DD
-  partyId?: string
-  type?: string
-}
-
-export async function listFinanceTransactions(filters: ListFinanceTransactionsFilters = {}) {
-  const { org } = await getAuthContext()
-  const where: Record<string, unknown> = { orgId: org.orgId, deleted: false }
+// ---------------------------------------------------------------------------
+// Shared where-clause builder to avoid duplication between list functions.
+// ---------------------------------------------------------------------------
+function buildTransactionWhere(
+  orgId: string,
+  filters: ListFinanceTransactionsFilters
+): Record<string, unknown> {
+  const where: Record<string, unknown> = { orgId, deleted: false }
   if (filters.type) where.type = filters.type
   if (filters.status) where.status = filters.status
   if (filters.projectId) where.projectId = filters.projectId
@@ -82,21 +80,99 @@ export async function listFinanceTransactions(filters: ListFinanceTransactionsFi
     if (filters.dateFrom) (where.issueDate as Record<string, Date>).gte = new Date(filters.dateFrom)
     if (filters.dateTo) (where.issueDate as Record<string, Date>).lte = new Date(filters.dateTo)
   }
+  return where
+}
+
+// Shared include shape used by both list functions.
+const TRANSACTION_LIST_INCLUDE = {
+  project: { select: { id: true, name: true } },
+  party: { select: { id: true, name: true } },
+  createdBy: { select: { user: { select: { fullName: true } } } },
+} as const
+
+export type GetProjectTransactionsFilters = {
+  dateFrom?: string // YYYY-MM-DD
+  dateTo?: string // YYYY-MM-DD
+  partyId?: string
+  type?: string
+}
+
+/**
+ * Legacy array-returning list. Returns at most 100 rows (safety cap).
+ * For paginated access use listFinanceTransactionsPaginated().
+ */
+export async function listFinanceTransactions(filters: ListFinanceTransactionsFilters = {}) {
+  const { org } = await getAuthContext()
+  const where = buildTransactionWhere(org.orgId, filters)
 
   const list = await prisma.financeTransaction.findMany({
     where,
     orderBy: { issueDate: 'desc' },
-    include: {
-      project: { select: { id: true, name: true } },
-      party: { select: { id: true, name: true } },
-      createdBy: { select: { user: { select: { fullName: true } } } },
-    },
+    take: 100, // SC1: never return unbounded results — use listFinanceTransactionsPaginated for full sets
+    include: TRANSACTION_LIST_INCLUDE,
   })
   return list.map((t) => ({
     ...t,
     total: Number(t.total),
     amountBaseCurrency: Number(t.amountBaseCurrency),
   }))
+}
+
+export type PaginatedFinanceTransactions = {
+  data: Awaited<ReturnType<typeof listFinanceTransactions>>
+  pagination: {
+    page: number
+    pageSize: number
+    total: number
+    totalPages: number
+    hasNext: boolean
+    hasPrev: boolean
+  }
+}
+
+/**
+ * Paginated finance transaction list.
+ * Preferred over listFinanceTransactions() for all full-list views.
+ * Default: page 1, 25 rows. Max pageSize: 100.
+ */
+export async function listFinanceTransactionsPaginated(
+  filters: ListFinanceTransactionsFilters & { page?: number; pageSize?: number } = {}
+): Promise<PaginatedFinanceTransactions> {
+  const { org } = await getAuthContext()
+  const where = buildTransactionWhere(org.orgId, filters)
+
+  const page = Math.max(1, filters.page ?? 1)
+  const pageSize = Math.min(Math.max(1, filters.pageSize ?? 25), 100)
+  const skip = (page - 1) * pageSize
+
+  const [items, total] = await prisma.$transaction([
+    prisma.financeTransaction.findMany({
+      where,
+      orderBy: { issueDate: 'desc' },
+      take: pageSize,
+      skip,
+      include: TRANSACTION_LIST_INCLUDE,
+    }),
+    prisma.financeTransaction.count({ where }),
+  ])
+
+  const totalPages = Math.ceil(total / pageSize)
+
+  return {
+    data: items.map((t) => ({
+      ...t,
+      total: Number(t.total),
+      amountBaseCurrency: Number(t.amountBaseCurrency),
+    })),
+    pagination: {
+      page,
+      pageSize,
+      total,
+      totalPages,
+      hasNext: page < totalPages,
+      hasPrev: page > 1,
+    },
+  }
 }
 
 export async function getFinanceTransaction(id: string) {
