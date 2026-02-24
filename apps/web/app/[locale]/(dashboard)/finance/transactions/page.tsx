@@ -4,6 +4,7 @@ import { getOrgContext } from '@/lib/org-context'
 import { hasMinimumRole } from '@/lib/rbac'
 import {
   getCompanyTransactions,
+  getCompanyFinanceBalance,
   getFinanceFilterOptions,
 } from '@/app/actions/finance'
 import { CompanyTransactionsListClient } from '@/components/finance/company-transactions-list-client'
@@ -14,9 +15,10 @@ export default async function FinanceTransactionsPage() {
   const org = await getOrgContext(session.user.id)
   if (!org) return notFound()
 
-  const [transactions, filterOptions] = await Promise.all([
+  const [transactions, filterOptions, companyBalance] = await Promise.all([
     getCompanyTransactions(),
     getFinanceFilterOptions(),
+    getCompanyFinanceBalance(),
   ])
   const canCreate = hasMinimumRole(org.role, 'ACCOUNTANT')
 
@@ -26,6 +28,7 @@ export default async function FinanceTransactionsPage() {
         initialTransactions={transactions ?? []}
         filterOptions={filterOptions ?? { projects: [], parties: [] }}
         canCreate={canCreate}
+        companyBalance={companyBalance}
       />
     </div>
   )

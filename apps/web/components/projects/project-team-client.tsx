@@ -36,7 +36,7 @@ import { toast } from 'sonner'
 
 const PROJECT_ROLES = [
   { value: 'MANAGER', label: 'Gestor de proyecto' },
-  { value: 'SUPERINTENDENT', label: 'Superintendente' },
+  { value: 'SUPERINTENDENT', label: 'Jefe de obra' },
   { value: 'VIEWER', label: 'Solo lectura' },
 ] as const
 
@@ -51,12 +51,15 @@ interface ProjectTeamClientProps {
   projectId: string
   initialProjectMembers: ProjectMemberRow[]
   orgMembers: OrgMemberRow[]
+  /** When false (e.g. project role VIEWER or Jefe de obra), hide add/remove actions */
+  canManageTeam?: boolean
 }
 
 export function ProjectTeamClient({
   projectId,
   initialProjectMembers,
   orgMembers,
+  canManageTeam = true,
 }: ProjectTeamClientProps) {
   const [projectMembers, setProjectMembers] = useState(initialProjectMembers)
   const [addDialogOpen, setAddDialogOpen] = useState(false)
@@ -140,15 +143,17 @@ export function ProjectTeamClient({
   return (
     <>
       <Card className="p-4">
-        <div className="mb-4 flex justify-end">
-          <Button
-            onClick={() => setAddDialogOpen(true)}
-            disabled={availableOrgMembers.length === 0}
-          >
-            <UserPlus className="mr-2 h-4 w-4" />
-            Agregar miembro
-          </Button>
-        </div>
+        {canManageTeam && (
+          <div className="mb-4 flex justify-end">
+            <Button
+              onClick={() => setAddDialogOpen(true)}
+              disabled={availableOrgMembers.length === 0}
+            >
+              <UserPlus className="mr-2 h-4 w-4" />
+              Agregar miembro
+            </Button>
+          </div>
+        )}
 
         <Table>
           <TableHeader>
@@ -156,7 +161,9 @@ export function ProjectTeamClient({
               <TableHead>Nombre</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Rol en el proyecto</TableHead>
-              <TableHead className="w-[80px]">Acciones</TableHead>
+              {canManageTeam && (
+                <TableHead className="w-[80px]">Acciones</TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -169,15 +176,17 @@ export function ProjectTeamClient({
                   {pm.orgMember?.user?.email ?? '—'}
                 </TableCell>
                 <TableCell>{getRoleLabel(pm.projectRole)}</TableCell>
-                <TableCell>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleRemove(pm.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </TableCell>
+                {canManageTeam && (
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRemove(pm.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                )}
               </TableRow>
             ))}
           </TableBody>
@@ -191,55 +200,59 @@ export function ProjectTeamClient({
       </Card>
 
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-        <DialogContent className="max-w-xl">
+        <DialogContent className="erp-form-modal max-w-xl gap-6 py-6">
           <DialogHeader>
             <DialogTitle>Agregar miembro al proyecto</DialogTitle>
             <DialogDescription>
               Elige un miembro de la organización y su rol en este proyecto.
+              Agrega miembros que ya pertenecen a tu organización.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div>
-              <Label>Miembro</Label>
-              <Select
-                value={selectedOrgMemberId}
-                onValueChange={setSelectedOrgMemberId}
-              >
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Seleccionar..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableOrgMembers.map((m) => (
-                    <SelectItem key={m.id} value={m.id}>
-                      {m.user?.fullName ?? m.user?.email ?? m.id}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Rol en el proyecto</Label>
-              <Select
-                value={selectedRole}
-                onValueChange={setSelectedRole}
-              >
-                <SelectTrigger className="mt-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PROJECT_ROLES.map((r) => (
-                    <SelectItem key={r.value} value={r.value}>
-                      {r.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          <div className="rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-900">
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="add-member-org">Miembro</Label>
+                <Select
+                  value={selectedOrgMemberId}
+                  onValueChange={setSelectedOrgMemberId}
+                >
+                  <SelectTrigger id="add-member-org" className="mt-1 w-full">
+                    <SelectValue placeholder="Seleccionar..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableOrgMembers.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.user?.fullName ?? m.user?.email ?? m.id}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="add-member-role">Rol en el proyecto</Label>
+                <Select
+                  value={selectedRole}
+                  onValueChange={setSelectedRole}
+                >
+                  <SelectTrigger id="add-member-role" className="mt-1 w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PROJECT_ROLES.map((r) => (
+                      <SelectItem key={r.value} value={r.value}>
+                        {r.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="gap-2 sm:gap-0">
             <Button
               variant="outline"
               onClick={() => setAddDialogOpen(false)}
+              disabled={isSubmitting}
             >
               Cancelar
             </Button>

@@ -166,6 +166,11 @@ export function MarkupConfiguration({
         </CardHeader>
 
         <CardContent className="space-y-3 pb-4 pt-0">
+          {!canEdit && (
+            <p className="text-sm text-muted-foreground">
+              {t('marginsLockedNote')}
+            </p>
+          )}
           <div className="rounded border border-border bg-muted/50 px-2.5 py-2 text-xs">
             <div className="flex items-start gap-2">
               <Info className="h-3.5 w-3.5 shrink-0 mt-0.5 text-primary" />

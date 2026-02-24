@@ -50,6 +50,8 @@ interface GlobalSidebarProps {
   orgName?: string
   orgLogoUrl?: string | null
   user: { name: string; email?: string | null }
+  /** When true, show only Tablero + Proyectos (restricted user) */
+  restrictedToProjects?: boolean
   isMobile?: boolean
   sidebarOpen?: boolean
   onSidebarClose?: () => void
@@ -63,7 +65,7 @@ const GLOBAL_SECTION_ORDER = ['operations', 'management', 'reports'] as const
  * Global sidebar for organization-wide navigation
  * Finance has an expandable submenu (Dashboard, Generales, Transacciones, etc.) like ProjectSidebar.
  */
-export function GlobalSidebar({ orgName = 'Bloqer', orgLogoUrl, user, isMobile = false, sidebarOpen = false, onSidebarClose, collapsed = false, onCollapseToggle }: GlobalSidebarProps) {
+export function GlobalSidebar({ orgName = 'Bloqer', orgLogoUrl, user, restrictedToProjects = false, isMobile = false, sidebarOpen = false, onSidebarClose, collapsed = false, onCollapseToggle }: GlobalSidebarProps) {
   const t = useTranslations('nav')
   const pathname = usePathname()
   const { canView, status, loading } = usePermissions()
@@ -112,10 +114,16 @@ export function GlobalSidebar({ orgName = 'Bloqer', orgLogoUrl, user, isMobile =
     [t]
   )
 
-  const navigation =
-    status === 'loading' || loading
-      ? allNav
-      : allNav.filter((item) => canView(item.module))
+  const navigation = useMemo(() => {
+    let list = status === 'loading' || loading ? allNav : allNav.filter((item) => canView(item.module))
+    if (restrictedToProjects) {
+      list = list.filter(
+        (item) =>
+          item.module === 'DASHBOARD' || (item.module === 'PROJECTS' && item.href === '/projects')
+      )
+    }
+    return list
+  }, [allNav, status, loading, restrictedToProjects])
 
   const sectionLabels: Record<string, string> = {
     operations: t('sectionOperations'),
@@ -249,7 +257,7 @@ export function GlobalSidebar({ orgName = 'Bloqer', orgLogoUrl, user, isMobile =
                           </button>
                         </div>
                         {isExpanded && (
-                          <div className="ml-11 mt-1 space-y-1">
+                          <div className="sidebar-children mt-1 space-y-1">
                             {item.children!.map((child) => {
                               const childActive =
                                 pathname === child.href || pathname.startsWith(child.href + '/')

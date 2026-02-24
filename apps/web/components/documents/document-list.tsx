@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 
 export type DocumentRow = {
@@ -30,10 +31,12 @@ function formatSize(bytes: number): string {
 }
 
 export function DocumentList({ documents }: DocumentListProps) {
+  const t = useTranslations('documents')
+
   if (documents.length === 0) {
     return (
       <div className="rounded-lg border border-gray-200 bg-white py-12 text-center text-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400">
-        No documents yet. Upload one to get started.
+        {t('noDocumentsYet')}
       </div>
     )
   }
@@ -44,22 +47,25 @@ export function DocumentList({ documents }: DocumentListProps) {
         <thead>
           <tr className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50">
             <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">
-              Title
+              {t('tableTitle')}
             </th>
             <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">
-              Type
+              {t('type')}
             </th>
             <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">
-              Project
+              {t('project')}
             </th>
             <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">
-              Latest version
+              {t('latestVersion')}
+            </th>
+            <th className="px-3 py-2 text-right font-medium text-gray-600 dark:text-gray-400">
+              {t('size')}
             </th>
             <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">
-              Created by
+              {t('createdBy')}
             </th>
             <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">
-              Date
+              {t('date')}
             </th>
             <th className="w-20 px-3 py-2" />
           </tr>
@@ -79,12 +85,15 @@ export function DocumentList({ documents }: DocumentListProps) {
                   {doc.docType.replace(/_/g, ' ')}
                 </td>
                 <td className="px-3 py-2 text-gray-600 dark:text-gray-400">
-                  {doc.project ? doc.project.name : '—'}
+                  {doc.project ? doc.project.name : t('none')}
                 </td>
                 <td className="px-3 py-2 text-gray-600 dark:text-gray-400">
                   {latest
-                    ? `v${latest.versionNumber} – ${latest.fileName} (${formatSize(latest.sizeBytes)})`
-                    : '—'}
+                    ? `v${latest.versionNumber} – ${latest.fileName}`
+                    : t('none')}
+                </td>
+                <td className="px-3 py-2 text-right tabular-nums text-gray-600 dark:text-gray-400">
+                  {latest ? formatSize(latest.sizeBytes) : '—'}
                 </td>
                 <td className="px-3 py-2 text-gray-600 dark:text-gray-400">
                   {doc.createdBy.user.fullName}
@@ -95,7 +104,7 @@ export function DocumentList({ documents }: DocumentListProps) {
                 <td className="px-3 py-2">
                   <Link href={`/documents/${doc.id}`}>
                     <Button type="button" variant="ghost" className="h-8 px-2 text-xs">
-                      View
+                      {t('view')}
                     </Button>
                   </Link>
                 </td>

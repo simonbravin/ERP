@@ -1,6 +1,8 @@
 import { notFound, redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { getOrgContext } from '@/lib/org-context'
+import { getProjectMemberRole } from '@/lib/project-context'
+import { canEditProjectArea, PROJECT_AREAS } from '@/lib/project-permissions'
 import { getLocale } from 'next-intl/server'
 import { prisma } from '@repo/database'
 import { ScheduleView } from '@/components/schedule/schedule-view'
@@ -58,6 +60,11 @@ export default async function ProjectSchedulePage({
     },
   })
 
+  const projectRoleForEmpty = await getProjectMemberRole(id, orgContext.memberId)
+  const canCreateSchedule =
+    ['EDITOR', 'ADMIN', 'OWNER'].includes(orgContext.role) ||
+    canEditProjectArea(projectRoleForEmpty, PROJECT_AREAS.SCHEDULE)
+
   if (schedules.length === 0) {
     return (
       <div className="erp-stack">
@@ -68,7 +75,7 @@ export default async function ProjectSchedulePage({
             WBS
           </p>
 
-          {['EDITOR', 'ADMIN', 'OWNER'].includes(orgContext.role) && (
+          {canCreateSchedule && (
             <Button asChild className="mt-6">
               <Link href={`/projects/${id}/schedule/new`}>
                 <Plus className="mr-2 h-4 w-4" />
@@ -84,29 +91,18 @@ export default async function ProjectSchedulePage({
   const activeSchedule =
     schedules.find((s) => s.isBaseline) ?? schedules[0]
 
-  const projectMember = await prisma.projectMember.findUnique({
-    where: {
-      projectId_orgMemberId: {
-        projectId: id,
-        orgMemberId: orgContext.memberId,
-      },
-    },
-    select: { projectRole: true },
-  })
-
+  const projectRole = await getProjectMemberRole(id, orgContext.memberId)
   const canEditByOrg = ['EDITOR', 'ADMIN', 'OWNER'].includes(orgContext.role)
-  const canEditByProjectRole =
-    projectMember?.projectRole &&
-    ['MANAGER', 'SUPERINTENDENT'].includes(projectMember.projectRole)
+  const canEditByProjectRole = canEditProjectArea(projectRole, PROJECT_AREAS.SCHEDULE)
   const canEdit =
-    (canEditByOrg || !!canEditByProjectRole) &&
-    activeSchedule.status === 'DRAFT'
+    (canEditByOrg || canEditByProjectRole) && activeSchedule.status === 'DRAFT'
+  const canCreateVersion = canEditByOrg || canEditByProjectRole
 
   return (
     <div className="erp-stack">
       <div className="erp-header-row">
         <p className="erp-section-desc">Cronograma: {activeSchedule.name}</p>
-        {['EDITOR', 'ADMIN', 'OWNER'].includes(orgContext.role) && (
+        {canCreateVersion && (
           <div className="erp-header-actions">
             <Button asChild>
               <Link href={`/projects/${id}/schedule/new`}>

@@ -1,7 +1,7 @@
 'use server'
 
 import { prisma } from '@repo/database'
-import { getAuthContext } from '@/lib/auth-helpers'
+import { requireOrgFinanceAccess } from '@/lib/auth-helpers'
 import { serializeTransaction } from './finance-helpers'
 
 // ====================
@@ -36,7 +36,7 @@ export type AccountsPayableItem = {
 export async function getCompanyAccountsPayable(
   filters: AccountsPayableFilters = {}
 ): Promise<AccountsPayableItem[]> {
-  const { org } = await getAuthContext()
+  const { org } = await requireOrgFinanceAccess()
   const where: Record<string, unknown> = {
     orgId: org.orgId,
     deleted: false,
@@ -73,7 +73,7 @@ export async function getProjectAccountsPayable(
   projectId: string,
   filters: Omit<AccountsPayableFilters, 'projectId'> = {}
 ): Promise<AccountsPayableItem[]> {
-  const { org } = await getAuthContext()
+  const { org } = await requireOrgFinanceAccess()
   const where: Record<string, unknown> = {
     projectId,
     orgId: org.orgId,
@@ -139,7 +139,7 @@ export type AccountsReceivableItem = {
 export async function getCompanyAccountsReceivable(
   filters: AccountsReceivableFilters = {}
 ): Promise<AccountsReceivableItem[]> {
-  const { org } = await getAuthContext()
+  const { org } = await requireOrgFinanceAccess()
   const where: Record<string, unknown> = {
     orgId: org.orgId,
     deleted: false,
@@ -178,7 +178,7 @@ export async function getProjectAccountsReceivable(
   projectId: string,
   filters: Omit<AccountsReceivableFilters, 'projectId'> = {}
 ): Promise<AccountsReceivableItem[]> {
-  const { org } = await getAuthContext()
+  const { org } = await requireOrgFinanceAccess()
   const where: Record<string, unknown> = {
     projectId,
     orgId: org.orgId,
@@ -228,7 +228,7 @@ export type CashProjectionResult = {
 }
 
 export async function getCompanyCashProjection(asOfDate: Date): Promise<CashProjectionResult> {
-  const { org } = await getAuthContext()
+  const { org } = await requireOrgFinanceAccess()
   const end = new Date(asOfDate)
   end.setHours(23, 59, 59, 999)
 
@@ -295,7 +295,7 @@ export async function getProjectCashProjection(
   projectId: string,
   asOfDate: Date
 ): Promise<CashProjectionResult> {
-  const { org } = await getAuthContext()
+  const { org } = await requireOrgFinanceAccess()
   const end = new Date(asOfDate)
   end.setHours(23, 59, 59, 999)
 
@@ -374,7 +374,7 @@ export type FinanceAlert = {
 const DEFAULT_MIN_CASH_THRESHOLD = 0
 
 export async function getCompanyFinanceAlerts(): Promise<FinanceAlert[]> {
-  const { org } = await getAuthContext()
+  const { org } = await requireOrgFinanceAccess()
   const alerts: FinanceAlert[] = []
   const now = new Date()
   const next30 = new Date(now)
@@ -454,7 +454,7 @@ export async function getCompanyFinanceAlerts(): Promise<FinanceAlert[]> {
 
 /** Project-scoped finance alerts (no "gastos generales sin asignar"). */
 export async function getProjectFinanceAlerts(projectId: string): Promise<FinanceAlert[]> {
-  const { org } = await getAuthContext()
+  const { org } = await requireOrgFinanceAccess()
   const project = await prisma.project.findFirst({
     where: { id: projectId, orgId: org.orgId },
     select: { id: true },

@@ -42,7 +42,7 @@ export function DeleteConfirmDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl">
+      <DialogContent className="erp-form-modal max-w-2xl" aria-describedby={description ? undefined : undefined}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           {description && <DialogDescription>{description}</DialogDescription>}

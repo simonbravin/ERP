@@ -95,10 +95,18 @@ export function ProjectCashflowPeriodSelector({ range }: Props) {
             <SelectValue placeholder="Rango" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="3months">Últimos 3 meses</SelectItem>
-            <SelectItem value="6months">Últimos 6 meses</SelectItem>
-            <SelectItem value="12months">Último año</SelectItem>
-            <SelectItem value="custom">Personalizado</SelectItem>
+            <SelectItem value="3months" onSelect={() => handlePresetChange('3months')}>
+              Últimos 3 meses
+            </SelectItem>
+            <SelectItem value="6months" onSelect={() => handlePresetChange('6months')}>
+              Últimos 6 meses
+            </SelectItem>
+            <SelectItem value="12months" onSelect={() => handlePresetChange('12months')}>
+              Último año
+            </SelectItem>
+            <SelectItem value="custom" onSelect={() => handlePresetChange('custom')}>
+              Personalizado
+            </SelectItem>
           </SelectContent>
         </Select>
         {preset === 'custom' && (

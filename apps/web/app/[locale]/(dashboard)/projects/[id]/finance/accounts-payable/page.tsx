@@ -18,6 +18,8 @@ export default async function ProjectAccountsPayablePage({ params }: PageProps) 
 
   if (!project) notFound()
 
+  const saldoPagar = items.reduce((s, i) => s + (i.amountBaseCurrency ?? i.total ?? 0), 0)
+
   return (
     <div className="space-y-6">
       <AccountsPayableListClient
@@ -25,6 +27,7 @@ export default async function ProjectAccountsPayablePage({ params }: PageProps) 
         filterOptions={filterOptions ?? { projects: [], parties: [] }}
         projectId={projectId}
         title="Cuentas por pagar (proyecto)"
+        saldoPagar={saldoPagar}
       />
     </div>
   )

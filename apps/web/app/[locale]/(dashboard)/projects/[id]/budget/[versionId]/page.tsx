@@ -200,7 +200,14 @@ export default async function BudgetVersionPage({ params }: PageProps) {
   const treeData =
     version.budgetLines.length > 0 ? buildTree(null) : buildTreeFromWbs(null)
 
-  const totalDirectCostNum = version.budgetLines.reduce(
+  const visibleLineIds = new Set<string>()
+  wbsGroups.forEach((lines) => {
+    lines.forEach((line) => visibleLineIds.add(line.id))
+  })
+
+  const visibleLines = version.budgetLines.filter((line) => visibleLineIds.has(line.id))
+
+  const totalDirectCostNum = visibleLines.reduce(
     (sum: number, line: (typeof version.budgetLines)[number]) => sum + Number(line.directCostTotal),
     0
   )
@@ -219,12 +226,12 @@ export default async function BudgetVersionPage({ params }: PageProps) {
     return price * Number(line.quantity)
   }
 
-  const projectTotalSale = version.budgetLines.reduce(
+  const projectTotalSale = visibleLines.reduce(
     (sum: number, line: (typeof version.budgetLines)[number]) => sum + lineSaleTotal(line),
     0
   )
 
-  const summaryData = version.budgetLines.map((line: (typeof version.budgetLines)[number]) => ({
+  const summaryData = visibleLines.map((line: (typeof version.budgetLines)[number]) => ({
     code: line.wbsNode.code,
     description: line.description,
     unit: line.unit,

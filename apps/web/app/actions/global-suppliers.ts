@@ -235,6 +235,49 @@ export async function createLocalSupplier(data: {
   return { success: true, partyId: party.id }
 }
 
+export async function createLocalClient(data: {
+  name: string
+  taxId?: string
+  email?: string
+  phone?: string
+  address?: string
+  city?: string
+  country?: string
+  website?: string
+}) {
+  const { org } = await getAuthContext()
+  requireRole(org.role, 'EDITOR')
+
+  const party = await prisma.$transaction(async (tx) => {
+    const created = await tx.party.create({
+      data: {
+        orgId: org.orgId,
+        partyType: 'CLIENT',
+        name: data.name,
+        taxId: data.taxId || undefined,
+        email: data.email || undefined,
+        phone: data.phone || undefined,
+        address: data.address || undefined,
+        city: data.city || undefined,
+        country: data.country || undefined,
+        website: data.website || undefined,
+      },
+    })
+    await publishOutboxEvent(tx, {
+      orgId: org.orgId,
+      eventType: 'PARTY.CREATED',
+      entityType: 'Party',
+      entityId: created.id,
+      payload: { partyType: 'CLIENT', name: created.name },
+    })
+    return created
+  })
+
+  revalidatePath('/suppliers')
+  revalidatePath('/suppliers/list')
+  return { success: true, partyId: party.id }
+}
+
 export async function updateLocalSupplier(
   partyId: string,
   data: {

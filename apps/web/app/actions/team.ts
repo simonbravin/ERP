@@ -3,6 +3,7 @@
 import { getSession } from '@/lib/session'
 import { getOrgContext } from '@/lib/org-context'
 import { requireRole } from '@/lib/rbac'
+import { assertProjectAccess, canEditProjectArea, PROJECT_AREAS } from '@/lib/project-permissions'
 import { prisma } from '@repo/database'
 import { revalidatePath } from 'next/cache'
 import crypto from 'crypto'
@@ -205,6 +206,76 @@ export async function resendInvitation(memberId: string) {
   }
 }
 
+/** Re-sends the invitation email for a pending invitation (by invitation id). Use from the pending invitations list. */
+export async function resendInvitationEmail(invitationId: string) {
+  const session = await getSession()
+  if (!session?.user?.id) {
+    return { success: false, error: 'Unauthorized' }
+  }
+
+  const orgContext = await getOrgContext(session.user.id)
+  if (!orgContext) return { success: false, error: 'Unauthorized' }
+
+  try {
+    requireRole(orgContext.role as 'OWNER' | 'ADMIN', 'ADMIN')
+  } catch {
+    return { success: false, error: 'No tienes permiso para reenviar invitaciones' }
+  }
+
+  const invitation = await prisma.invitation.findFirst({
+    where: {
+      id: invitationId,
+      orgId: orgContext.orgId,
+      status: 'PENDING',
+      expiresAt: { gte: new Date() },
+    },
+    include: {
+      invitedBy: { select: { fullName: true, name: true, email: true } },
+    },
+  })
+
+  if (!invitation) {
+    return { success: false, error: 'Invitación no encontrada o expirada' }
+  }
+
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
+  const defaultLocale = process.env.NEXT_PUBLIC_DEFAULT_LOCALE ?? 'es'
+  const invitationUrl = `${baseUrl}/${defaultLocale}/invite/${invitation.token}`
+
+  const org = await prisma.organization.findUnique({
+    where: { id: orgContext.orgId },
+    select: { name: true },
+  })
+
+  const inviterName =
+    invitation.invitedBy?.fullName ??
+    invitation.invitedBy?.name ??
+    invitation.invitedBy?.email ??
+    'Un administrador'
+
+  const emailResult = await sendInvitationEmail({
+    to: invitation.email,
+    inviterName,
+    orgName: org?.name ?? 'la organización',
+    invitationUrl,
+    role: invitation.role,
+  })
+
+  if (!emailResult.success) {
+    console.error('Resend invitation email error:', emailResult.error)
+    return {
+      success: false,
+      error:
+        (emailResult.error as { message?: string })?.message ??
+        'No se pudo enviar el correo',
+    }
+  }
+
+  revalidatePath('/team')
+  revalidatePath('/settings/team')
+  return { success: true }
+}
+
 // ==================== ORG MEMBERS (for /team page) ====================
 
 export async function getOrgMembers() {
@@ -245,6 +316,7 @@ export async function getMemberPermissions(memberId: string) {
       id: true,
       role: true,
       customPermissions: true,
+      restrictedToProjects: true,
       user: {
         select: { fullName: true, email: true },
       },
@@ -253,6 +325,85 @@ export async function getMemberPermissions(memberId: string) {
 
   if (!member) throw new Error('Miembro no encontrado')
   return member
+}
+
+/** Project assignments for a given org member (for team permissions UI). Only OWNER/ADMIN. */
+export async function getProjectAssignmentsForMember(orgMemberId: string) {
+  const session = await getSession()
+  if (!session?.user?.id) throw new Error('No autorizado')
+
+  const orgContext = await getOrgContext(session.user.id)
+  if (!orgContext) throw new Error('No autorizado')
+
+  try {
+    requireRole(orgContext.role as 'OWNER' | 'ADMIN', 'ADMIN')
+  } catch {
+    throw new Error('No tienes permiso para ver asignaciones')
+  }
+
+  const member = await prisma.orgMember.findFirst({
+    where: { id: orgMemberId, orgId: orgContext.orgId },
+  })
+  if (!member) throw new Error('Miembro no encontrado')
+
+  const assignments = await prisma.projectMember.findMany({
+    where: { orgMemberId },
+    include: {
+      project: {
+        select: { id: true, name: true, projectNumber: true },
+      },
+    },
+    orderBy: { project: { name: 'asc' } },
+  })
+
+  return assignments.map((a) => ({
+    id: a.id,
+    projectId: a.projectId,
+    projectName: a.project.name,
+    projectNumber: a.project.projectNumber,
+    projectRole: a.projectRole,
+  }))
+}
+
+/** Set restrictedToProjects for a member. Only OWNER/ADMIN; target must be EDITOR or VIEWER. */
+export async function setMemberRestrictedToProjects(
+  orgMemberId: string,
+  restricted: boolean
+): Promise<{ success: true } | { success: false; error: string }> {
+  const session = await getSession()
+  if (!session?.user?.id) return { success: false, error: 'No autorizado' }
+
+  const orgContext = await getOrgContext(session.user.id)
+  if (!orgContext) return { success: false, error: 'No autorizado' }
+
+  try {
+    requireRole(orgContext.role as 'OWNER' | 'ADMIN', 'ADMIN')
+  } catch {
+    return { success: false, error: 'No tienes permiso para esta acción' }
+  }
+
+  const target = await prisma.orgMember.findFirst({
+    where: { id: orgMemberId, orgId: orgContext.orgId },
+  })
+  if (!target) return { success: false, error: 'Miembro no encontrado' }
+
+  const restrictedRoles = ['EDITOR', 'VIEWER']
+  if (!restrictedRoles.includes(target.role)) {
+    return {
+      success: false,
+      error: 'Solo se puede restringir a usuarios con rol EDITOR o VIEWER',
+    }
+  }
+
+  await prisma.orgMember.update({
+    where: { id: orgMemberId },
+    data: { restrictedToProjects: restricted },
+  })
+
+  revalidatePath('/team')
+  revalidatePath(`/team/${orgMemberId}/permissions`)
+  revalidatePath('/settings/team')
+  return { success: true }
 }
 
 export async function updateMemberPermissions(
@@ -275,6 +426,9 @@ export async function updateMemberPermissions(
     where: { id: memberId, orgId: orgContext.orgId },
   })
   if (!target) return { success: false, error: 'Miembro no encontrado' }
+  if (target.userId === session.user.id) {
+    return { success: false, error: 'No puedes modificar tus propios permisos' }
+  }
   if (target.role === 'OWNER') {
     return { success: false, error: 'No se pueden modificar permisos del dueño' }
   }
@@ -332,21 +486,36 @@ export async function inviteUser(data: { email: string; role: OrgRole }) {
     },
   })
 
-  if (existingInvitation?.status === 'PENDING') {
+  const now = new Date()
+  if (
+    existingInvitation?.status === 'PENDING' &&
+    existingInvitation.expiresAt >= now
+  ) {
     throw new Error('Ya existe una invitación pendiente para este email')
   }
 
   const token = crypto.randomBytes(32).toString('hex')
-  const expiresAt = new Date()
+  const expiresAt = new Date(now)
   expiresAt.setDate(expiresAt.getDate() + 7)
 
-  const invitation = await prisma.invitation.create({
-    data: {
+  // Upsert: crea nueva invitación o reutiliza la fila (org_id, email) si ya existía (EXPIRED/REVOKED/ACCEPTED)
+  const invitation = await prisma.invitation.upsert({
+    where: {
+      orgId_email: { orgId, email },
+    },
+    create: {
       orgId,
       email,
       role: data.role,
       token,
       expiresAt,
+      invitedByUserId: session.user.id,
+    },
+    update: {
+      token,
+      expiresAt,
+      role: data.role,
+      status: 'PENDING',
       invitedByUserId: session.user.id,
     },
   })
@@ -511,6 +680,9 @@ export async function updateMemberRole(
   })
 
   if (!targetMember) return { success: false, error: 'Miembro no encontrado' }
+  if (targetMember.userId === session.user.id) {
+    return { success: false, error: 'No puedes cambiar tu propio rol' }
+  }
   if (targetMember.role === 'OWNER') {
     return { success: false, error: 'No se puede cambiar el rol del dueño' }
   }
@@ -529,33 +701,41 @@ export async function toggleMemberStatus(
   memberId: string
 ): Promise<{ success: true } | { success: false; error: string }> {
   try {
-    await requirePermission('TEAM', 'edit')
-  } catch {
-    return { success: false, error: 'No tienes permiso para esta acción' }
+    try {
+      await requirePermission('TEAM', 'edit')
+    } catch {
+      return { success: false, error: 'No tienes permiso para esta acción' }
+    }
+    const session = await getSession()
+    if (!session?.user?.id) return { success: false, error: 'No autorizado' }
+
+    const orgContext = await getOrgContext(session.user.id)
+    if (!orgContext) return { success: false, error: 'No autorizado' }
+
+    const member = await prisma.orgMember.findFirst({
+      where: { id: memberId, orgId: orgContext.orgId },
+    })
+
+    if (!member) return { success: false, error: 'Miembro no encontrado' }
+    if (member.role === 'OWNER') {
+      return { success: false, error: 'No se puede desactivar al dueño' }
+    }
+
+    await prisma.orgMember.update({
+      where: { id: memberId },
+      data: { active: !member.active },
+    })
+
+    revalidatePath('/team')
+    revalidatePath('/settings/team')
+    return { success: true }
+  } catch (error) {
+    console.error('Error toggling member status:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error al cambiar estado',
+    }
   }
-  const session = await getSession()
-  if (!session?.user?.id) return { success: false, error: 'No autorizado' }
-
-  const orgContext = await getOrgContext(session.user.id)
-  if (!orgContext) return { success: false, error: 'No autorizado' }
-
-  const member = await prisma.orgMember.findFirst({
-    where: { id: memberId, orgId: orgContext.orgId },
-  })
-
-  if (!member) return { success: false, error: 'Miembro no encontrado' }
-  if (member.role === 'OWNER') {
-    return { success: false, error: 'No se puede desactivar al dueño' }
-  }
-
-  await prisma.orgMember.update({
-    where: { id: memberId },
-    data: { active: !member.active },
-  })
-
-  revalidatePath('/team')
-  revalidatePath('/settings/team')
-  return { success: true }
 }
 
 // ==================== PROJECT MEMBERS ====================
@@ -602,6 +782,16 @@ export async function addProjectMember(data: {
   })
   if (!project) throw new Error('Proyecto no encontrado')
 
+  try {
+    const access = await assertProjectAccess(data.projectId, orgContext)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.TEAM)) {
+      throw new Error('No tenés permiso para gestionar el equipo de este proyecto')
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('permiso')) throw e
+    throw new Error(e instanceof Error ? e.message : 'Acceso denegado')
+  }
+
   const orgMember = await prisma.orgMember.findFirst({
     where: { id: data.orgMemberId, orgId: orgContext.orgId },
   })
@@ -616,6 +806,8 @@ export async function addProjectMember(data: {
   })
 
   revalidatePath(`/projects/${data.projectId}/team`)
+  revalidatePath('/team')
+  revalidatePath(`/team/${data.orgMemberId}/permissions`)
   return { success: true }
 }
 
@@ -634,10 +826,23 @@ export async function removeProjectMember(projectMemberId: string) {
     throw new Error('No encontrado')
   }
 
+  try {
+    const access = await assertProjectAccess(pm.projectId, orgContext)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.TEAM)) {
+      throw new Error('No tenés permiso para gestionar el equipo de este proyecto')
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('permiso')) throw e
+    throw new Error(e instanceof Error ? e.message : 'Acceso denegado')
+  }
+
+  const orgMemberId = pm.orgMemberId
   await prisma.projectMember.delete({
     where: { id: projectMemberId },
   })
 
   revalidatePath(`/projects/${pm.projectId}/team`)
+  revalidatePath('/team')
+  revalidatePath(`/team/${orgMemberId}/permissions`)
   return { success: true }
 }

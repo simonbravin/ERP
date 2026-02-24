@@ -63,6 +63,7 @@ model Organization {
   templates           Template[]
   exportRuns          ExportRun[]
   documents           Document[]
+  documentFolders    DocumentFolder[]
   financialTransactions FinanceTransaction[]
   commitments         Commitment[]
   certifications      Certification[]
@@ -196,14 +197,15 @@ enum OrgRole {
 }
 
 model OrgMember {
-  id                 String   @id @default(uuid())
-  orgId              String   @map("org_id")
-  userId             String   @map("user_id")
-  role               OrgRole
-  active             Boolean  @default(true)
-  customPermissions  Json?    @map("custom_permissions") // { "finance": ["view","create"], "projects": ["view"] } - override del rol base
-  createdAt          DateTime @default(now()) @map("created_at")
-  updatedAt          DateTime @updatedAt @map("updated_at")
+  id                    String   @id @default(uuid())
+  orgId                 String   @map("org_id")
+  userId                String   @map("user_id")
+  role                  OrgRole
+  active                Boolean  @default(true)
+  customPermissions     Json?    @map("custom_permissions") // { "finance": ["view","create"], "projects": ["view"] } - override del rol base
+  restrictedToProjects  Boolean  @default(false) @map("restricted_to_projects") // Si true y rol EDITOR/VIEWER: solo ve proyectos asignados y no accede a Finanzas empresa. OWNER/ADMIN/ACCOUNTANT ignoran este flag.
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
 
   // Relations
   organization       Organization         @relation(fields: [orgId], references: [id], onDelete: Cascade)
@@ -586,6 +588,7 @@ model Project {
   submittals         Submittal[]
   inspections        Inspection[]
   documents          Document[]
+  documentFolders   DocumentFolder[]
   schedules           Schedule[]
   progressUpdates    ProgressUpdate[]
   dailyReports       DailyReport[]
@@ -1789,10 +1792,33 @@ model InspectionItem {
 // DOCUMENTS (Versioned)
 // ============================================================
 
+model DocumentFolder {
+  id        String   @id @default(uuid())
+  orgId     String   @map("org_id")
+  projectId String?  @map("project_id")
+  parentId  String?  @map("parent_id")
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  organization Organization    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  project      Project?        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parent       DocumentFolder? @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children     DocumentFolder[] @relation("FolderHierarchy")
+  documents    Document[]
+
+  @@index([orgId, projectId])
+  @@index([orgId, parentId])
+  @@map("document_folders")
+  @@schema("public")
+}
+
 model Document {
   id                   String   @id @default(uuid())
   orgId                String   @map("org_id")
   projectId            String?  @map("project_id")
+  folderId             String?  @map("folder_id")
   title                String
   docType              String   @map("doc_type")
   category             String?
@@ -1806,6 +1832,7 @@ model Document {
   // Relations
   organization    Organization      @relation(fields: [orgId], references: [id], onDelete: Cascade)
   project         Project?          @relation(fields: [projectId], references: [id])
+  folder          DocumentFolder?   @relation(fields: [folderId], references: [id], onDelete: SetNull)
   createdBy       OrgMember         @relation(fields: [createdByOrgMemberId], references: [id])
   versions        DocumentVersion[]
   links           DocumentLink[]
@@ -1813,6 +1840,7 @@ model Document {
 
   @@index([orgId, projectId])
   @@index([orgId, docType])
+  @@index([folderId])
   @@map("documents")
   @@schema("public")
 }

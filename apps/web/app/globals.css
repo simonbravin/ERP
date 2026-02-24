@@ -435,6 +435,15 @@
   .sidebar-nav-scroll::-webkit-scrollbar-thumb:hover {
     background: hsl(var(--sidebar-ring) / 0.75);
   }
+
+  /* Sidebar: sangría reducida para subítems (aplica en project-sidebar y global-sidebar) */
+  .sidebar-children {
+    margin-left: 1.25rem; /* antes ml-11 (2.75rem) */
+  }
+  .sidebar-children-nested {
+    margin-left: 0.5rem; /* antes ml-3 (0.75rem) */
+  }
+
   .erp-wizard-step-separator {
     @apply text-muted-foreground;
   }

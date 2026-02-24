@@ -3,13 +3,15 @@ import { getSession } from '@/lib/session'
 import { getOrgContext } from '@/lib/org-context'
 import { prisma } from '@repo/database'
 import { serializeForClient } from '@/lib/utils/serialization'
-import { PageHeader } from '@/components/layout/page-header'
 import { InventoryKPICards } from '@/components/inventory/inventory-kpi-cards'
 import { LowStockAlerts } from '@/components/inventory/low-stock-alerts'
 import { RecentMovements } from '@/components/inventory/recent-movements'
 import { Button } from '@/components/ui/button'
-import { Plus, Package } from 'lucide-react'
+import { Plus, Package, MapPin, FileStack } from 'lucide-react'
 import { Link } from '@/i18n/navigation'
+
+const ACTION_CARD_CLASS =
+  'flex items-center gap-4 rounded-xl border border-border/60 bg-card p-5 shadow-sm transition-shadow hover:shadow-md min-w-0'
 
 export default async function InventoryDashboardPage() {
   const session = await getSession()
@@ -145,71 +147,70 @@ export default async function InventoryDashboardPage() {
   const recentMovementsPlain = recentMovements.map((m) => serializeForClient(m))
 
   return (
-    <div className="h-full">
-      <PageHeader
-        title="Inventario"
-        subtitle="Gestión de materiales, stock y movimientos"
-        actions={
-          <div className="flex gap-2">
-            <Button asChild variant="outline">
-              <Link href="/inventory/movements/new">Nuevo Movimiento</Link>
-            </Button>
-            <Button asChild variant="default">
-              <Link href="/inventory/items/new">
-                <Plus className="mr-2 h-4 w-4" />
-                Nuevo Item
-              </Link>
-            </Button>
+    <div className="erp-view-container space-y-6 bg-background">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="erp-section-header">
+          <h1 className="erp-page-title">Inventario</h1>
+          <p className="erp-section-desc">Gestión de materiales, stock y movimientos.</p>
+        </div>
+        <div className="flex shrink-0 gap-2">
+          <Button asChild variant="outline">
+            <Link href="/inventory/movements/new">Nuevo Movimiento</Link>
+          </Button>
+          <Button asChild variant="default">
+            <Link href="/inventory/items/new">
+              <Plus className="mr-2 h-4 w-4" />
+              Nuevo Item
+            </Link>
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <Link href="/inventory/items" className={ACTION_CARD_CLASS}>
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <Package className="h-5 w-5" />
           </div>
-        }
+          <div className="min-w-0">
+            <h3 className="font-semibold text-foreground">Ver Items</h3>
+            <p className="text-sm text-muted-foreground">{totalItems} items registrados</p>
+          </div>
+        </Link>
+
+        <Link href="/inventory/locations" className={ACTION_CARD_CLASS}>
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600 dark:bg-slate-950/50 dark:text-slate-400">
+            <MapPin className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <h3 className="font-semibold text-foreground">Ubicaciones</h3>
+            <p className="text-sm text-muted-foreground">Gestionar almacenes y obras</p>
+          </div>
+        </Link>
+
+        <Link href="/inventory/movements" className={ACTION_CARD_CLASS}>
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600 dark:bg-slate-950/50 dark:text-slate-400">
+            <FileStack className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <h3 className="font-semibold text-foreground">Movimientos</h3>
+            <p className="text-sm text-muted-foreground">Historial completo</p>
+          </div>
+        </Link>
+      </div>
+
+      <InventoryKPICards
+        totalItems={totalItems}
+        criticalStock={criticalStock}
+        totalValue={totalValue}
+        monthMovements={monthMovements}
       />
 
-      <div className="space-y-6 p-6">
-        <InventoryKPICards
-          totalItems={totalItems}
-          criticalStock={criticalStock}
-          totalValue={totalValue}
-          monthMovements={monthMovements}
-        />
-
-        <div className="grid gap-6 lg:grid-cols-2">
-          <LowStockAlerts items={lowStockItems} />
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
+        <div className="lg:col-span-2">
           <RecentMovements movements={recentMovementsPlain} />
         </div>
-
-        <div className="grid gap-4 md:grid-cols-3">
-          <Link
-            href="/inventory/items"
-            className="flex items-center gap-4 rounded-lg border border-border bg-card p-6 transition-colors hover:bg-muted/50"
-          >
-            <Package className="h-8 w-8 text-primary" />
-            <div>
-              <h3 className="font-semibold">Ver Items</h3>
-              <p className="text-sm text-muted-foreground">{totalItems} items registrados</p>
-            </div>
-          </Link>
-
-          <Link
-            href="/inventory/locations"
-            className="flex items-center gap-4 rounded-lg border border-border bg-card p-6 transition-colors hover:bg-muted/50"
-          >
-            <Package className="h-8 w-8 text-primary" />
-            <div>
-              <h3 className="font-semibold">Ubicaciones</h3>
-              <p className="text-sm text-muted-foreground">Gestionar almacenes y obras</p>
-            </div>
-          </Link>
-
-          <Link
-            href="/inventory/movements"
-            className="flex items-center gap-4 rounded-lg border border-border bg-card p-6 transition-colors hover:bg-muted/50"
-          >
-            <Package className="h-8 w-8 text-primary" />
-            <div>
-              <h3 className="font-semibold">Movimientos</h3>
-              <p className="text-sm text-muted-foreground">Historial completo</p>
-            </div>
-          </Link>
+        <div className="lg:col-span-1">
+          <LowStockAlerts items={lowStockItems} />
         </div>
       </div>
     </div>

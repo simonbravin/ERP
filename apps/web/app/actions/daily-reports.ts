@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { prisma, Prisma } from '@repo/database'
 import { requireRole, hasMinimumRole } from '@/lib/rbac'
 import { getAuthContext } from '@/lib/auth-helpers'
+import { assertProjectAccess, canEditProjectArea, PROJECT_AREAS } from '@/lib/project-permissions'
 import { uploadToR2, getDownloadUrl, calculateChecksum } from '@/lib/r2-client'
 import {
   createDailyReportSchema,
@@ -86,6 +87,11 @@ export async function listDailyReports(
   pageSize = 25
 ) {
   const { org } = await getAuthContext()
+  try {
+    await assertProjectAccess(projectId, org)
+  } catch {
+    return { items: [] as DailyReportListItem[], total: 0, project: null }
+  }
   const project = await ensureProjectInOrg(projectId, org.orgId)
   if (!project) return { items: [] as DailyReportListItem[], total: 0, project: null }
 
@@ -224,22 +230,29 @@ function toPlainObject<T>(obj: T): T {
 
 export async function getDailyReport(reportId: string) {
   const { org } = await getAuthContext()
+  let report: { projectId: string; [k: string]: unknown } | null = null
   try {
-    const report = await prisma.dailyReport.findFirst({
+    report = await prisma.dailyReport.findFirst({
       where: { id: reportId, orgId: org.orgId },
       include: {
         ...getDailyReportIncludeBase,
         wbsNodes: { select: { wbsNode: { select: { id: true, code: true, name: true } } } },
       },
     })
-    return report ? toPlainObject(report) : null
   } catch {
-    const report = await prisma.dailyReport.findFirst({
+    report = await prisma.dailyReport.findFirst({
       where: { id: reportId, orgId: org.orgId },
       include: getDailyReportIncludeBase,
     })
-    return report ? toPlainObject({ ...report, wbsNodes: [] }) : null
+    if (report) (report as { wbsNodes?: unknown }).wbsNodes = []
   }
+  if (!report) return null
+  try {
+    await assertProjectAccess(report.projectId, org)
+  } catch {
+    return null
+  }
+  return toPlainObject(report)
 }
 
 export async function createDailyReport(projectId: string, data: CreateDailyReportInput) {
@@ -249,6 +262,15 @@ export async function createDailyReport(projectId: string, data: CreateDailyRepo
   const project = await ensureProjectInOrg(projectId, org.orgId)
   if (!project) throw new Error('Proyecto no encontrado')
   ensureProjectAllowsDailyReports(project)
+  try {
+    const access = await assertProjectAccess(projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.DAILY_REPORTS)) {
+      throw new Error('No tenés permiso para editar reportes diarios de este proyecto')
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('permiso')) throw e
+    throw new Error(e instanceof Error ? e.message : 'Acceso denegado')
+  }
 
   const parsed = createDailyReportSchema.safeParse({ ...data, projectId })
   if (!parsed.success) throw new Error(parsed.error.errors.map((e) => e.message).join(', '))
@@ -353,6 +375,15 @@ export async function updateDailyReport(reportId: string, data: UpdateDailyRepor
   const isAuthor = existing.createdByOrgMemberId === org.memberId
   const isAdmin = hasMinimumRole(org.role, 'ADMIN')
   if (!isAuthor && !isAdmin) throw new Error('No tienes permiso para editar este reporte')
+  try {
+    const access = await assertProjectAccess(existing.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.DAILY_REPORTS)) {
+      throw new Error('No tenés permiso para editar reportes diarios de este proyecto')
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('permiso')) throw e
+    throw new Error(e instanceof Error ? e.message : 'Acceso denegado')
+  }
 
   const parsed = updateDailyReportSchema.safeParse(data)
   if (!parsed.success) throw new Error(parsed.error.errors.map((e) => e.message).join(', '))
@@ -419,6 +450,15 @@ export async function deleteDailyReport(reportId: string) {
   const isAuthor = existing.createdByOrgMemberId === org.memberId
   const isAdmin = hasMinimumRole(org.role, 'ADMIN')
   if (!isAuthor && !isAdmin) throw new Error('No tienes permiso para eliminar este reporte')
+  try {
+    const access = await assertProjectAccess(existing.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.DAILY_REPORTS)) {
+      throw new Error('No tenés permiso para editar reportes diarios de este proyecto')
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('permiso')) throw e
+    throw new Error(e instanceof Error ? e.message : 'Acceso denegado')
+  }
 
   await prisma.dailyReport.delete({ where: { id: reportId } })
   revalidatePath(`/projects/${existing.projectId}/daily-reports`)
@@ -434,6 +474,15 @@ export async function submitDailyReport(reportId: string) {
   if (!existing) throw new Error('Reporte no encontrado')
   if (existing.status !== 'DRAFT') throw new Error('Solo reportes en borrador pueden enviarse')
   if (existing.createdByOrgMemberId !== org.memberId) throw new Error('Solo el autor puede enviar el reporte')
+  try {
+    const access = await assertProjectAccess(existing.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.DAILY_REPORTS)) {
+      throw new Error('No tenés permiso para editar reportes diarios de este proyecto')
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('permiso')) throw e
+    throw new Error(e instanceof Error ? e.message : 'Acceso denegado')
+  }
 
   const submittedAt = new Date()
   const report = await prisma.dailyReport.update({
@@ -462,6 +511,15 @@ export async function approveDailyReport(reportId: string, _adminNotes?: string)
   })
   if (!existing) throw new Error('Reporte no encontrado')
   if (existing.status !== 'SUBMITTED') throw new Error('Solo reportes enviados pueden aprobarse')
+  try {
+    const access = await assertProjectAccess(existing.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.DAILY_REPORTS)) {
+      throw new Error('No tenés permiso para editar reportes diarios de este proyecto')
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('permiso')) throw e
+    throw new Error(e instanceof Error ? e.message : 'Acceso denegado')
+  }
 
   const approvedAt = new Date()
   const report = await prisma.dailyReport.update({
@@ -496,6 +554,15 @@ export async function rejectDailyReport(reportId: string, reason: string) {
   })
   if (!existing) throw new Error('Reporte no encontrado')
   if (existing.status !== 'SUBMITTED') throw new Error('Solo reportes enviados pueden rechazarse')
+  try {
+    const access = await assertProjectAccess(existing.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.DAILY_REPORTS)) {
+      throw new Error('No tenés permiso para editar reportes diarios de este proyecto')
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('permiso')) throw e
+    throw new Error(e instanceof Error ? e.message : 'Acceso denegado')
+  }
 
   const report = await prisma.dailyReport.update({
     where: { id: reportId },
@@ -521,6 +588,15 @@ export async function publishDailyReport(reportId: string) {
   })
   if (!existing) throw new Error('Reporte no encontrado')
   if (existing.status !== 'APPROVED') throw new Error('Solo reportes aprobados pueden publicarse')
+  try {
+    const access = await assertProjectAccess(existing.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.DAILY_REPORTS)) {
+      throw new Error('No tenés permiso para editar reportes diarios de este proyecto')
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('permiso')) throw e
+    throw new Error(e instanceof Error ? e.message : 'Acceso denegado')
+  }
 
   const report = await prisma.dailyReport.update({
     where: { id: reportId },
@@ -555,6 +631,15 @@ export async function uploadDailyReportFiles(
   if (existing.status !== 'DRAFT') throw new Error('Solo se pueden subir archivos a reportes en borrador')
   if (existing.createdByOrgMemberId !== org.memberId && !hasMinimumRole(org.role, 'ADMIN'))
     throw new Error('No tienes permiso para subir archivos a este reporte')
+  try {
+    const access = await assertProjectAccess(existing.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.DAILY_REPORTS)) {
+      throw new Error('No tenés permiso para editar reportes diarios de este proyecto')
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('permiso')) throw e
+    throw new Error(e instanceof Error ? e.message : 'Acceso denegado')
+  }
 
   const files = formData.getAll('files') as File[]
   if (!files.length) return []
@@ -629,6 +714,11 @@ export async function uploadDailyReportFiles(
 
 export async function getWbsNodesForProject(projectId: string) {
   const { org } = await getAuthContext()
+  try {
+    await assertProjectAccess(projectId, org)
+  } catch {
+    return []
+  }
   const project = await ensureProjectInOrg(projectId, org.orgId)
   if (!project) return []
   return prisma.wbsNode.findMany({
@@ -640,6 +730,11 @@ export async function getWbsNodesForProject(projectId: string) {
 
 export async function getAuthorsForProject(projectId: string) {
   const { org } = await getAuthContext()
+  try {
+    await assertProjectAccess(projectId, org)
+  } catch {
+    return []
+  }
   const project = await ensureProjectInOrg(projectId, org.orgId)
   if (!project) return []
   const members = await prisma.dailyReport.findMany({

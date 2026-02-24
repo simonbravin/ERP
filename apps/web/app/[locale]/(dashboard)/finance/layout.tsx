@@ -1,5 +1,5 @@
 import { getSession } from '@/lib/session'
-import { getOrgContext } from '@/lib/org-context'
+import { getOrgContext, isRestrictedToProjects } from '@/lib/org-context'
 import { redirect } from '@/i18n/navigation'
 import { getLocale } from 'next-intl/server'
 import { FinanceTabs } from '@/components/finance/finance-tabs'
@@ -15,6 +15,7 @@ export default async function FinanceLayout({
   if (!userId) redirect({ href: '/login', locale })
   const org = await getOrgContext(userId!)
   if (!org) redirect({ href: '/login', locale })
+  if (isRestrictedToProjects(org)) redirect({ href: '/projects', locale })
 
   return (
     <div className="erp-view-container space-y-6">

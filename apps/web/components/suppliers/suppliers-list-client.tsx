@@ -76,7 +76,10 @@ export function SuppliersListClient({
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table')
   const [search, setSearch] = useState(searchParams.get('q') ?? '')
   const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') ?? '')
-  const [localPartyTypeFilter, setLocalPartyTypeFilter] = useState<'all' | 'suppliers' | 'clients'>('all')
+  const filterParam = searchParams.get('filter') as 'all' | 'suppliers' | 'clients' | null
+  const [localPartyTypeFilter, setLocalPartyTypeFilter] = useState<'all' | 'suppliers' | 'clients'>(
+    filterParam === 'suppliers' || filterParam === 'clients' ? filterParam : 'all'
+  )
 
   const categories = Array.from(
     new Set([

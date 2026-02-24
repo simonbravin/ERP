@@ -4,16 +4,19 @@ import {
   getProjectCashflowSummary,
   getProjectCashflowBreakdownByWbs,
   getProjectCashflowMonthComparison,
+  getProjectCashProjection,
 } from '@/app/actions/finance'
 import { getProject } from '@/app/actions/projects'
 import { CashflowComparisonCards } from '@/components/finance/cashflow-comparison-cards'
 import { CashflowChartClient } from '@/components/finance/cashflow-chart-client'
 import { CashflowKPICards } from '@/components/finance/cashflow-kpi-cards'
+import { CashProjectionClient } from '@/components/finance/cash-projection-client'
 import { ProjectCashflowBreakdownChart } from '@/components/finance/project-cashflow-breakdown-chart'
 import { ProjectCashflowExportToolbar } from '@/components/finance/project-cashflow-export-toolbar'
 import { ProjectCashflowPeriodSelector } from '@/components/finance/project-cashflow-period-selector'
 import { ProjectCashflowSummaryStats } from '@/components/finance/project-cashflow-summary-stats'
 import { UpcomingPaymentsTable } from '@/components/finance/upcoming-payments-table'
+import { ChevronRight } from 'lucide-react'
 import { notFound } from 'next/navigation'
 
 interface PageProps {
@@ -30,7 +33,7 @@ export default async function ProjectCashflowPage({ params, searchParams }: Page
     : new Date(toDate.getFullYear(), toDate.getMonth() - 6, 1)
 
   const dateRange = { from: fromDate, to: toDate }
-  const [project, cashflowData, kpis, summary, breakdownResult, monthComparison] =
+  const [project, cashflowData, kpis, summary, breakdownResult, monthComparison, initialProjection] =
     await Promise.all([
       getProject(projectId),
       getProjectCashflow(projectId, dateRange),
@@ -38,6 +41,7 @@ export default async function ProjectCashflowPage({ params, searchParams }: Page
       getProjectCashflowSummary(projectId, dateRange),
       getProjectCashflowBreakdownByWbs(projectId, dateRange),
       getProjectCashflowMonthComparison(projectId),
+      getProjectCashProjection(projectId, new Date()),
     ])
 
   if (!project) notFound()
@@ -77,6 +81,20 @@ export default async function ProjectCashflowPage({ params, searchParams }: Page
       {kpis.upcomingPayments.length > 0 && (
         <UpcomingPaymentsTable payments={kpis.upcomingPayments} />
       )}
+
+      <details className="group rounded-lg border border-border bg-card">
+        <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-base font-medium text-foreground hover:bg-muted/50 [&::-webkit-details-marker]:hidden">
+          <ChevronRight className="h-5 w-5 shrink-0 transition-transform group-open:rotate-90" />
+          Proyección de caja
+        </summary>
+        <div className="border-t border-border px-4 py-4">
+          <CashProjectionClient
+            initialProjection={initialProjection}
+            projectId={projectId}
+            title="Proyección de caja (proyecto)"
+          />
+        </div>
+      </details>
     </div>
   )
 }

@@ -30,6 +30,13 @@ import {
   getPartiesForProject,
   createPartyForTransaction,
 } from '@/app/actions/finance'
+import {
+  listDocumentsForEntity,
+  linkDocumentToEntity,
+  createDocument,
+  getDocumentDownloadUrl,
+} from '@/app/actions/documents'
+import { FINANCE_TRANSACTION_ENTITY } from '@/lib/document-entities'
 import { DOCUMENT_TYPE_LABELS, getStatusLabel } from '@/lib/finance-labels'
 import { PartyCombobox } from './party-combobox'
 import { toast } from 'sonner'
@@ -39,6 +46,7 @@ import {
   DOCUMENT_TYPE,
   type ProjectTransactionCreateInput,
 } from '@repo/validators'
+import { Paperclip, FileDown, Loader2 } from 'lucide-react'
 
 const formSchema = z.object({
   type: z.enum(PROJECT_TRANSACTION_TYPE),
@@ -105,8 +113,12 @@ export function TransactionFormDialog({
 }: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [parties, setParties] = useState<{ id: string; name: string }[]>([])
+  const [attachmentDocs, setAttachmentDocs] = useState<{ id: string; documentId: string; title: string; docType: string; versionId: string; fileName: string }[]>([])
+  const [attachmentLoading, setAttachmentLoading] = useState(false)
+  const [attachUploading, setAttachUploading] = useState(false)
   const isEditing = !!transaction
   const isCompanyLevel = projectId == null
+  const canAttach = isEditing && transaction?.id && projectId != null
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -206,6 +218,49 @@ export function TransactionFormDialog({
       form.setValue('total', t)
     }
   }, [subtotal, taxTotal, form])
+
+  useEffect(() => {
+    if (!open || !canAttach || !transaction?.id) return
+    setAttachmentLoading(true)
+    listDocumentsForEntity(FINANCE_TRANSACTION_ENTITY, transaction.id)
+      .then(setAttachmentDocs)
+      .catch(() => setAttachmentDocs([]))
+      .finally(() => setAttachmentLoading(false))
+  }, [open, canAttach, transaction?.id])
+
+  async function handleAttachFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file || !transaction?.id || !projectId) return
+    e.target.value = ''
+    setAttachUploading(true)
+    try {
+      const formData = new FormData()
+      formData.set('projectId', projectId)
+      formData.set('title', file.name.replace(/\.[^.]+$/, '').trim() || file.name)
+      formData.set('docType', 'INVOICE')
+      formData.set('file', file)
+      const result = await createDocument(formData)
+      if (result && 'docId' in result) {
+        await linkDocumentToEntity(result.docId, FINANCE_TRANSACTION_ENTITY, transaction.id)
+        const list = await listDocumentsForEntity(FINANCE_TRANSACTION_ENTITY, transaction.id)
+        setAttachmentDocs(list)
+        toast.success('Documento adjuntado')
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'No se pudo adjuntar')
+    } finally {
+      setAttachUploading(false)
+    }
+  }
+
+  async function handleDownloadAttachment(versionId: string) {
+    try {
+      const { url } = await getDocumentDownloadUrl(versionId)
+      window.open(url, '_blank')
+    } catch {
+      toast.error('No se pudo descargar')
+    }
+  }
 
   async function handleSubmit(data: FormData) {
     setIsSubmitting(true)
@@ -318,7 +373,7 @@ export function TransactionFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl" style={{ maxWidth: '42rem' }} aria-describedby="transaction-form-desc">
+      <DialogContent className="max-w-3xl" style={{ maxWidth: '52rem' }} aria-describedby="transaction-form-desc">
         <DialogHeader>
           <DialogTitle>
             {isEditing ? 'Editar Transacción' : 'Nueva Transacción'}
@@ -328,6 +383,7 @@ export function TransactionFormDialog({
           </DialogDescription>
         </DialogHeader>
 
+        <div className="max-h-[70vh] overflow-y-auto pr-1">
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
@@ -565,9 +621,53 @@ export function TransactionFormDialog({
             <Input
               id="reference"
               {...form.register('reference')}
-              placeholder="Referencia externa"
+              placeholder="Ej. número de OC (OC-0001) o nº de factura del proveedor para trazabilidad"
             />
           </div>
+
+          {canAttach && (
+            <div className="space-y-2 rounded-lg border border-border p-3">
+              <div className="flex items-center justify-between">
+                <Label className="flex items-center gap-2">
+                  <Paperclip className="h-4 w-4" />
+                  Adjuntos
+                </Label>
+                <label className="cursor-pointer">
+                  <input
+                    type="file"
+                    className="sr-only"
+                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                    disabled={attachUploading}
+                    onChange={handleAttachFile}
+                  />
+                  <span className="inline-flex items-center gap-1 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent">
+                    {attachUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                    {attachUploading ? 'Subiendo...' : 'Adjuntar documento'}
+                  </span>
+                </label>
+              </div>
+              {attachmentLoading ? (
+                <p className="text-sm text-muted-foreground">Cargando adjuntos...</p>
+              ) : attachmentDocs.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Sin adjuntos. Subí facturas o fotos desde el celular.</p>
+              ) : (
+                <ul className="space-y-1">
+                  {attachmentDocs.map((d) => (
+                    <li key={d.id}>
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadAttachment(d.versionId)}
+                        className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-sm hover:bg-muted"
+                      >
+                        <FileDown className="h-4 w-4 shrink-0" />
+                        <span className="truncate">{d.title || d.fileName}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
 
           <DialogFooter>
             <Button
@@ -583,6 +683,7 @@ export function TransactionFormDialog({
             </Button>
           </DialogFooter>
         </form>
+        </div>
       </DialogContent>
     </Dialog>
   )

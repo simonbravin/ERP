@@ -1,6 +1,5 @@
 'use client'
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Link } from '@/i18n/navigation'
 import { AlertTriangle } from 'lucide-react'
@@ -28,18 +27,20 @@ function toNum(v: unknown): number {
   return Number(v)
 }
 
+const CARD_CLASS = 'rounded-xl border border-border/60 bg-card shadow-sm min-w-0'
+
 export function LowStockAlerts({ items }: LowStockAlertsProps) {
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-base font-medium">Stock bajo</CardTitle>
+    <div className={CARD_CLASS}>
+      <div className="flex flex-row items-center justify-between border-b border-border px-5 py-4">
+        <h3 className="text-base font-medium">Stock bajo</h3>
         {items.length > 0 && (
           <Button asChild variant="outline" size="sm">
             <Link href="/inventory/items?stock=low">Ver todos</Link>
           </Button>
         )}
-      </CardHeader>
-      <CardContent>
+      </div>
+      <div className="px-5 py-4">
         {items.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-center text-sm text-muted-foreground">
             <AlertTriangle className="mb-2 h-8 w-8 opacity-50" />
@@ -69,7 +70,7 @@ export function LowStockAlerts({ items }: LowStockAlertsProps) {
             })}
           </ul>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }

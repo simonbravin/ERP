@@ -2,7 +2,9 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
+import { toast } from 'sonner'
 
 type DocumentDeleteButtonProps = {
   docId: string
@@ -16,10 +18,11 @@ export function DocumentDeleteButton({
   deleteDocument,
 }: DocumentDeleteButtonProps) {
   const router = useRouter()
+  const t = useTranslations('documents')
   const [deleting, setDeleting] = useState(false)
 
   async function handleDelete() {
-    if (!confirm('Are you sure you want to delete this document? This will soft-delete it.')) {
+    if (!confirm(t('deleteConfirm'))) {
       return
     }
     setDeleting(true)
@@ -27,8 +30,9 @@ export function DocumentDeleteButton({
       await deleteDocument(docId)
       router.push(redirectTo)
       router.refresh()
+      toast.success(t('delete'))
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Delete failed')
+      toast.error(err instanceof Error ? err.message : t('deleteFailed'))
     } finally {
       setDeleting(false)
     }
@@ -42,7 +46,7 @@ export function DocumentDeleteButton({
       onClick={handleDelete}
       disabled={deleting}
     >
-      {deleting ? 'Deleting…' : 'Delete'}
+      {deleting ? t('deleting') : t('delete')}
     </Button>
   )
 }

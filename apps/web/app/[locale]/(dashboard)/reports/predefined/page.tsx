@@ -29,6 +29,13 @@ export default async function PredefinedReportsPage() {
       color: 'text-green-600',
     },
     {
+      title: 'Avance vs Costo',
+      description: 'Consumido vs avance de obra por proyecto',
+      icon: TrendingUp,
+      href: '/reports/predefined/progress-vs-cost',
+      color: 'text-emerald-600',
+    },
+    {
       title: 'Top 10 Materiales',
       description: 'Materiales más caros de la empresa',
       icon: PieChart,

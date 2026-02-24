@@ -25,6 +25,11 @@ import {
   Home,
 } from 'lucide-react'
 import { SidebarFooter } from './sidebar-footer'
+import {
+  canAccessProjectArea,
+  PROJECT_AREAS,
+  type ProjectArea,
+} from '@/lib/project-permissions'
 
 interface ProjectSidebarProps {
   projectId: string
@@ -40,13 +45,20 @@ interface ProjectSidebarProps {
 
 type ProjectSectionKey = 'vision' | 'planning' | 'resources' | 'quality'
 
+interface NavItemChild {
+  name: string
+  href: string
+  children?: { name: string; href: string }[]
+}
+
 interface NavItem {
   name: string
   href: string
   icon: React.ComponentType<{ className?: string }>
   exact?: boolean
   sectionKey: ProjectSectionKey
-  children?: { name: string; href: string }[]
+  projectArea: ProjectArea
+  children?: NavItemChild[]
 }
 
 const PROJECT_SECTION_ORDER: ProjectSectionKey[] = ['vision', 'planning', 'resources', 'quality']
@@ -59,6 +71,7 @@ export function ProjectSidebar({ projectId, orgName = 'Bloqer', orgLogoUrl, user
   const t = useTranslations('nav')
   const pathname = usePathname()
   const [projectName, setProjectName] = useState('Proyecto')
+  const [projectRole, setProjectRole] = useState<string | null>(null)
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
   
   // Fetch project name
@@ -69,42 +82,70 @@ export function ProjectSidebar({ projectId, orgName = 'Bloqer', orgLogoUrl, user
       .catch(() => setProjectName('Proyecto'))
   }, [projectId])
 
-  const navigation: NavItem[] = useMemo(() => [
-    { name: t('overview'), href: `/projects/${projectId}`, icon: LayoutDashboard, exact: true, sectionKey: 'vision' },
-    { name: t('projectDashboard'), href: `/projects/${projectId}/dashboard`, icon: BarChart3, sectionKey: 'vision' },
-    { name: t('budget'), href: `/projects/${projectId}/budget`, icon: DollarSign, sectionKey: 'planning' },
-    { name: t('schedule'), href: `/projects/${projectId}/schedule`, icon: Calendar, sectionKey: 'planning' },
-    { name: t('dailyReports'), href: `/projects/${projectId}/daily-reports`, icon: ClipboardList, sectionKey: 'planning' },
+  // Fetch current user's project role for nav filtering
+  useEffect(() => {
+    fetch(`/api/projects/${projectId}/my-role`)
+      .then(res => res.ok ? res.json() : Promise.reject())
+      .then(data => setProjectRole(data.projectRole ?? null))
+      .catch(() => setProjectRole(null))
+  }, [projectId])
+
+  const allNavigation: NavItem[] = useMemo(() => [
+    { name: t('overview'), href: `/projects/${projectId}`, icon: LayoutDashboard, exact: true, sectionKey: 'vision', projectArea: PROJECT_AREAS.OVERVIEW },
+    { name: t('projectDashboard'), href: `/projects/${projectId}/dashboard`, icon: BarChart3, sectionKey: 'vision', projectArea: PROJECT_AREAS.DASHBOARD },
+    {
+      name: t('budget'),
+      href: `/projects/${projectId}/budget`,
+      icon: DollarSign,
+      sectionKey: 'planning',
+      projectArea: PROJECT_AREAS.BUDGET,
+      children: [
+        { name: t('budgetVersions', { defaultValue: 'Versiones' }), href: `/projects/${projectId}/budget` },
+        { name: t('budgetApproved', { defaultValue: 'Aprobado' }), href: `/projects/${projectId}/budget/approved` },
+        { name: t('budgetMaterials', { defaultValue: 'Materiales' }), href: `/projects/${projectId}/budget/materials` },
+      ],
+    },
+    { name: t('schedule'), href: `/projects/${projectId}/schedule`, icon: Calendar, sectionKey: 'planning', projectArea: PROJECT_AREAS.SCHEDULE },
+    { name: t('dailyReports'), href: `/projects/${projectId}/daily-reports`, icon: ClipboardList, sectionKey: 'planning', projectArea: PROJECT_AREAS.DAILY_REPORTS },
     {
       name: t('finance'),
       href: `/projects/${projectId}/finance`,
       icon: Receipt,
       sectionKey: 'planning',
+      projectArea: PROJECT_AREAS.FINANCE,
       children: [
         { name: t('transactions'), href: `/projects/${projectId}/finance/transactions` },
         { name: t('accountsPayable'), href: `/projects/${projectId}/finance/accounts-payable` },
         { name: t('accountsReceivable'), href: `/projects/${projectId}/finance/accounts-receivable` },
-        { name: t('cashflow', { defaultValue: 'Flujo de caja' }), href: `/projects/${projectId}/finance/cashflow` },
-        { name: t('cashProjection'), href: `/projects/${projectId}/finance/cash-projection` },
+        { name: t('overhead', { defaultValue: 'Generales' }), href: `/projects/${projectId}/finance/overhead` },
+        { name: t('purchaseOrders', { defaultValue: 'Órdenes de compra' }), href: `/projects/${projectId}/finance/purchase-orders` },
+        { name: t('navCash', { defaultValue: 'Caja' }), href: `/projects/${projectId}/finance/cashflow` },
         { name: t('certifications'), href: `/projects/${projectId}/finance/certifications` },
       ],
     },
-    { name: t('projectTeam', { defaultValue: 'Equipo del Proyecto' }), href: `/projects/${projectId}/team`, icon: Users, sectionKey: 'resources' },
-    { name: t('inventory', { defaultValue: 'Inventario' }), href: `/projects/${projectId}/inventory`, icon: Package, sectionKey: 'resources' },
-    { name: t('projectSuppliers'), href: `/projects/${projectId}/suppliers`, icon: Building2, sectionKey: 'resources' },
-    { name: t('documents'), href: `/projects/${projectId}/documents`, icon: FileText, sectionKey: 'resources' },
+    { name: t('projectTeam', { defaultValue: 'Equipo del Proyecto' }), href: `/projects/${projectId}/team`, icon: Users, sectionKey: 'resources', projectArea: PROJECT_AREAS.TEAM },
+    { name: t('inventory', { defaultValue: 'Inventario' }), href: `/projects/${projectId}/inventory`, icon: Package, sectionKey: 'resources', projectArea: PROJECT_AREAS.INVENTORY },
+    { name: t('projectSuppliers'), href: `/projects/${projectId}/suppliers`, icon: Building2, sectionKey: 'resources', projectArea: PROJECT_AREAS.SUPPLIERS },
+    { name: t('documents'), href: `/projects/${projectId}/documents`, icon: FileText, sectionKey: 'resources', projectArea: PROJECT_AREAS.DOCUMENTS },
     {
       name: t('quality'),
       href: `/projects/${projectId}/quality`,
       icon: CheckSquare,
       sectionKey: 'quality',
+      projectArea: PROJECT_AREAS.QUALITY,
       children: [
         { name: t('rfis'), href: `/projects/${projectId}/quality/rfis` },
         { name: t('submittals'), href: `/projects/${projectId}/quality/submittals` },
       ],
     },
-    { name: t('reports'), href: `/projects/${projectId}/reports`, icon: BarChart3, sectionKey: 'quality' },
+    { name: t('reports'), href: `/projects/${projectId}/reports`, icon: BarChart3, sectionKey: 'quality', projectArea: PROJECT_AREAS.REPORTS },
   ], [projectId, t])
+
+  // Filter nav by project role (when user is project member); null role = show all
+  const navigation = useMemo(() => {
+    if (projectRole === null) return allNavigation
+    return allNavigation.filter((item) => canAccessProjectArea(projectRole, item.projectArea))
+  }, [allNavigation, projectRole])
 
   const projectSectionLabels: Record<ProjectSectionKey, string> = {
     vision: t('sectionProjectVision'),
@@ -287,9 +328,48 @@ export function ProjectSidebar({ projectId, orgName = 'Bloqer', orgLogoUrl, user
                         )}
                       </div>
                       {hasChildren && isExpanded && (
-                        <div className="ml-11 mt-1 space-y-1">
+                        <div className="sidebar-children mt-1 space-y-1">
                           {item.children!.map((child) => {
                             const childActive = pathname === child.href || pathname.startsWith(child.href + '/')
+                            const hasNested = child.children && child.children.length > 0
+                            if (hasNested) {
+                              return (
+                                <div key={child.href} className="space-y-0.5">
+                                  <Link
+                                    href={child.href}
+                                    onClick={closeOnNav}
+                                    className={cn(
+                                      'block rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
+                                      childActive
+                                        ? 'text-sidebar-foreground'
+                                        : 'text-sidebar-muted hover:text-sidebar-foreground'
+                                    )}
+                                  >
+                                    {child.name}
+                                  </Link>
+                                  <div className="sidebar-children-nested space-y-0.5">
+                                    {child.children!.map((sub) => {
+                                      const subActive = pathname === sub.href || pathname.startsWith(sub.href + '/')
+                                      return (
+                                        <Link
+                                          key={sub.href}
+                                          href={sub.href}
+                                          onClick={closeOnNav}
+                                          className={cn(
+                                            'block rounded-lg px-3 py-1 text-sm transition-colors',
+                                            subActive
+                                              ? 'font-medium text-sidebar-foreground'
+                                              : 'text-sidebar-muted hover:text-sidebar-foreground'
+                                          )}
+                                        >
+                                          {sub.name}
+                                        </Link>
+                                      )
+                                    })}
+                                  </div>
+                                </div>
+                              )
+                            }
                             return (
                               <Link
                                 key={child.href}

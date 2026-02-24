@@ -1,7 +1,8 @@
 'use server'
 
 import { prisma } from '@repo/database'
-import { getAuthContext } from '@/lib/auth-helpers'
+import { getAuthContext, requireOrgFinanceAccess } from '@/lib/auth-helpers'
+import { assertProjectAccess } from '@/lib/project-permissions'
 
 // ====================
 // CASHFLOW DEL PROYECTO
@@ -21,6 +22,11 @@ export async function getProjectCashflow(
   dateRange?: { from: Date; to: Date }
 ): Promise<CashflowDataPoint[]> {
   const { org } = await getAuthContext()
+  try {
+    await assertProjectAccess(projectId, org)
+  } catch {
+    return []
+  }
   const to = dateRange?.to ?? new Date()
   const from = dateRange?.from ?? new Date(to.getFullYear(), to.getMonth() - 6, 1)
 
@@ -125,6 +131,11 @@ export async function getProjectCashflowBreakdownByWbs(
   dateRange: { from: Date; to: Date }
 ): Promise<ProjectCashflowBreakdownByWbsResult> {
   const { org } = await getAuthContext()
+  try {
+    await assertProjectAccess(projectId, org)
+  } catch {
+    return { breakdown: [], timelineByWbs: [] }
+  }
   const from = dateRange.from
   const to = dateRange.to
 
@@ -250,6 +261,21 @@ export async function getProjectCashflowBreakdownByWbs(
 
 export async function getProjectCashflowKPIs(projectId: string) {
   const { org } = await getAuthContext()
+  try {
+    await assertProjectAccess(projectId, org)
+  } catch {
+    return {
+      totalIncome: 0,
+      totalExpense: 0,
+      balance: 0,
+      pendingIncome: 0,
+      pendingExpense: 0,
+      currentMonthIncome: 0,
+      currentMonthExpense: 0,
+      currentMonthNet: 0,
+      upcomingPayments: [],
+    }
+  }
   const now = new Date()
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
   const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
@@ -371,6 +397,11 @@ export async function getProjectCashflowKPIs(projectId: string) {
  */
 export async function getWBSActualCosts(projectId: string): Promise<Record<string, number>> {
   const { org } = await getAuthContext()
+  try {
+    await assertProjectAccess(projectId, org)
+  } catch {
+    return {}
+  }
   const project = await prisma.project.findFirst({
     where: { id: projectId, orgId: org.orgId },
     select: { id: true },
@@ -416,6 +447,65 @@ export async function getWBSActualCost(wbsNodeId: string): Promise<number> {
   return Number(result._sum.lineTotal ?? 0)
 }
 
+/**
+ * Budget and consumed for a single WBS node (from approved budget version).
+ * Used in transaction line form to show presupuesto/consumido/disponible and detect over-budget.
+ */
+export type WBSBudgetAndConsumed = {
+  budgeted: number
+  consumed: number
+  available: number
+}
+
+export async function getWBSBudgetAndConsumed(
+  projectId: string,
+  wbsNodeId: string
+): Promise<WBSBudgetAndConsumed | null> {
+  const { org } = await getAuthContext()
+  try {
+    await assertProjectAccess(projectId, org)
+  } catch {
+    return null
+  }
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, orgId: org.orgId },
+    select: { id: true },
+  })
+  if (!project) return null
+
+  const [budgetVersion, consumedResult] = await Promise.all([
+    prisma.budgetVersion.findFirst({
+      where: { projectId, orgId: org.orgId, status: 'APPROVED' },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        budgetLines: {
+          where: { wbsNodeId },
+          select: { salePriceTotal: true },
+        },
+      },
+    }),
+    prisma.financeLine.aggregate({
+      where: {
+        wbsNodeId,
+        transaction: {
+          projectId,
+          orgId: org.orgId,
+          status: { in: ['APPROVED', 'PAID'] },
+          deleted: false,
+        },
+      },
+      _sum: { lineTotal: true },
+    }),
+  ])
+
+  const budgeted =
+    budgetVersion?.budgetLines.reduce((s, bl) => s + Number(bl.salePriceTotal), 0) ?? 0
+  const consumed = Number(consumedResult._sum.lineTotal ?? 0)
+  const available = Math.max(0, budgeted - consumed)
+
+  return { budgeted, consumed, available }
+}
+
 // ====================
 // COMPANY CASHFLOW
 // ====================
@@ -429,7 +519,7 @@ export type CompanyCashflowPoint = {
 }
 
 export async function getCompanyCashflow(dateRange?: { from: Date; to: Date }): Promise<CompanyCashflowPoint[]> {
-  const { org } = await getAuthContext()
+  const { org } = await requireOrgFinanceAccess()
   const toDate = dateRange?.to ?? new Date()
   const fromDate = dateRange?.from ?? new Date(toDate.getFullYear(), toDate.getMonth() - 6, 1)
 
@@ -508,7 +598,7 @@ export type CompanyCashflowDetailedResult = {
 export async function getCompanyCashflowDetailed(
   dateRange?: { from: Date; to: Date }
 ): Promise<CompanyCashflowDetailedResult> {
-  const { org } = await getAuthContext()
+  const { org } = await requireOrgFinanceAccess()
   const toDate = dateRange?.to ?? new Date()
   const fromDate = dateRange?.from ?? new Date(toDate.getFullYear(), toDate.getMonth() - 6, 1)
 
@@ -641,7 +731,7 @@ export type CashflowMonthComparisonResult = {
 }
 
 export async function getCashflowMonthComparison(): Promise<CashflowMonthComparisonResult> {
-  const { org } = await getAuthContext()
+  const { org } = await requireOrgFinanceAccess()
   const now = new Date()
   const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1)
   const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
@@ -719,6 +809,15 @@ export async function getProjectCashflowMonthComparison(
   projectId: string
 ): Promise<CashflowMonthComparisonResult> {
   const { org } = await getAuthContext()
+  try {
+    await assertProjectAccess(projectId, org)
+  } catch {
+    return {
+      current: { income: 0, expense: 0, balance: 0 },
+      previous: { income: 0, expense: 0, balance: 0 },
+      changes: { incomeChange: 0, expenseChange: 0, balanceChange: 0 },
+    }
+  }
   const now = new Date()
   const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1)
   const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)

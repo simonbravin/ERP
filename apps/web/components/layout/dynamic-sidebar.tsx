@@ -11,6 +11,8 @@ interface DynamicSidebarProps {
   orgName?: string
   orgLogoUrl?: string | null
   user: { name: string; email?: string | null }
+  /** When true, global sidebar shows only Dashboard + Projects */
+  restrictedToProjects?: boolean
   /** Mobile: sidebar as overlay drawer */
   isMobile?: boolean
   sidebarOpen?: boolean
@@ -36,6 +38,7 @@ export function DynamicSidebar({
   orgName = 'Bloqer',
   orgLogoUrl,
   user,
+  restrictedToProjects,
   isMobile = false,
   sidebarOpen = false,
   onSidebarClose,
@@ -71,6 +74,7 @@ export function DynamicSidebar({
       orgName={orgName}
       orgLogoUrl={orgLogoUrl}
       user={user}
+      restrictedToProjects={restrictedToProjects}
       {...mobileProps}
       {...collapseProps}
     />

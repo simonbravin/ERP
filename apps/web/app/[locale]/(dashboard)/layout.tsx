@@ -2,7 +2,7 @@ import { unstable_rethrow } from 'next/navigation'
 import { redirect } from '@/i18n/navigation'
 import { getLocale } from 'next-intl/server'
 import { getSession } from '@/lib/session'
-import { getOrgContext } from '@/lib/org-context'
+import { getOrgContext, isRestrictedToProjects } from '@/lib/org-context'
 import { getDownloadUrl } from '@/lib/r2-client'
 import { prisma } from '@repo/database'
 import { DashboardLayout } from '@/components/layouts/dashboard-layout'
@@ -87,6 +87,7 @@ export default async function DashboardLayoutPage({
           name: session.user.name ?? session.user.email ?? 'User',
           email: session.user.email ?? null,
         }}
+        restrictedToProjects={isRestrictedToProjects(orgContext)}
       >
         {children}
       </DashboardLayout>

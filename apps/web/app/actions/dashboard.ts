@@ -1,6 +1,7 @@
 'use server'
 
 import { prisma, Prisma } from '@repo/database'
+import { getApprovedOrBaselineBudgetTotals } from './budget'
 
 export type KPIs = {
   activeProjects: number
@@ -43,47 +44,56 @@ export type ActivityItem = {
 }
 
 /**
- * Get organization-wide KPIs for dashboard
+ * Get organization-wide KPIs for dashboard.
+ * When allowedProjectIds is provided (restricted user), only those projects are included; null = all projects.
  */
-export async function getOrgKPIs(orgId: string): Promise<KPIs> {
+export async function getOrgKPIs(
+  orgId: string,
+  allowedProjectIds: string[] | null = null
+): Promise<KPIs> {
+  const projectFilter =
+    allowedProjectIds === null
+      ? { orgId, status: 'ACTIVE' as const, active: true }
+      : { orgId, status: 'ACTIVE' as const, active: true, id: { in: allowedProjectIds } }
+
   // Total active projects
   const activeProjectsCount = await prisma.project.count({
-    where: { orgId, status: 'ACTIVE', active: true },
+    where: projectFilter,
   })
 
-  // Total budget from BASELINE versions of active projects
-  const budgetLines = await prisma.budgetLine.findMany({
-    where: {
-      orgId,
-      budgetVersion: {
-        versionType: 'BASELINE',
-        project: { status: 'ACTIVE', active: true },
-      },
-    },
-    select: { salePriceTotal: true },
+  // Total budget: same logic as projects list (approved or baseline version per project)
+  const activeProjects = await prisma.project.findMany({
+    where: projectFilter,
+    select: { id: true },
   })
-
-  const totalBudget = budgetLines.reduce(
-    (sum, line) => sum.add(line.salePriceTotal),
-    new Prisma.Decimal(0)
-  )
+  const activeProjectIds = activeProjects.map((p) => p.id)
+  const budgetTotalsByProject = await getApprovedOrBaselineBudgetTotals(activeProjectIds)
+  const totalBudget = Object.values(budgetTotalsByProject).reduce((sum, v) => sum + v, 0)
 
   // Pending certifications (ISSUED status)
   const pendingCertifications = await prisma.certification.count({
-    where: { orgId, status: 'ISSUED' },
+    where:
+      allowedProjectIds === null
+        ? { orgId, status: 'ISSUED' }
+        : { orgId, status: 'ISSUED', projectId: { in: allowedProjectIds } },
   })
 
   // Current month expenses
   const now = new Date()
   const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
 
+  const txBaseWhere = {
+    orgId,
+    deleted: false,
+    ...(allowedProjectIds !== null ? { projectId: { in: allowedProjectIds } } : {}),
+  }
+
   const monthExpenses = await prisma.financeTransaction.aggregate({
     where: {
-      orgId,
+      ...txBaseWhere,
       type: { in: ['EXPENSE', 'PURCHASE'] },
       status: { in: ['APPROVED', 'PAID'] },
       issueDate: { gte: firstDayOfMonth },
-      deleted: false,
     },
     _sum: { amountBaseCurrency: true },
   })
@@ -91,10 +101,9 @@ export async function getOrgKPIs(orgId: string): Promise<KPIs> {
   // Cuentas por cobrar: INCOME/SALE no cobrados
   const receivables = await prisma.financeTransaction.aggregate({
     where: {
-      orgId,
+      ...txBaseWhere,
       type: { in: ['INCOME', 'SALE'] },
       status: { in: ['DRAFT', 'SUBMITTED', 'APPROVED'] },
-      deleted: false,
     },
     _sum: { amountBaseCurrency: true },
   })
@@ -102,10 +111,9 @@ export async function getOrgKPIs(orgId: string): Promise<KPIs> {
   // Cuentas por pagar: EXPENSE/PURCHASE/OVERHEAD no pagados
   const payables = await prisma.financeTransaction.aggregate({
     where: {
-      orgId,
+      ...txBaseWhere,
       type: { in: ['EXPENSE', 'PURCHASE', 'OVERHEAD'] },
       status: { in: ['DRAFT', 'SUBMITTED', 'APPROVED'] },
-      deleted: false,
     },
     _sum: { amountBaseCurrency: true },
   })
@@ -115,7 +123,10 @@ export async function getOrgKPIs(orgId: string): Promise<KPIs> {
     where: {
       orgId,
       status: 'APPROVED',
-      project: { status: 'ACTIVE', active: true },
+      project:
+        allowedProjectIds === null
+          ? { status: 'ACTIVE', active: true }
+          : { status: 'ACTIVE', active: true, id: { in: allowedProjectIds } },
     },
     include: {
       lines: {
@@ -153,10 +164,14 @@ export async function getOrgKPIs(orgId: string): Promise<KPIs> {
 
   // Órdenes de cambio pendientes (no aprobadas)
   const pendingChangeOrders = await prisma.changeOrder.count({
-    where: {
-      orgId,
-      status: { in: ['DRAFT', 'CHANGES_REQUESTED'] },
-    },
+    where:
+      allowedProjectIds === null
+        ? { orgId, status: { in: ['DRAFT', 'CHANGES_REQUESTED'] } }
+        : {
+            orgId,
+            status: { in: ['DRAFT', 'CHANGES_REQUESTED'] },
+            projectId: { in: allowedProjectIds },
+          },
   })
 
   return {
@@ -339,9 +354,13 @@ export async function getProjectCashflowData(
 }
 
 /**
- * Get alerts for dashboard
+ * Get alerts for dashboard.
+ * When allowedProjectIds is provided (restricted user), only alerts for those projects; null = all.
  */
-export async function getAlerts(orgId: string): Promise<Alert[]> {
+export async function getAlerts(
+  orgId: string,
+  allowedProjectIds: string[] | null = null
+): Promise<Alert[]> {
   const alerts: Alert[] = []
 
   // 1. Certifications overdue (>30 days without approval)
@@ -353,6 +372,7 @@ export async function getAlerts(orgId: string): Promise<Alert[]> {
       orgId,
       status: 'ISSUED',
       issuedAt: { lt: thirtyDaysAgo },
+      ...(allowedProjectIds !== null ? { projectId: { in: allowedProjectIds } } : {}),
     },
     include: { project: { select: { name: true } } },
     take: 3,
@@ -377,6 +397,7 @@ export async function getAlerts(orgId: string): Promise<Alert[]> {
       orgId,
       status: 'OPEN',
       createdAt: { lt: sevenDaysAgo },
+      ...(allowedProjectIds !== null ? { projectId: { in: allowedProjectIds } } : {}),
     },
   })
 
@@ -389,20 +410,23 @@ export async function getAlerts(orgId: string): Promise<Alert[]> {
     })
   }
 
-  // 3. Low stock items
-  const lowStockItems = await prisma.inventoryItem.findMany({
-    where: {
-      orgId,
-      active: true,
-      minStockQty: { not: null },
-    },
-    select: {
-      id: true,
-      name: true,
-      minStockQty: true,
-    },
-    take: 10,
-  })
+  // 3. Low stock items (org-level; skip for restricted users so we only show project-related alerts)
+  const lowStockItems =
+    allowedProjectIds === null
+      ? await prisma.inventoryItem.findMany({
+          where: {
+            orgId,
+            active: true,
+            minStockQty: { not: null },
+          },
+          select: {
+            id: true,
+            name: true,
+            minStockQty: true,
+          },
+          take: 10,
+        })
+      : []
 
   for (const item of lowStockItems) {
     // Calculate current stock from movements
@@ -439,6 +463,7 @@ export async function getAlerts(orgId: string): Promise<Alert[]> {
     where: {
       orgId,
       status: 'SUBMITTED',
+      ...(allowedProjectIds !== null ? { projectId: { in: allowedProjectIds } } : {}),
     },
   })
 
@@ -455,11 +480,20 @@ export async function getAlerts(orgId: string): Promise<Alert[]> {
 }
 
 /**
- * Get recent activity from audit log
+ * Get recent activity from audit log.
+ * When allowedProjectIds is provided (restricted user), only activity for those projects; activities without projectId are excluded. null = all.
  */
-export async function getRecentActivity(orgId: string): Promise<ActivityItem[]> {
+export async function getRecentActivity(
+  orgId: string,
+  allowedProjectIds: string[] | null = null
+): Promise<ActivityItem[]> {
   const activities = await prisma.auditLog.findMany({
-    where: { orgId },
+    where: {
+      orgId,
+      ...(allowedProjectIds !== null
+        ? { projectId: { in: allowedProjectIds } }
+        : {}),
+    },
     orderBy: { createdAt: 'desc' },
     take: 10,
   })

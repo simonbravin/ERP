@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { prisma, Prisma } from '@repo/database'
 import { requireRole } from '@/lib/rbac'
-import { requirePermission, getAuthContext } from '@/lib/auth-helpers'
+import { requirePermission, requireOrgFinanceAccess } from '@/lib/auth-helpers'
 import { publishOutboxEvent } from '@/lib/events/event-publisher'
 import { toBaseAmount } from '@/lib/currency-utils'
 import { serializeTransaction } from './finance-helpers'
@@ -26,7 +26,7 @@ export async function createCompanyTransaction(data: {
   adjustmentNotes?: string
 }) {
   await requirePermission('FINANCE', 'create')
-  const { org } = await getAuthContext()
+  const { org } = await requireOrgFinanceAccess()
   requireRole(org.role, 'ACCOUNTANT')
   if (data.partyId) {
     const party = await prisma.party.findFirst({
@@ -98,7 +98,7 @@ export async function allocateOverhead(
   transactionId: string,
   allocations: Array<{ projectId: string; allocationPct: number }>
 ) {
-  const { org } = await getAuthContext()
+  const { org } = await requireOrgFinanceAccess()
   requireRole(org.role, 'ACCOUNTANT')
   const tx = await prisma.financeTransaction.findFirst({
     where: { id: transactionId, orgId: org.orgId, deleted: false },
@@ -165,7 +165,7 @@ export async function getApprovedBudgetTotalByProject(
 
 /** Total de gastos generales asignados a un proyecto (suma de allocationAmount). */
 export async function getOverheadAllocatedToProject(projectId: string): Promise<number> {
-  const { org } = await getAuthContext()
+  const { org } = await requireOrgFinanceAccess()
   const project = await prisma.project.findFirst({
     where: { id: projectId, orgId: org.orgId },
     select: { id: true },
@@ -176,6 +176,138 @@ export async function getOverheadAllocatedToProject(projectId: string): Promise<
     _sum: { allocationAmount: true },
   })
   return Number(result._sum.allocationAmount ?? 0)
+}
+
+/**
+ * Presupuesto de generales (cotizado) del proyecto: total costo directo del presupuesto
+ * APPROVED/BASELINE × globalOverheadPct / 100 (márgenes globales).
+ */
+export async function getProjectOverheadBudgeted(projectId: string): Promise<number> {
+  const { org } = await requireOrgFinanceAccess()
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, orgId: org.orgId },
+    select: { id: true },
+  })
+  if (!project) return 0
+  const version = await prisma.budgetVersion.findFirst({
+    where: {
+      projectId,
+      orgId: org.orgId,
+      status: { in: ['APPROVED', 'BASELINE'] },
+    },
+    orderBy: [{ status: 'desc' }, { createdAt: 'desc' }],
+    select: {
+      globalOverheadPct: true,
+      budgetLines: { select: { directCostTotal: true } },
+    },
+  })
+  if (!version?.budgetLines?.length) return 0
+  const totalDirectCost = version.budgetLines.reduce(
+    (s, l) => s + Number(l.directCostTotal),
+    0
+  )
+  const pct = Number(version.globalOverheadPct ?? 0)
+  return totalDirectCost * (pct / 100)
+}
+
+/**
+ * Consumo de generales del proyecto: asignaciones de empresa a este proyecto
+ * + transacciones OVERHEAD con projectId = este proyecto.
+ */
+export async function getProjectOverheadConsumed(projectId: string): Promise<number> {
+  const allocated = await getOverheadAllocatedToProject(projectId)
+  const { org } = await requireOrgFinanceAccess()
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, orgId: org.orgId },
+    select: { id: true },
+  })
+  if (!project) return allocated
+  const result = await prisma.financeTransaction.aggregate({
+    where: {
+      projectId,
+      orgId: org.orgId,
+      deleted: false,
+      type: 'OVERHEAD',
+    },
+    _sum: { amountBaseCurrency: true },
+  })
+  const projectOverhead = Number(result._sum.amountBaseCurrency ?? 0)
+  return allocated + projectOverhead
+}
+
+export type ProjectOverheadItem = {
+  id: string
+  /** Para allocation es allocationId; para project es transactionId. */
+  transactionId?: string
+  source: 'allocation' | 'project'
+  transactionNumber: string
+  description: string
+  issueDate: Date
+  amount: number
+  partyName: string | null
+}
+
+/** Lista de generales que consumen el proyecto: asignaciones de empresa + transacciones OVERHEAD del proyecto. */
+export async function getProjectOverheadItems(projectId: string): Promise<ProjectOverheadItem[]> {
+  const { org } = await requireOrgFinanceAccess()
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, orgId: org.orgId },
+    select: { id: true },
+  })
+  if (!project) return []
+
+  const [allocations, projectTx] = await Promise.all([
+    prisma.overheadAllocation.findMany({
+      where: { projectId, orgId: org.orgId },
+      include: {
+        transaction: {
+          select: {
+            transactionNumber: true,
+            description: true,
+            issueDate: true,
+            party: { select: { name: true } },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.financeTransaction.findMany({
+      where: {
+        projectId,
+        orgId: org.orgId,
+        deleted: false,
+        type: 'OVERHEAD',
+      },
+      include: { party: { select: { name: true } } },
+      orderBy: { issueDate: 'desc' },
+    }),
+  ])
+
+  const allocationItems: ProjectOverheadItem[] = allocations.map((a) => ({
+    id: a.id,
+    transactionId: a.transactionId,
+    source: 'allocation',
+    transactionNumber: a.transaction.transactionNumber,
+    description: a.transaction.description,
+    issueDate: a.transaction.issueDate,
+    amount: Number(a.allocationAmount),
+    partyName: a.transaction.party?.name ?? null,
+  }))
+
+  const projectItems: ProjectOverheadItem[] = projectTx.map((t) => ({
+    id: t.id,
+    transactionId: t.id,
+    source: 'project',
+    transactionNumber: t.transactionNumber,
+    description: t.description,
+    issueDate: t.issueDate,
+    amount: Number(t.amountBaseCurrency),
+    partyName: t.party?.name ?? null,
+  }))
+
+  const combined = [...allocationItems, ...projectItems]
+  combined.sort((a, b) => b.issueDate.getTime() - a.issueDate.getTime())
+  return combined
 }
 
 // ====================
@@ -206,7 +338,7 @@ export type OverheadTransactionWithAllocations = {
 }
 
 export async function getOverheadTransactions(): Promise<OverheadTransactionWithAllocations[]> {
-  const { org } = await getAuthContext()
+  const { org } = await requireOrgFinanceAccess()
   const transactions = await prisma.financeTransaction.findMany({
     where: {
       orgId: org.orgId,
@@ -285,7 +417,7 @@ export type OverheadDashboard = {
 }
 
 export async function getOverheadDashboard(): Promise<OverheadDashboard> {
-  const { org } = await getAuthContext()
+  const { org } = await requireOrgFinanceAccess()
   const overheadTransactions = await prisma.financeTransaction.findMany({
     where: {
       orgId: org.orgId,
@@ -358,7 +490,7 @@ export async function getOverheadDashboard(): Promise<OverheadDashboard> {
 
 export async function deleteOverheadAllocation(allocationId: string) {
   await requirePermission('FINANCE', 'edit')
-  const { org } = await getAuthContext()
+  const { org } = await requireOrgFinanceAccess()
   requireRole(org.role, 'ACCOUNTANT')
   const allocation = await prisma.overheadAllocation.findUnique({
     where: { id: allocationId },
@@ -388,7 +520,7 @@ export async function updateOverheadAllocation(
   data: { allocationPct: number; notes?: string }
 ) {
   await requirePermission('FINANCE', 'edit')
-  const { org } = await getAuthContext()
+  const { org } = await requireOrgFinanceAccess()
   requireRole(org.role, 'ACCOUNTANT')
   const allocation = await prisma.overheadAllocation.findUnique({
     where: { id: allocationId },

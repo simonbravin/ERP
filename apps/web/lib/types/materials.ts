@@ -37,3 +37,17 @@ export interface MaterialsListFilter {
   sortBy: 'name' | 'quantity' | 'cost'
   sortOrder: 'asc' | 'desc'
 }
+
+/** Line item for purchase order from budget materials (has WBS for traceability). */
+export interface MaterialLineForPO {
+  budgetResourceId: string
+  wbsNodeId: string
+  wbsCode: string
+  wbsName: string
+  description: string
+  unit: string
+  quantity: number
+  unitCost: number
+  totalCost: number
+  supplierName: string | null
+}

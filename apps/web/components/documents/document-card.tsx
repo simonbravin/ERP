@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 import type { DocumentRow } from './document-list'
 
 function formatDate(d: Date): string {
@@ -18,6 +19,7 @@ type DocumentCardProps = {
 }
 
 export function DocumentCard({ document: doc }: DocumentCardProps) {
+  const t = useTranslations('documents')
   const latest = doc.versions[0]
 
   return (
@@ -36,7 +38,7 @@ export function DocumentCard({ document: doc }: DocumentCardProps) {
         <span className="text-xs text-muted-foreground">
           {doc.createdBy.user.fullName} · {formatDate(doc.createdAt)}
         </span>
-        <span className="text-xs font-medium text-primary">Ver</span>
+        <span className="text-xs font-medium text-primary">{t('view')}</span>
       </div>
     </Link>
   )

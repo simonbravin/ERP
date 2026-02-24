@@ -196,10 +196,7 @@ export default async function ProjectDetailPage({ params }: PageProps) {
         </dl>
       </div>
 
-      {/* Actividad reciente */}
-      <RecentActivityFeed activities={recentActivity} hideProjectName />
-
-      {/* Quick Actions */}
+      {/* Quick Actions (Acceso Rápido) */}
       <div className="erp-card-elevated p-6">
         <h2 className="erp-section-title mb-4">
           Acceso Rápido
@@ -261,6 +258,9 @@ export default async function ProjectDetailPage({ params }: PageProps) {
           </Link>
         </div>
       </div>
+
+      {/* Actividad reciente */}
+      <RecentActivityFeed activities={recentActivity} hideProjectName />
     </div>
   )
 }

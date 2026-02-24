@@ -6,6 +6,7 @@ import { getSession } from '@/lib/session'
 import { getOrgContext } from '@/lib/org-context'
 import { requireRole } from '@/lib/rbac'
 import { getAuthContext } from '@/lib/auth-helpers'
+import { assertProjectAccess, canEditProjectArea, PROJECT_AREAS } from '@/lib/project-permissions'
 import { publishOutboxEvent, type PrismaTransaction } from '@/lib/events/event-publisher'
 import {
   createWBSItemSchema,
@@ -162,9 +163,14 @@ export async function calculateWBSCosts(wbsId: string): Promise<WbsCostResult | 
   const { org } = await getAuthContext()
   const node = await prisma.wbsNode.findFirst({
     where: { id: wbsId, orgId: org.orgId },
-    select: { id: true },
+    select: { id: true, projectId: true },
   })
   if (!node) return null
+  try {
+    await assertProjectAccess(node.projectId, org)
+  } catch {
+    return null
+  }
 
   const [budgetAgg, financeAgg] = await Promise.all([
     prisma.budgetLine.aggregate({
@@ -200,6 +206,11 @@ export async function getProjectWBSCostsMap(
   projectId: string
 ): Promise<Record<string, WbsCostResult> | null> {
   const { org } = await getAuthContext()
+  try {
+    await assertProjectAccess(projectId, org)
+  } catch {
+    return null
+  }
   const project = await ensureProjectInOrg(projectId, org.orgId)
   if (!project) return null
 
@@ -260,6 +271,14 @@ export async function createWBSItem(projectId: string, data: CreateWBSItemInput)
 
   const project = await ensureProjectInOrg(projectId, org.orgId)
   if (!project) return { error: { _form: ['Project not found'] } }
+  try {
+    const access = await assertProjectAccess(projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.BUDGET)) {
+      return { error: { _form: ['No tenés permiso para editar el WBS de este proyecto'] } }
+    }
+  } catch (e) {
+    return { error: { _form: [e instanceof Error ? e.message : 'Acceso denegado'] } }
+  }
 
   const parsed = createWBSItemSchema.safeParse(data)
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
@@ -342,6 +361,14 @@ export async function updateWBSItem(
 
   const project = await ensureProjectInOrg(projectId, org.orgId)
   if (!project) return { error: { _form: ['Project not found'] } }
+  try {
+    const access = await assertProjectAccess(projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.BUDGET)) {
+      return { error: { _form: ['No tenés permiso para editar el WBS de este proyecto'] } }
+    }
+  } catch (e) {
+    return { error: { _form: [e instanceof Error ? e.message : 'Acceso denegado'] } }
+  }
 
   const existing = await prisma.wbsNode.findFirst({
     where: { id, projectId, orgId: org.orgId, active: true },
@@ -417,6 +444,14 @@ export async function reorderWBSItems(
 
   const project = await ensureProjectInOrg(projectId, org.orgId)
   if (!project) return { error: 'Project not found' }
+  try {
+    const access = await assertProjectAccess(projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.BUDGET)) {
+      return { error: 'No tenés permiso para editar el WBS de este proyecto' }
+    }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Acceso denegado' }
+  }
 
   const nodes = await prisma.wbsNode.findMany({
     where: {
@@ -473,6 +508,15 @@ export async function deleteWBSItem(id: string, projectId: string) {
 
   const project = await ensureProjectInOrg(projectId, org.orgId)
   if (!project) throw new Error('Project not found')
+  try {
+    const access = await assertProjectAccess(projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.BUDGET)) {
+      throw new Error('No tenés permiso para editar el WBS de este proyecto')
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('permiso')) throw e
+    throw new Error(e instanceof Error ? e.message : 'Acceso denegado')
+  }
 
   const node = await prisma.wbsNode.findFirst({
     where: { id, projectId, orgId: org.orgId, active: true },
@@ -530,6 +574,10 @@ export async function createWbsNode(data: {
       where: { id: data.projectId, orgId: org.orgId },
     })
     if (!project) return { success: false, error: 'Proyecto no encontrado' }
+    const access = await assertProjectAccess(data.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.BUDGET)) {
+      return { success: false, error: 'No tenés permiso para editar el WBS de este proyecto' }
+    }
 
     const existing = await prisma.wbsNode.findFirst({
       where: {
@@ -594,6 +642,10 @@ export async function updateWbsNode(
       where: { id: nodeId, orgId: org.orgId },
     })
     if (!node) return { success: false, error: 'Nodo no encontrado' }
+    const access = await assertProjectAccess(node.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.BUDGET)) {
+      return { success: false, error: 'No tenés permiso para editar el WBS de este proyecto' }
+    }
 
     const existing = await prisma.wbsNode.findFirst({
       where: {
@@ -647,6 +699,10 @@ export async function deleteWbsNode(nodeId: string) {
       include: { children: { where: { active: true } } },
     })
     if (!node) return { success: false, error: 'Nodo no encontrado' }
+    const access = await assertProjectAccess(node.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.BUDGET)) {
+      return { success: false, error: 'No tenés permiso para editar el WBS de este proyecto' }
+    }
     if (node.children.length > 0) {
       return {
         success: false,
@@ -688,6 +744,10 @@ export async function reorderWbsNode(nodeId: string, newSortOrder: number) {
       where: { id: nodeId, orgId: org.orgId },
     })
     if (!node) return { success: false, error: 'Nodo no encontrado' }
+    const access = await assertProjectAccess(node.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.BUDGET)) {
+      return { success: false, error: 'No tenés permiso para editar el WBS de este proyecto' }
+    }
     await prisma.$transaction(async (tx) => {
       await tx.wbsNode.update({
         where: { id: nodeId },
@@ -864,6 +924,14 @@ export async function addWbsNode(data: {
 
   const project = await ensureProjectInOrg(data.projectId, org.orgId)
   if (!project) return { success: false, error: 'Project not found' }
+  try {
+    const access = await assertProjectAccess(data.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.BUDGET)) {
+      return { success: false, error: 'No tenés permiso para editar el WBS de este proyecto' }
+    }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Acceso denegado' }
+  }
 
   try {
     const newCode = await calculateNextCode(data.projectId, data.parentId)
@@ -1033,6 +1101,10 @@ export async function deleteWbsNodeWithRenumber(nodeId: string) {
       },
     })
     if (!node) return { success: false, error: 'Node not found' }
+    const access = await assertProjectAccess(node.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.BUDGET)) {
+      return { success: false, error: 'No tenés permiso para editar el WBS de este proyecto' }
+    }
 
     const childrenCount = node._count.children ?? 0
     if (childrenCount > 0) {
@@ -1096,6 +1168,10 @@ export async function deleteWbsNodeCascade(nodeId: string) {
       select: { id: true, code: true, parentId: true, projectId: true },
     })
     if (!node) return { success: false, error: 'Node not found' }
+    const access = await assertProjectAccess(node.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.BUDGET)) {
+      return { success: false, error: 'No tenés permiso para editar el WBS de este proyecto' }
+    }
 
     const descendants = await getAllDescendants(nodeId)
     const idsToDelete = [...descendants.map((d) => d.id), nodeId]

@@ -96,7 +96,7 @@ export function ProjectDashboardClient({ project, data }: Props) {
     data.budget.total === 0 ? 0 : (data.budget.spent / data.budget.total) * 100
   const isOverBudget = budgetUsagePct > 100
 
-  const wbsChartData = data.expensesByWbs.slice(0, 10).map((w) => ({
+  const wbsChartData = data.expensesByWbs.slice(0, 5).map((w) => ({
     name: w.wbsCode,
     Presupuestado: w.budgeted,
     Real: w.actual,
@@ -218,21 +218,23 @@ export function ProjectDashboardClient({ project, data }: Props) {
       <div className="grid min-h-[320px] gap-6 lg:grid-cols-2">
         <div id="chart-wbs">
           <ChartCard
-            title="Presupuesto vs Real por partida (Top 10)"
+            title="Presupuesto vs Real por partida (Top 5)"
             description="WBS con mayor gasto real"
           >
             <div className="h-[280px] min-h-[280px] w-full min-w-0" style={{ minHeight: 280 }}>
             <ResponsiveContainer width="100%" height={280}>
               <BarChart
                 data={wbsChartData}
-                margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                layout="vertical"
+                margin={{ top: 10, right: 30, left: 60, bottom: 10 }}
               >
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                <YAxis
+                <XAxis
+                  type="number"
                   tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
                   tick={{ fontSize: 12 }}
                 />
+                <YAxis type="category" dataKey="name" width={56} tick={{ fontSize: 11 }} />
                 <Tooltip
                   formatter={(value: number) => formatCurrency(value)}
                   contentStyle={{
@@ -241,8 +243,8 @@ export function ProjectDashboardClient({ project, data }: Props) {
                   }}
                 />
                 <Legend />
-                <Bar dataKey="Presupuestado" fill={COLORS.budget} radius={[4, 4, 0, 0]} />
-                <Bar dataKey="Real" fill={COLORS.actual} radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Presupuestado" fill={COLORS.budget} radius={[0, 4, 4, 0]} />
+                <Bar dataKey="Real" fill={COLORS.actual} radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

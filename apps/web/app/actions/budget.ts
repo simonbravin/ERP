@@ -23,6 +23,7 @@ import { calculateBudgetLine } from '@/lib/budget-calculations'
 import { createAuditLog } from '@/lib/audit-log'
 import { publishOutboxEvent } from '@/lib/events/event-publisher'
 import { serializeForClient } from '@/lib/utils/serialization'
+import { assertProjectAccess, canEditProjectArea, PROJECT_AREAS } from '@/lib/project-permissions'
 
 function ensureProjectInOrg(projectId: string, orgId: string) {
   return prisma.project.findFirst({
@@ -58,8 +59,11 @@ function isEditableVersion(status: string): boolean {
 
 export async function listBudgetVersions(projectId: string) {
   const { org } = await getAuthContext()
-  const project = await ensureProjectInOrg(projectId, org.orgId)
-  if (!project) return null
+  try {
+    await assertProjectAccess(projectId, org)
+  } catch {
+    return null
+  }
 
   const versions = await prisma.budgetVersion.findMany({
     where: { projectId, orgId: org.orgId },
@@ -124,6 +128,16 @@ export async function createBudgetVersion(projectId: string, data: CreateBudgetV
   await requirePermission('BUDGET', 'create')
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  let projectRole: string | null
+  try {
+    const access = await assertProjectAccess(projectId, org)
+    projectRole = access.projectRole
+  } catch (e) {
+    return { error: { _form: [e instanceof Error ? e.message : 'Proyecto no encontrado'] } }
+  }
+  if (!canEditProjectArea(projectRole, PROJECT_AREAS.BUDGET)) {
+    return { error: { _form: ['No tenés permiso para editar el presupuesto de este proyecto'] } }
+  }
 
   const project = await ensureProjectInOrg(projectId, org.orgId)
   if (!project) return { error: { _form: ['Project not found'] } }
@@ -200,6 +214,14 @@ export async function updateBudgetVersion(versionId: string, data: UpdateBudgetV
     select: { id: true, projectId: true, status: true },
   })
   if (!version) return { error: { _form: ['Version not found'] } }
+  try {
+    const access = await assertProjectAccess(version.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.BUDGET)) {
+      return { error: { _form: ['No tenés permiso para editar el presupuesto de este proyecto'] } }
+    }
+  } catch (e) {
+    return { error: { _form: [e instanceof Error ? e.message : 'Acceso denegado'] } }
+  }
   if (!isEditableVersion(version.status)) {
     return { error: { _form: ['Cannot edit BASELINE or APPROVED version.'] } }
   }
@@ -231,6 +253,14 @@ export async function setBudgetBaseline(versionId: string) {
     select: { id: true, projectId: true, status: true },
   })
   if (!version) return { error: 'Version not found' }
+  try {
+    const access = await assertProjectAccess(version.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.BUDGET)) {
+      return { error: 'No tenés permiso para editar el presupuesto de este proyecto' }
+    }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Acceso denegado' }
+  }
 
   await prisma.$transaction([
     prisma.budgetVersion.updateMany({
@@ -267,6 +297,14 @@ export async function approveBudgetVersion(versionId: string) {
     select: { id: true, projectId: true, versionCode: true, createdByOrgMemberId: true },
   })
   if (!version) return { error: 'Version not found' }
+  try {
+    const access = await assertProjectAccess(version.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.BUDGET)) {
+      return { error: 'No tenés permiso para editar el presupuesto de este proyecto' }
+    }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Acceso denegado' }
+  }
 
   await prisma.$transaction(async (tx) => {
     await tx.budgetVersion.update({
@@ -334,6 +372,14 @@ export async function updateBudgetVersionStatus(
 
     if (!version) {
       return { success: false, error: 'Version not found' }
+    }
+    try {
+      const access = await assertProjectAccess(version.projectId, org)
+      if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.BUDGET)) {
+        return { success: false, error: 'No tenés permiso para editar el presupuesto de este proyecto' }
+      }
+    } catch (e) {
+      return { success: false, error: e instanceof Error ? e.message : 'Acceso denegado' }
     }
 
     if (version.status === 'APPROVED') {
@@ -419,6 +465,14 @@ export async function updateMarkupMode(
     if (!version) {
       return { success: false, error: 'Version not found' }
     }
+    try {
+      const access = await assertProjectAccess(version.projectId, org)
+      if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.BUDGET)) {
+        return { success: false, error: 'No tenés permiso para editar el presupuesto de este proyecto' }
+      }
+    } catch (e) {
+      return { success: false, error: e instanceof Error ? e.message : 'Acceso denegado' }
+    }
 
     if (version.status !== 'DRAFT') {
       return { success: false, error: 'Solo se puede editar en modo DRAFT' }
@@ -484,6 +538,14 @@ export async function updateGlobalMarkups(
 
     if (!version) {
       return { success: false, error: 'Version not found' }
+    }
+    try {
+      const access = await assertProjectAccess(version.projectId, org)
+      if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.BUDGET)) {
+        return { success: false, error: 'No tenés permiso para editar el presupuesto de este proyecto' }
+      }
+    } catch (e) {
+      return { success: false, error: e instanceof Error ? e.message : 'Acceso denegado' }
     }
 
     if (version.status !== 'DRAFT') {
@@ -568,6 +630,14 @@ export async function updateLineMarkup(
     if (!line) {
       return { success: false, error: 'Line not found' }
     }
+    try {
+      const access = await assertProjectAccess(line.budgetVersion.projectId, org)
+      if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.BUDGET)) {
+        return { success: false, error: 'No tenés permiso para editar el presupuesto de este proyecto' }
+      }
+    } catch (e) {
+      return { success: false, error: e instanceof Error ? e.message : 'Acceso denegado' }
+    }
 
     if (line.budgetVersion.status !== 'DRAFT') {
       return { success: false, error: 'Solo editable en DRAFT' }
@@ -607,6 +677,14 @@ export async function createBudgetLine(versionId: string, data: CreateBudgetLine
     select: { id: true, projectId: true, status: true },
   })
   if (!version) return { error: { _form: ['Version not found'] } }
+  try {
+    const access = await assertProjectAccess(version.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.BUDGET)) {
+      return { error: { _form: ['No tenés permiso para editar el presupuesto de este proyecto'] } }
+    }
+  } catch (e) {
+    return { error: { _form: [e instanceof Error ? e.message : 'Acceso denegado'] } }
+  }
   if (!isEditableVersion(version.status)) {
     return { error: { _form: ['Cannot add lines to locked/approved version.'] } }
   }
@@ -685,6 +763,14 @@ export async function updateBudgetLine(lineId: string, data: UpdateBudgetLineInp
     include: { budgetVersion: { select: { id: true, projectId: true, status: true } } },
   })
   if (!line) return { error: { _form: ['Line not found'] } }
+  try {
+    const access = await assertProjectAccess(line.budgetVersion.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.BUDGET)) {
+      return { error: { _form: ['No tenés permiso para editar el presupuesto de este proyecto'] } }
+    }
+  } catch (e) {
+    return { error: { _form: [e instanceof Error ? e.message : 'Acceso denegado'] } }
+  }
   if (!isEditableVersion(line.budgetVersion.status)) {
     return { error: { _form: ['Cannot edit lines in locked/approved version.'] } }
   }
@@ -761,6 +847,15 @@ export async function deleteBudgetLine(lineId: string) {
     include: { budgetVersion: { select: { id: true, projectId: true, status: true } } },
   })
   if (!line) throw new Error('Line not found')
+  try {
+    const access = await assertProjectAccess(line.budgetVersion.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.BUDGET)) {
+      throw new Error('No tenés permiso para editar el presupuesto de este proyecto')
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('permiso')) throw e
+    throw new Error(e instanceof Error ? e.message : 'Acceso denegado')
+  }
   if (!isEditableVersion(line.budgetVersion.status)) {
     throw new Error('Cannot delete lines in locked/approved version.')
   }
@@ -790,6 +885,14 @@ export async function copyBudgetVersion(sourceVersionId: string) {
     include: { budgetLines: true },
   })
   if (!source) return { error: 'Version not found' }
+  try {
+    const access = await assertProjectAccess(source.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.BUDGET)) {
+      return { error: 'No tenés permiso para editar el presupuesto de este proyecto' }
+    }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Acceso denegado' }
+  }
 
   const versionCode = await getNextVersionCode(source.projectId)
   const newVersion = await prisma.budgetVersion.create({
@@ -840,7 +943,10 @@ export async function listBudgetLines(versionId: string) {
   if (!version) return null
 
   const lines = await prisma.budgetLine.findMany({
-    where: { budgetVersionId: versionId },
+    where: {
+      budgetVersionId: versionId,
+      wbsNode: { active: true },
+    },
     orderBy: { sortOrder: 'asc' },
     include: {
       wbsNode: { select: { id: true, code: true, name: true } },
@@ -887,6 +993,14 @@ export async function importLinesFromVersion(
   if (!target || !source) return { error: 'Version not found' }
   if (target.projectId !== source.projectId) return { error: 'Versions must belong to the same project' }
   if (!isEditableVersion(target.status)) return { error: 'Target version must be DRAFT' }
+  try {
+    const access = await assertProjectAccess(target.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.BUDGET)) {
+      return { error: 'No tenés permiso para editar el presupuesto de este proyecto' }
+    }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Acceso denegado' }
+  }
 
   if (source.budgetLines.length === 0) return { success: true, count: 0 }
 
@@ -1140,6 +1254,14 @@ export async function addBudgetResource(
     },
   })
   if (!line) return { success: false, error: 'Línea no encontrada' }
+  try {
+    const access = await assertProjectAccess(line.budgetVersion.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.BUDGET)) {
+      return { success: false, error: 'No tenés permiso para editar el presupuesto de este proyecto' }
+    }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Acceso denegado' }
+  }
   if (!isEditableVersion(line.budgetVersion.status)) {
     return { success: false, error: 'No se puede editar esta versión' }
   }
@@ -1233,6 +1355,14 @@ export async function updateBudgetResource(
     },
   })
   if (!resource) return { success: false, error: 'Recurso no encontrado' }
+  try {
+    const access = await assertProjectAccess(resource.budgetLine.budgetVersion.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.BUDGET)) {
+      return { success: false, error: 'No tenés permiso para editar el presupuesto de este proyecto' }
+    }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Acceso denegado' }
+  }
   if (!isEditableVersion(resource.budgetLine.budgetVersion.status)) {
     return { success: false, error: 'No se puede editar esta versión' }
   }
@@ -1289,6 +1419,14 @@ export async function deleteBudgetResource(resourceId: string): Promise<{ succes
     include: { budgetLine: { include: { budgetVersion: { select: { status: true, projectId: true } } } } },
   })
   if (!resource) return { success: false, error: 'Recurso no encontrado' }
+  try {
+    const access = await assertProjectAccess(resource.budgetLine.budgetVersion.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.BUDGET)) {
+      return { success: false, error: 'No tenés permiso para editar el presupuesto de este proyecto' }
+    }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Acceso denegado' }
+  }
   if (!isEditableVersion(resource.budgetLine.budgetVersion.status)) {
     return { success: false, error: 'No se puede editar esta versión' }
   }
@@ -1317,6 +1455,14 @@ export async function updateBudgetLineQuantity(
     include: { budgetVersion: { select: { status: true, projectId: true } } },
   })
   if (!line) return { success: false, error: 'Línea no encontrada' }
+  try {
+    const access = await assertProjectAccess(line.budgetVersion.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.BUDGET)) {
+      return { success: false, error: 'No tenés permiso para editar el presupuesto de este proyecto' }
+    }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Acceso denegado' }
+  }
   if (!isEditableVersion(line.budgetVersion.status)) {
     return { success: false, error: 'No se puede editar cantidad en versión aprobada' }
   }
@@ -1350,6 +1496,28 @@ export async function updateBudgetLineQuantity(
   revalidatePath(`/projects/${line.budgetVersion.projectId}/budget`)
   revalidatePath(`/projects/${line.budgetVersion.projectId}/budget/${line.budgetVersionId}`)
   return { success: true }
+}
+
+/**
+ * Id de la versión APPROVED o BASELINE del proyecto (para redirect a materiales, etc.).
+ * Retorna null si no hay ninguna.
+ */
+export async function getApprovedOrBaselineVersionId(projectId: string): Promise<string | null> {
+  try {
+    const { org } = await getAuthContext()
+    const version = await prisma.budgetVersion.findFirst({
+      where: {
+        projectId,
+        orgId: org.orgId,
+        status: { in: ['APPROVED', 'BASELINE'] },
+      },
+      orderBy: [{ status: 'desc' }, { createdAt: 'desc' }],
+      select: { id: true },
+    })
+    return version?.id ?? null
+  } catch {
+    return null
+  }
 }
 
 /**

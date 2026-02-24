@@ -1,7 +1,8 @@
 import { getSession } from '@/lib/session'
-import { getOrgContext } from '@/lib/org-context'
+import { getOrgContext, isRestrictedToProjects, getVisibleProjectIds } from '@/lib/org-context'
 import { redirectToLogin } from '@/lib/i18n-redirect'
 import { getTranslations } from 'next-intl/server'
+import Link from 'next/link'
 import { getOrgKPIs, getAlerts, getRecentActivity } from '@/app/actions/dashboard'
 import { getCompanyCashflowDetailed } from '@/app/actions/finance'
 import { KPICards } from '@/components/dashboard/kpi-cards'
@@ -17,6 +18,12 @@ export default async function DashboardHomePage() {
   if (!orgContext) return redirectToLogin()
 
   const t = await getTranslations('dashboard')
+
+  const allowedProjectIds = isRestrictedToProjects(orgContext)
+    ? await getVisibleProjectIds(orgContext)
+    : null
+  const restrictedNoProjects =
+    Array.isArray(allowedProjectIds) && allowedProjectIds.length === 0
 
   // Fetch all dashboard data in parallel; on any error use safe defaults so page does not 500
   let kpis: Awaited<ReturnType<typeof getOrgKPIs>> = {
@@ -38,10 +45,10 @@ export default async function DashboardHomePage() {
     const toDate = new Date()
     const fromDate = new Date(toDate.getFullYear(), toDate.getMonth() - 12, 1)
     const [kpisRes, cashflowRes, alertsRes, activityRes] = await Promise.all([
-      getOrgKPIs(orgContext.orgId),
+      getOrgKPIs(orgContext.orgId, allowedProjectIds),
       getCompanyCashflowDetailed({ from: fromDate, to: toDate }),
-      getAlerts(orgContext.orgId),
-      getRecentActivity(orgContext.orgId),
+      getAlerts(orgContext.orgId, allowedProjectIds),
+      getRecentActivity(orgContext.orgId, allowedProjectIds),
     ])
     kpis = kpisRes
     cashflowTimeline = cashflowRes.timeline
@@ -50,6 +57,28 @@ export default async function DashboardHomePage() {
     recentActivity = activityRes
   } catch (err) {
     console.error('[dashboard] Error loading dashboard data:', err)
+  }
+
+  if (restrictedNoProjects) {
+    return (
+      <div className="erp-view-container space-y-6 bg-background">
+        <div className="erp-section-header">
+          <h1 className="erp-page-title">{t('title')}</h1>
+          <p className="erp-section-desc">{t('subtitle')}</p>
+        </div>
+        <div className="rounded-lg border border-border bg-muted/30 p-6 text-center">
+          <p className="text-muted-foreground">
+            {t('noAssignedProjects', { defaultMessage: 'No tenés proyectos asignados. Contactá al administrador para que te asigne al menos un proyecto.' })}
+          </p>
+          <Link
+            href="/projects"
+            className="mt-4 inline-block text-primary underline underline-offset-2"
+          >
+            {t('viewProjects', { defaultMessage: 'Ver proyectos' })}
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   return (

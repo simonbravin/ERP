@@ -12,6 +12,7 @@ interface DashboardShellProps {
   orgName: string
   orgLogoUrl?: string | null
   user: { name: string; email?: string | null }
+  restrictedToProjects?: boolean
 }
 
 function useIsMobile() {
@@ -31,7 +32,7 @@ function useIsMobile() {
  * On mobile, sidebar is an overlay drawer; on desktop it can be collapsed (icons only).
  * No top header bar: page titles live in each section; mobile gets a floating menu button to open the sidebar.
  */
-export function DashboardShell({ children, orgName, orgLogoUrl, user }: DashboardShellProps) {
+export function DashboardShell({ children, orgName, orgLogoUrl, user, restrictedToProjects }: DashboardShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const isMobile = useIsMobile()
@@ -43,6 +44,7 @@ export function DashboardShell({ children, orgName, orgLogoUrl, user }: Dashboar
           orgName={orgName}
           orgLogoUrl={orgLogoUrl}
           user={user}
+          restrictedToProjects={restrictedToProjects}
           isMobile={isMobile}
           sidebarOpen={sidebarOpen}
           onSidebarClose={() => setSidebarOpen(false)}

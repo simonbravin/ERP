@@ -72,6 +72,7 @@ export default async function MaterialsListPage({ params }: PageProps) {
         materials={materials}
         suppliers={suppliers}
         budgetVersionId={versionId}
+        projectId={projectId}
         projectName={version.project.name}
         versionCode={version.versionCode}
       />

@@ -1,7 +1,7 @@
 'use server'
 
 import { getSession } from '@/lib/session'
-import { getOrgContext } from '@/lib/org-context'
+import { getOrgContext, getVisibleProjectIds } from '@/lib/org-context'
 import { prisma } from '@repo/database'
 
 async function getAuth() {
@@ -9,7 +9,8 @@ async function getAuth() {
   if (!session?.user?.id) throw new Error('No autorizado')
   const org = await getOrgContext(session.user.id)
   if (!org?.orgId) throw new Error('No autorizado')
-  return { orgId: org.orgId }
+  const allowedProjectIds = await getVisibleProjectIds(org)
+  return { orgId: org.orgId, allowedProjectIds }
 }
 
 // ====================
@@ -27,19 +28,21 @@ export type ExpensesBySupplierRow = {
 export async function getExpensesBySupplierReport(
   supplierId?: string
 ): Promise<ExpensesBySupplierRow[]> {
-  const { orgId } = await getAuth()
+  const { orgId, allowedProjectIds } = await getAuth()
 
   const where: {
     orgId: string
     deleted: boolean
     type: { in: string[] }
     partyId?: string
+    projectId?: { in: string[] }
   } = {
     orgId,
     deleted: false,
     type: { in: ['EXPENSE', 'PURCHASE'] },
   }
   if (supplierId) where.partyId = supplierId
+  if (Array.isArray(allowedProjectIds)) where.projectId = { in: allowedProjectIds }
 
   const transactions = await prisma.financeTransaction.findMany({
     where,
@@ -93,10 +96,14 @@ export type BudgetVsActualRow = {
 }
 
 export async function getBudgetVsActualReport(): Promise<BudgetVsActualRow[]> {
-  const { orgId } = await getAuth()
+  const { orgId, allowedProjectIds } = await getAuth()
 
   const projects = await prisma.project.findMany({
-    where: { orgId, active: true },
+    where: {
+      orgId,
+      active: true,
+      ...(Array.isArray(allowedProjectIds) ? { id: { in: allowedProjectIds } } : {}),
+    },
     include: {
       budgetVersions: {
         where: { status: 'APPROVED' },
@@ -146,6 +153,99 @@ export async function getBudgetVsActualReport(): Promise<BudgetVsActualRow[]> {
 }
 
 // ====================
+// AVANCE VS COSTO (consumido vs avance de obra por proyecto)
+// ====================
+
+export type ProgressVsCostRow = {
+  projectId: string
+  projectNumber: string
+  projectName: string
+  budgeted: number
+  consumed: number
+  consumedPct: number
+  /** Latest average progress % for the project (from ProgressUpdate). Null if no updates. */
+  progressPct: number | null
+}
+
+export async function getProgressVsCostReport(): Promise<ProgressVsCostRow[]> {
+  const { orgId, allowedProjectIds } = await getAuth()
+
+  const projects = await prisma.project.findMany({
+    where: {
+      orgId,
+      active: true,
+      ...(Array.isArray(allowedProjectIds) ? { id: { in: allowedProjectIds } } : {}),
+    },
+    include: {
+      budgetVersions: {
+        where: { status: 'APPROVED' },
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+        select: { id: true, budgetLines: { select: { salePriceTotal: true } } },
+      },
+    },
+  })
+
+  const result: ProgressVsCostRow[] = []
+
+  for (const project of projects) {
+    const version = project.budgetVersions[0]
+    const budgetTotal = version?.budgetLines.reduce(
+      (s, bl) => s + Number(bl.salePriceTotal),
+      0
+    ) ?? 0
+
+    const agg = await prisma.financeTransaction.aggregate({
+      where: {
+        projectId: project.id,
+        orgId,
+        deleted: false,
+        type: { in: ['EXPENSE', 'PURCHASE', 'OVERHEAD'] },
+        status: 'PAID',
+      },
+      _sum: { amountBaseCurrency: true },
+    })
+    const consumed = Number(agg._sum.amountBaseCurrency ?? 0)
+    const consumedPct = budgetTotal > 0 ? (consumed / budgetTotal) * 100 : 0
+
+    const latestProgress = await prisma.progressUpdate.findFirst({
+      where: { projectId: project.id, orgId },
+      orderBy: { asOfDate: 'desc' },
+      select: { asOfDate: true },
+    })
+    let progressPct: number | null = null
+    if (latestProgress) {
+      const updatesAtDate = await prisma.progressUpdate.findMany({
+        where: {
+          projectId: project.id,
+          orgId,
+          asOfDate: latestProgress.asOfDate,
+        },
+        select: { progressPct: true },
+      })
+      if (updatesAtDate.length > 0) {
+        const sum = updatesAtDate.reduce((s, u) => s + Number(u.progressPct), 0)
+        progressPct = sum / updatesAtDate.length
+      }
+    }
+
+    result.push({
+      projectId: project.id,
+      projectNumber: project.projectNumber,
+      projectName: project.name,
+      budgeted: budgetTotal,
+      consumed,
+      consumedPct,
+      progressPct,
+    })
+  }
+
+  return result
+    .filter((p) => p.budgeted > 0 || p.consumed > 0)
+    .sort((a, b) => b.budgeted - a.budgeted)
+}
+
+// ====================
 // TOP MATERIALES MÁS CAROS (por costo total en presupuestos)
 // ====================
 
@@ -161,13 +261,14 @@ export type TopMaterialsRow = {
 export async function getTopMaterialsReport(
   limit: number = 10
 ): Promise<TopMaterialsRow[]> {
-  const { orgId } = await getAuth()
+  const { orgId, allowedProjectIds } = await getAuth()
 
   const lines = await prisma.budgetLine.findMany({
     where: {
       budgetVersion: {
         orgId,
         status: 'APPROVED',
+        ...(Array.isArray(allowedProjectIds) ? { projectId: { in: allowedProjectIds } } : {}),
       },
     },
     select: {
@@ -241,10 +342,14 @@ export type CertificationsByProjectRow = {
 export async function getCertificationsByProjectReport(): Promise<
   CertificationsByProjectRow[]
 > {
-  const { orgId } = await getAuth()
+  const { orgId, allowedProjectIds } = await getAuth()
 
   const projects = await prisma.project.findMany({
-    where: { orgId, active: true },
+    where: {
+      orgId,
+      active: true,
+      ...(Array.isArray(allowedProjectIds) ? { id: { in: allowedProjectIds } } : {}),
+    },
     include: {
       certifications: {
         include: {

@@ -1,7 +1,7 @@
 'use server'
 
 import { getSession } from '@/lib/session'
-import { getOrgContext } from '@/lib/org-context'
+import { getOrgContext, getVisibleProjectIds } from '@/lib/org-context'
 import { requirePermission } from '@/lib/auth-helpers'
 import { prisma } from '@repo/database'
 import { revalidatePath } from 'next/cache'
@@ -38,8 +38,12 @@ export async function getProjectsForQueryBuilder(): Promise<
   { id: string; name: string; projectNumber: string }[]
 > {
   const { org } = await getAuthForReports()
+  const allowedProjectIds = await getVisibleProjectIds(org)
   const projects = await prisma.project.findMany({
-    where: { orgId: org.orgId },
+    where: {
+      orgId: org.orgId,
+      ...(Array.isArray(allowedProjectIds) ? { id: { in: allowedProjectIds } } : {}),
+    },
     select: { id: true, name: true, projectNumber: true },
     orderBy: { name: 'asc' },
   })
@@ -154,11 +158,17 @@ function buildCompanyTransactionsFilters(where: QueryFilter[]): CompanyTransacti
 
 export async function executeCustomQuery(config: QueryConfig): Promise<ReportResult> {
   const { org } = await getAuthForReports()
+  const allowedProjectIds = await getVisibleProjectIds(org)
   const startTime = Date.now()
 
   if (!WHITELIST_TABLES.includes(config.table as (typeof WHITELIST_TABLES)[number])) {
     throw new Error('Tabla no permitida')
   }
+
+  const effectiveProjectIds =
+    Array.isArray(allowedProjectIds) && config.projectIds?.length
+      ? config.projectIds.filter((id) => allowedProjectIds.includes(id))
+      : config.projectIds
 
   const selectSet = new Set(config.select)
   const pick = (row: Record<string, unknown>) => {
@@ -177,7 +187,8 @@ export async function executeCustomQuery(config: QueryConfig): Promise<ReportRes
   if (config.table === 'finance_transactions') {
     const { getCompanyTransactions } = await import('./finance')
     const filters = buildCompanyTransactionsFilters(config.where ?? [])
-    if (config.projectIds?.length) filters.projectIds = config.projectIds
+    if (effectiveProjectIds?.length) filters.projectIds = effectiveProjectIds
+    else if (Array.isArray(allowedProjectIds)) filters.projectIds = allowedProjectIds
     if (config.dateFrom) filters.dateFrom = config.dateFrom
     if (config.dateTo) filters.dateTo = config.dateTo
     const list = await getCompanyTransactions(filters)
@@ -218,7 +229,12 @@ export async function executeCustomQuery(config: QueryConfig): Promise<ReportRes
   }
 
   if (config.table === 'projects') {
-    const projectIdsFilter = config.projectIds?.length ? { id: { in: config.projectIds } } : {}
+    const projectIdsFilter =
+      effectiveProjectIds?.length
+        ? { id: { in: effectiveProjectIds } }
+        : Array.isArray(allowedProjectIds)
+          ? { id: { in: allowedProjectIds } }
+          : {}
     const projects = await prisma.project.findMany({
       where: { orgId: org.orgId, ...projectIdsFilter },
       select: {

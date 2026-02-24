@@ -23,9 +23,10 @@ type ProjectLayoutInnerProps = {
 export function ProjectLayoutInner({ project, canEdit, children }: ProjectLayoutInnerProps) {
   const pathname = usePathname() ?? ''
   const isBudgetVersionPage = /\/projects\/[^/]+\/budget\/[^/]+/.test(pathname)
+  const isDocumentsPage = /\/projects\/[^/]+\/documents/.test(pathname)
   const t = useTranslations('projects')
 
-  if (isBudgetVersionPage) {
+  if (isBudgetVersionPage || isDocumentsPage) {
     return <>{children}</>
   }
 

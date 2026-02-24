@@ -16,6 +16,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts'
+import { cn } from '@/lib/utils'
 import { ChartCard } from '@/components/charts/chart-card'
 import { CompanyFinanceKPICards } from '@/components/finance/company-finance-kpi-cards'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -23,7 +24,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { formatCurrency, formatDateShort } from '@/lib/format-utils'
-import { Download, AlertCircle } from 'lucide-react'
+import { Download, AlertTriangle } from 'lucide-react'
 import { Link } from '@/i18n/navigation'
 import { toast } from 'sonner'
 import { useChartExport } from '@/hooks/use-chart-export'
@@ -122,170 +123,177 @@ export function FinanceExecutiveDashboardClient({ data, alerts = [] }: Props) {
     total: p.total,
   }))
 
+  const allAlerts = alerts.map((a) => ({
+    id: a.id,
+    title: a.title,
+    message: a.message,
+    link: a.link ?? undefined,
+    linkLabel: 'Ver detalle' as const,
+    severity: a.severity,
+  }))
+
+  const alertClassName = cn(
+    'flex gap-3 items-start py-3 px-3 rounded-lg border text-sm',
+  )
+
   return (
-    <div className="space-y-6">
+    <div className="erp-stack">
       <CompanyFinanceKPICards data={kpisData} />
 
-      {alerts.length > 0 && (
-        <div className="space-y-2">
-          {alerts.map((alert) => (
+      {/* Fila: Alertas (mitad) | Gastos por categoría (mitad). Si no hay alertas, categoría a ancho completo. */}
+      <div className={allAlerts.length > 0 ? 'grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-2' : ''}>
+        {allAlerts.length > 0 && (
+          <div role="region" aria-label="Alertas" className="flex flex-col gap-4 min-w-0">
+          {allAlerts.map((alert) => (
             <Alert
               key={alert.id}
               variant={alert.severity === 'danger' ? 'destructive' : 'default'}
-              className={alert.severity === 'danger' ? '' : 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30'}
+              className={cn(
+                alertClassName,
+                alert.severity !== 'danger' &&
+                  'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30'
+              )}
             >
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>{alert.title}</AlertTitle>
-              <AlertDescription>
-                <span className="block text-sm">{alert.message}</span>
-                {alert.link && (
-                  <Link href={alert.link} className="mt-2 inline-block">
-                    <Button variant="outline" size="sm">
-                      Ver detalle
-                    </Button>
-                  </Link>
-                )}
-              </AlertDescription>
+              {alert.severity === 'danger' ? (
+                <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-red-600 dark:text-red-400" />
+              ) : (
+                <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-500" />
+              )}
+              <div className="flex-1 min-w-0 space-y-0.5">
+                <AlertTitle className="mb-0 font-medium">{alert.title}</AlertTitle>
+                <AlertDescription className="mt-0 flex flex-wrap items-center gap-x-3 gap-y-1 text-muted-foreground">
+                  <span>{alert.message}</span>
+                  {alert.link && (
+                    <Link
+                      href={alert.link}
+                      className="text-sm font-medium text-primary hover:underline shrink-0"
+                    >
+                      {alert.linkLabel}
+                    </Link>
+                  )}
+                </AlertDescription>
+              </div>
             </Alert>
           ))}
+          </div>
+        )}
+
+        <div id="chart-category" className={allAlerts.length > 0 ? 'min-w-0' : ''}>
+          <ChartCard title="Gastos por categoría" description="Distribución por tipo">
+            <div className="h-[280px]">
+              <ResponsiveContainer width="100%" height={280}>
+                <PieChart>
+                  <Pie
+                    data={categoryChartData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    outerRadius={100}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {categoryChartData.map((_, index) => (
+                      <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value: number) => formatCurrency(value, 'ARS')} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </ChartCard>
         </div>
-      )}
+      </div>
 
-      {data.overheadSummary.unallocated > 0 && (
-        <Alert
-          variant="default"
-          className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30"
-        >
-          <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-500" />
-          <AlertTitle>Gastos generales sin asignar</AlertTitle>
-          <AlertDescription>
-            <span className="font-medium">
-              Gastos generales sin asignar: {formatCurrency(data.overheadSummary.unallocated, 'ARS')}
-            </span>
-            <span className="block mt-1 text-sm">
-              {data.overheadSummary.unallocatedTransactions} transacción(es) pendiente(s) de
-              asignación a proyectos
-            </span>
-            <Link href="/finance/overhead" className="mt-3 inline-block">
-              <Button variant="outline" size="sm">
-                Asignar ahora
-              </Button>
-            </Link>
-          </AlertDescription>
-        </Alert>
-      )}
-
-      <div className="grid gap-6 lg:grid-cols-2">
+      {/* Tendencia mensual: todo el ancho */}
+      <div id="chart-trend">
         <ChartCard
           title="Tendencia mensual (12 meses)"
           description="Ingresos vs gastos por mes"
         >
-          <div className="h-[280px]">
-            <ResponsiveContainer width="100%" height={280}>
-              <AreaChart data={trendChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
-                <YAxis
-                  tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
-                  tick={{ fontSize: 12 }}
-                />
-                <Tooltip
-                  formatter={(value: number) => formatCurrency(value, 'ARS')}
-                  contentStyle={{
-                    backgroundColor: 'hsl(var(--background))',
-                    border: '1px solid hsl(var(--border))',
-                  }}
-                />
-                <Legend />
-                <Area
-                  type="monotone"
-                  dataKey="Ingresos"
-                  stackId="1"
-                  stroke="hsl(var(--chart-1))"
-                  fill="hsl(var(--chart-1))"
-                  fillOpacity={0.6}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="Gastos"
-                  stackId="2"
-                  stroke="hsl(var(--chart-2))"
-                  fill="hsl(var(--chart-2))"
-                  fillOpacity={0.6}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-          </ChartCard>
+        <div className="h-[280px]">
+          <ResponsiveContainer width="100%" height={280}>
+            <AreaChart data={trendChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+              <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
+              <YAxis
+                tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                tick={{ fontSize: 12 }}
+              />
+              <Tooltip
+                formatter={(value: number) => formatCurrency(value, 'ARS')}
+                contentStyle={{
+                  backgroundColor: 'hsl(var(--background))',
+                  border: '1px solid hsl(var(--border))',
+                }}
+              />
+              <Legend />
+              <Area
+                type="monotone"
+                dataKey="Ingresos"
+                stackId="1"
+                stroke="hsl(var(--chart-1))"
+                fill="hsl(var(--chart-1))"
+                fillOpacity={0.6}
+              />
+              <Area
+                type="monotone"
+                dataKey="Gastos"
+                stackId="2"
+                stroke="hsl(var(--chart-2))"
+                fill="hsl(var(--chart-2))"
+                fillOpacity={0.6}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
         </div>
-
-        <div id="chart-category">
-          <ChartCard title="Gastos por categoría" description="Distribución por tipo">
-            <div className="h-[280px]">
-            <ResponsiveContainer width="100%" height={280}>
-              <PieChart>
-                <Pie
-                  data={categoryChartData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={100}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {categoryChartData.map((_, index) => (
-                    <Cell key={index} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value: number) => formatCurrency(value, 'ARS')} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
         </ChartCard>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <ChartCard title="Top 5 proveedores por gasto" description="Últimos 12 meses">
-          <div className="h-[260px]">
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart
-                data={suppliersChartData}
-                layout="vertical"
-                margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis
-                  type="number"
-                  tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
-                  tick={{ fontSize: 12 }}
-                />
-                <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(value: number) => formatCurrency(value, 'ARS')} />
-                <Bar dataKey="total" fill="hsl(var(--chart-3))" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+      {/* Top 5 proveedores y Top 5 proyectos: mitad cada uno, misma línea */}
+      <div className="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-2">
+        <div id="chart-suppliers" className="min-w-0">
+          <ChartCard title="Top 5 proveedores por gasto" description="Últimos 12 meses">
+            <div className="h-[260px]">
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart
+                  data={suppliersChartData}
+                  layout="vertical"
+                  margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis
+                    type="number"
+                    tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                    tick={{ fontSize: 12 }}
+                  />
+                  <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 11 }} />
+                  <Tooltip formatter={(value: number) => formatCurrency(value, 'ARS')} />
+                  <Bar dataKey="total" fill="hsl(var(--chart-3))" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </ChartCard>
         </div>
 
-        <div id="chart-projects">
+        <div id="chart-projects" className="min-w-0">
           <ChartCard title="Top 5 proyectos por gasto" description="Últimos 12 meses">
             <div className="h-[260px]">
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={projectsChartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                <YAxis
-                  tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
-                  tick={{ fontSize: 12 }}
-                />
-                <Tooltip formatter={(value: number) => formatCurrency(value, 'ARS')} />
-                <Bar dataKey="total" fill="hsl(var(--chart-4))" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </ChartCard>
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={projectsChartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                  <YAxis
+                    tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                    tick={{ fontSize: 12 }}
+                  />
+                  <Tooltip formatter={(value: number) => formatCurrency(value, 'ARS')} />
+                  <Bar dataKey="total" fill="hsl(var(--chart-4))" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </ChartCard>
+        </div>
       </div>
 
       {data.upcomingDue.length > 0 && (

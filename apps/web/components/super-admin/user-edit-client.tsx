@@ -23,7 +23,15 @@ import {
   updateUserModules,
   toggleUserStatus,
   resetUserPassword,
+  setOrgMemberRole,
 } from '@/app/actions/super-admin'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   ArrowLeft,
   Save,
@@ -72,6 +80,8 @@ interface UserEditClientProps {
       }
     }>
   }
+  /** Si es el usuario actual (ej. super-admin editándose a sí mismo), no puede cambiar su propio rol. */
+  currentUserId?: string
 }
 
 function getDefaultModulesByRole(role: string): string[] {
@@ -85,7 +95,7 @@ function getDefaultModulesByRole(role: string): string[] {
   return defaults[role] ?? []
 }
 
-export function UserEditClient({ user }: UserEditClientProps) {
+export function UserEditClient({ user, currentUserId }: UserEditClientProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [showResetPassword, setShowResetPassword] = useState(false)
@@ -255,7 +265,7 @@ export function UserEditClient({ user }: UserEditClientProps) {
                   {member.organization.legalName ?? 'Sin razón social'}
                 </CardDescription>
               </div>
-              <div className="flex flex-wrap items-center gap-4">
+                <div className="flex flex-wrap items-center gap-4">
                 <div className="flex items-center gap-2">
                   <Label htmlFor={`active-${member.id}`} className="text-sm">
                     {orgActiveStatus[member.organization.id] ? 'Activo' : 'Inactivo'}
@@ -267,10 +277,44 @@ export function UserEditClient({ user }: UserEditClientProps) {
                     disabled={isPending}
                   />
                 </div>
-                <Badge variant="outline">
-                  <Shield className="mr-1 h-3 w-3" />
-                  {member.role}
-                </Badge>
+                {member.role === 'OWNER' ? (
+                  <Badge variant="outline">
+                    <Shield className="mr-1 h-3 w-3" />
+                    OWNER
+                  </Badge>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor={`role-${member.id}`} className="text-sm text-muted-foreground">
+                      Rol
+                    </Label>
+                    <Select
+                      value={member.role}
+                      onValueChange={(value) => {
+                        const role = value as 'ADMIN' | 'EDITOR' | 'ACCOUNTANT' | 'VIEWER'
+                        startTransition(async () => {
+                          const result = await setOrgMemberRole(user.id, member.organization.id, role)
+                          if (result.success) {
+                            toast.success('Rol actualizado')
+                            router.refresh()
+                          } else {
+                            toast.error(result.error)
+                          }
+                        })
+                      }}
+                      disabled={isPending || (currentUserId != null && user.id === currentUserId)}
+                    >
+                      <SelectTrigger id={`role-${member.id}`} className="w-[140px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ADMIN">ADMIN</SelectItem>
+                        <SelectItem value="EDITOR">EDITOR</SelectItem>
+                        <SelectItem value="ACCOUNTANT">ACCOUNTANT</SelectItem>
+                        <SelectItem value="VIEWER">VIEWER</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
             </div>
           </CardHeader>

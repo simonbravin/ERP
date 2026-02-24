@@ -1,8 +1,8 @@
 import { getSession } from '@/lib/session'
-import { getOrgContext } from '@/lib/org-context'
+import { getOrgContext, getVisibleProjectIds } from '@/lib/org-context'
 import { redirectToLogin } from '@/lib/i18n-redirect'
 import { prisma } from '@repo/database'
-import { PageHeader } from '@/components/layout/page-header'
+import { serializeForClient } from '@/lib/utils/serialization'
 import { MovementsListClient } from '@/components/inventory/movements-list-client'
 import { Button } from '@/components/ui/button'
 import { Plus, Download } from 'lucide-react'
@@ -18,6 +18,11 @@ type PageProps = {
   }>
 }
 
+function parseMultiParam(value: string | undefined): string[] {
+  if (!value || typeof value !== 'string') return []
+  return value.split(',').map((s) => s.trim()).filter(Boolean)
+}
+
 export default async function MovementsListPage({ searchParams }: PageProps) {
   const session = await getSession()
   if (!session?.user?.id) return redirectToLogin()
@@ -25,23 +30,34 @@ export default async function MovementsListPage({ searchParams }: PageProps) {
   const org = await getOrgContext(session.user.id)
   if (!org) return redirectToLogin()
 
+  const allowedProjectIds = await getVisibleProjectIds(org)
   const params = await searchParams
 
-  const where: any = { orgId: org.orgId }
-
-  if (params.type) {
-    where.movementType = params.type
+  const where: Record<string, unknown> = { orgId: org.orgId }
+  if (Array.isArray(allowedProjectIds)) {
+    where.OR =
+      allowedProjectIds.length === 0
+        ? [{ projectId: null }]
+        : [{ projectId: null }, { projectId: { in: allowedProjectIds } }]
   }
 
-  if (params.itemId) {
-    where.itemId = params.itemId
+  const typeList = parseMultiParam(params.type)
+  if (typeList.length > 0) {
+    where.movementType = typeList.length === 1 ? typeList[0] : { in: typeList }
   }
 
-  if (params.locationId) {
-    where.OR = [
-      { fromLocationId: params.locationId },
-      { toLocationId: params.locationId },
+  const itemIdList = parseMultiParam(params.itemId)
+  if (itemIdList.length > 0) {
+    where.itemId = itemIdList.length === 1 ? itemIdList[0] : { in: itemIdList }
+  }
+
+  const locationIdList = parseMultiParam(params.locationId)
+  if (locationIdList.length > 0) {
+    const locationFilter = [
+      { fromLocationId: locationIdList.length === 1 ? locationIdList[0] : { in: locationIdList } },
+      { toLocationId: locationIdList.length === 1 ? locationIdList[0] : { in: locationIdList } },
     ]
+    where.AND = where.AND ? [...(Array.isArray(where.AND) ? where.AND : [where.AND]), { OR: locationFilter }] : [{ OR: locationFilter }]
   }
 
   if (params.from || params.to) {
@@ -97,34 +113,32 @@ export default async function MovementsListPage({ searchParams }: PageProps) {
     }),
   ])
 
-  return (
-    <div className="h-full">
-      <PageHeader
-        title="Movimientos de Inventario"
-        subtitle={`${movements.length} movimientos encontrados`}
-        breadcrumbs={[
-          { label: 'Inventario', href: '/inventory' },
-          { label: 'Movimientos', href: '/inventory/movements' },
-        ]}
-        actions={
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm">
-              <Download className="mr-2 h-4 w-4" />
-              Exportar
-            </Button>
-            <Button asChild variant="default">
-              <Link href="/inventory/movements/new">
-                <Plus className="mr-2 h-4 w-4" />
-                Nuevo Movimiento
-              </Link>
-            </Button>
-          </div>
-        }
-      />
+  const movementsPlain = movements.map((m) => serializeForClient(m))
 
-      <div className="p-6">
+  return (
+    <div className="erp-view-container space-y-6 bg-background">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="erp-section-header">
+          <h1 className="erp-page-title">Movimientos de Inventario</h1>
+          <p className="erp-section-desc">{movementsPlain.length} movimientos encontrados</p>
+        </div>
+        <div className="flex shrink-0 gap-2">
+          <Button variant="outline" size="sm">
+            <Download className="mr-2 h-4 w-4" />
+            Exportar
+          </Button>
+          <Button asChild variant="default">
+            <Link href="/inventory/movements/new">
+              <Plus className="mr-2 h-4 w-4" />
+              Nuevo Movimiento
+            </Link>
+          </Button>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-border/60 bg-card p-4 shadow-sm md:p-6">
         <MovementsListClient
-          movements={movements}
+          movements={movementsPlain}
           items={items}
           locations={locations}
         />

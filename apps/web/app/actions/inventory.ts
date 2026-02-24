@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { prisma, Prisma } from '@repo/database'
 import { requireRole } from '@/lib/rbac'
 import { requirePermission, getAuthContext } from '@/lib/auth-helpers'
+import { assertProjectAccess } from '@/lib/project-permissions'
 import { publishOutboxEvent } from '@/lib/events/event-publisher'
 import { calculateTotalStock, calculateStockBalance } from '@/lib/inventory-utils'
 import { createInAppNotificationsForUsers } from '@/app/actions/notifications'
@@ -597,6 +598,7 @@ export async function getItemStockByLocation(itemId: string, locationId: string)
 export async function getProjectWBSNodes(projectId: string) {
   try {
     const { org } = await getAuthContext()
+    await assertProjectAccess(projectId, org)
     const project = await prisma.project.findFirst({
       where: { id: projectId, orgId: org.orgId },
       select: { id: true },

@@ -1,11 +1,17 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { formatCurrency } from '@/lib/format-utils'
@@ -15,8 +21,9 @@ import {
   Minus,
   Plus,
   ArrowRight,
-  Filter,
+  Search,
   X,
+  ChevronDown,
 } from 'lucide-react'
 
 interface MovementsListClientProps {
@@ -47,10 +54,110 @@ const movementTypes: Record<
   ADJUSTMENT: { label: 'Ajuste', icon: Plus, variant: 'neutral' },
 }
 
+const MOVEMENT_TYPE_OPTIONS = [
+  { id: 'PURCHASE', label: 'Compra' },
+  { id: 'TRANSFER', label: 'Transferencia' },
+  { id: 'ISSUE', label: 'Consumo' },
+  { id: 'ADJUSTMENT', label: 'Ajuste' },
+]
+
 function toNum(v: unknown): number {
   if (v == null) return 0
   if (typeof v === 'number') return v
   return (v as { toNumber?: () => number })?.toNumber?.() ?? 0
+}
+
+function parseMultiParam(value: string | null): string[] {
+  if (!value || typeof value !== 'string') return []
+  return value.split(',').map((s) => s.trim()).filter(Boolean)
+}
+
+function FilterMultiSelect({
+  label,
+  options,
+  selectedIds,
+  onSelectionChange,
+  searchPlaceholder = 'Buscar...',
+  allLabel = 'Todos',
+}: {
+  label: string
+  options: { id: string; label: string }[]
+  selectedIds: string[]
+  onSelectionChange: (ids: string[]) => void
+  searchPlaceholder?: string
+  allLabel?: string
+}) {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const filtered = useMemo(() => {
+    if (!search.trim()) return options
+    const q = search.trim().toLowerCase()
+    return options.filter((o) => o.label.toLowerCase().includes(q))
+  }, [options, search])
+
+  const handleToggle = (id: string, checked: boolean) => {
+    const next = checked
+      ? [...selectedIds, id]
+      : selectedIds.filter((x) => x !== id)
+    onSelectionChange(next)
+  }
+
+  const buttonLabel =
+    selectedIds.length === 0
+      ? allLabel
+      : selectedIds.length === options.length
+        ? allLabel
+        : `${selectedIds.length} seleccionado(s)`
+
+  return (
+    <div>
+      <label className="mb-2 block text-sm font-medium">{label}</label>
+      <DropdownMenu open={open} onOpenChange={setOpen}>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="outline"
+            className="w-full justify-between font-normal"
+          >
+            <span className="truncate">{buttonLabel}</span>
+            <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-56 p-0">
+          <div className="border-b p-2">
+            <Input
+              placeholder={searchPlaceholder}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-8"
+              onKeyDown={(e) => e.stopPropagation()}
+            />
+          </div>
+          <div className="max-h-60 overflow-y-auto p-1">
+            {filtered.map((opt) => (
+              <label
+                key={opt.id}
+                className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-muted"
+              >
+                <Checkbox
+                  checked={selectedIds.includes(opt.id)}
+                  onCheckedChange={(checked) =>
+                    handleToggle(opt.id, checked === true)
+                  }
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <span>{opt.label}</span>
+              </label>
+            ))}
+            {filtered.length === 0 && (
+              <p className="px-2 py-4 text-center text-sm text-muted-foreground">
+                Sin resultados
+              </p>
+            )}
+          </div>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  )
 }
 
 export function MovementsListClient({
@@ -60,150 +167,145 @@ export function MovementsListClient({
 }: MovementsListClientProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [showFilters, setShowFilters] = useState(false)
 
-  const [filters, setFilters] = useState({
-    type: searchParams.get('type') ?? '',
-    itemId: searchParams.get('itemId') ?? '',
-    locationId: searchParams.get('locationId') ?? '',
-    from: searchParams.get('from') ?? '',
-    to: searchParams.get('to') ?? '',
-  })
+  const typeParam = searchParams.get('type') ?? ''
+  const itemIdParam = searchParams.get('itemId') ?? ''
+  const locationIdParam = searchParams.get('locationId') ?? ''
+  const fromParam = searchParams.get('from') ?? ''
+  const toParam = searchParams.get('to') ?? ''
 
-  function handleApplyFilters() {
-    const params = new URLSearchParams()
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value) params.set(key, value)
-    })
-    router.push(`/inventory/movements?${params.toString()}`)
-  }
+  const typeIds = useMemo(() => parseMultiParam(typeParam), [typeParam])
+  const itemIds = useMemo(() => parseMultiParam(itemIdParam), [itemIdParam])
+  const locationIds = useMemo(() => parseMultiParam(locationIdParam), [locationIdParam])
 
-  function handleClearFilters() {
-    setFilters({
-      type: '',
-      itemId: '',
-      locationId: '',
-      from: '',
-      to: '',
-    })
+  const [searchQuery, setSearchQuery] = useState('')
+
+  const updateUrl = useCallback(
+    (updates: {
+      type?: string[]
+      itemId?: string[]
+      locationId?: string[]
+      from?: string
+      to?: string
+    }) => {
+      const params = new URLSearchParams()
+      const type = updates.type !== undefined ? updates.type : typeIds
+      const itemId = updates.itemId !== undefined ? updates.itemId : itemIds
+      const locationId =
+        updates.locationId !== undefined ? updates.locationId : locationIds
+      const from = updates.from !== undefined ? updates.from : fromParam
+      const to = updates.to !== undefined ? updates.to : toParam
+      if (type.length) params.set('type', type.join(','))
+      if (itemId.length) params.set('itemId', itemId.join(','))
+      if (locationId.length) params.set('locationId', locationId.join(','))
+      if (from) params.set('from', from)
+      if (to) params.set('to', to)
+      router.push(`/inventory/movements?${params.toString()}`)
+    },
+    [router, typeIds, itemIds, locationIds, fromParam, toParam]
+  )
+
+  const handleClearFilters = () => {
+    setSearchQuery('')
     router.push('/inventory/movements')
   }
 
-  const hasActiveFilters = Object.values(filters).some((v) => v !== '')
+  const hasActiveFilters =
+    typeIds.length > 0 ||
+    itemIds.length > 0 ||
+    locationIds.length > 0 ||
+    fromParam !== '' ||
+    toParam !== ''
+
+  const itemOptions = useMemo(
+    () => items.map((i) => ({ id: i.id, label: `${i.sku} - ${i.name}` })),
+    [items]
+  )
+  const locationOptions = useMemo(
+    () => locations.map((l) => ({ id: l.id, label: l.name })),
+    [locations]
+  )
+
+  const filteredBySearch = useMemo(() => {
+    if (!searchQuery.trim()) return movements
+    const q = searchQuery.trim().toLowerCase()
+    return movements.filter((m) => {
+      const itemMatch =
+        m.item.name.toLowerCase().includes(q) ||
+        m.item.sku.toLowerCase().includes(q)
+      const fromMatch = m.fromLocation?.name?.toLowerCase().includes(q)
+      const toMatch = m.toLocation?.name?.toLowerCase().includes(q)
+      const typeLabel =
+        movementTypes[m.movementType]?.label?.toLowerCase().includes(q)
+      return itemMatch || fromMatch || toMatch || typeLabel
+    })
+  }, [movements, searchQuery])
 
   return (
     <div className="space-y-4">
-      <Card className="p-4">
-        <div className="flex items-center justify-between">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowFilters(!showFilters)}
-          >
-            <Filter className="mr-2 h-4 w-4" />
-            Filtros
-            {hasActiveFilters && (
-              <span className="ml-2 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">
-                {Object.values(filters).filter((v) => v !== '').length}
-              </span>
-            )}
-          </Button>
+      {/* Barra de búsqueda */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          placeholder="Buscar por item, SKU, ubicación o tipo..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-9"
+        />
+      </div>
 
-          {hasActiveFilters && (
-            <Button variant="ghost" size="sm" onClick={handleClearFilters}>
-              <X className="mr-2 h-4 w-4" />
-              Limpiar Filtros
-            </Button>
-          )}
+      {/* Filtros siempre visibles */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <FilterMultiSelect
+          label="Tipo de movimiento"
+          options={MOVEMENT_TYPE_OPTIONS}
+          selectedIds={typeIds}
+          onSelectionChange={(ids) => updateUrl({ type: ids })}
+          searchPlaceholder="Buscar tipo..."
+          allLabel="Todos"
+        />
+        <FilterMultiSelect
+          label="Item"
+          options={itemOptions}
+          selectedIds={itemIds}
+          onSelectionChange={(ids) => updateUrl({ itemId: ids })}
+          searchPlaceholder="Buscar item..."
+          allLabel="Todos"
+        />
+        <FilterMultiSelect
+          label="Ubicación"
+          options={locationOptions}
+          selectedIds={locationIds}
+          onSelectionChange={(ids) => updateUrl({ locationId: ids })}
+          searchPlaceholder="Buscar ubicación..."
+          allLabel="Todas"
+        />
+        <div>
+          <label className="mb-2 block text-sm font-medium">Desde</label>
+          <Input
+            type="date"
+            value={fromParam}
+            onChange={(e) => updateUrl({ from: e.target.value })}
+          />
         </div>
+        <div>
+          <label className="mb-2 block text-sm font-medium">Hasta</label>
+          <Input
+            type="date"
+            value={toParam}
+            onChange={(e) => updateUrl({ to: e.target.value })}
+          />
+        </div>
+      </div>
 
-        {showFilters && (
-          <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-            <div>
-              <label className="mb-2 block text-sm font-medium">
-                Tipo de Movimiento
-              </label>
-              <select
-                value={filters.type}
-                onChange={(e) => setFilters({ ...filters, type: e.target.value })}
-                className="flex h-10 w-full rounded-md border border-input bg-card dark:bg-background px-3 py-2 text-sm"
-              >
-                <option value="">Todos</option>
-                <option value="PURCHASE">Compra</option>
-                <option value="TRANSFER">Transferencia</option>
-                <option value="ISSUE">Consumo</option>
-                <option value="ADJUSTMENT">Ajuste</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium">Item</label>
-              <select
-                value={filters.itemId}
-                onChange={(e) =>
-                  setFilters({ ...filters, itemId: e.target.value })
-                }
-                className="flex h-10 w-full rounded-md border border-input bg-card dark:bg-background px-3 py-2 text-sm"
-              >
-                <option value="">Todos</option>
-                {items.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.sku} - {item.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium">
-                Ubicación
-              </label>
-              <select
-                value={filters.locationId}
-                onChange={(e) =>
-                  setFilters({ ...filters, locationId: e.target.value })
-                }
-                className="flex h-10 w-full rounded-md border border-input bg-card dark:bg-background px-3 py-2 text-sm"
-              >
-                <option value="">Todas</option>
-                {locations.map((loc) => (
-                  <option key={loc.id} value={loc.id}>
-                    {loc.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium">Desde</label>
-              <Input
-                type="date"
-                value={filters.from}
-                onChange={(e) =>
-                  setFilters({ ...filters, from: e.target.value })
-                }
-              />
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium">Hasta</label>
-              <Input
-                type="date"
-                value={filters.to}
-                onChange={(e) =>
-                  setFilters({ ...filters, to: e.target.value })
-                }
-              />
-            </div>
-
-            <div className="flex items-end md:col-span-2 lg:col-span-5">
-              <Button onClick={handleApplyFilters} className="w-full">
-                Aplicar Filtros
-              </Button>
-            </div>
-          </div>
-        )}
-      </Card>
+      {hasActiveFilters && (
+        <div className="flex justify-end">
+          <Button variant="ghost" size="sm" onClick={handleClearFilters}>
+            <X className="mr-2 h-4 w-4" />
+            Limpiar filtros
+          </Button>
+        </div>
+      )}
 
       <Card>
         <div className="overflow-x-auto">
@@ -223,9 +325,10 @@ export function MovementsListClient({
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {movements.map((movement) => {
+              {filteredBySearch.map((movement) => {
                 const typeInfo =
-                  movementTypes[movement.movementType] ?? movementTypes.ADJUSTMENT
+                  movementTypes[movement.movementType] ??
+                  movementTypes.ADJUSTMENT
                 const Icon = typeInfo.icon
                 const qty = toNum(movement.quantity)
                 const unitCost = toNum(movement.unitCost)
@@ -243,7 +346,10 @@ export function MovementsListClient({
                       })}
                     </td>
                     <td className="p-4">
-                      <Badge variant={typeInfo.variant} className="inline-flex items-center gap-1">
+                      <Badge
+                        variant={typeInfo.variant}
+                        className="inline-flex items-center gap-1"
+                      >
                         <Icon className="h-3 w-3" />
                         {typeInfo.label}
                       </Badge>
@@ -293,9 +399,11 @@ export function MovementsListClient({
             </tbody>
           </table>
 
-          {movements.length === 0 && (
+          {filteredBySearch.length === 0 && (
             <div className="py-12 text-center text-muted-foreground">
-              No se encontraron movimientos
+              {movements.length === 0
+                ? 'No se encontraron movimientos'
+                : 'Ningún movimiento coincide con la búsqueda'}
             </div>
           )}
         </div>

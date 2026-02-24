@@ -18,6 +18,8 @@ export default async function ProjectAccountsReceivablePage({ params }: PageProp
 
   if (!project) notFound()
 
+  const saldoCobrar = items.reduce((s, i) => s + (i.amountBaseCurrency ?? i.total ?? 0), 0)
+
   return (
     <div className="space-y-6">
       <AccountsReceivableListClient
@@ -25,6 +27,7 @@ export default async function ProjectAccountsReceivablePage({ params }: PageProp
         filterOptions={filterOptions ?? { projects: [], parties: [] }}
         projectId={projectId}
         title="Cuentas por cobrar (proyecto)"
+        saldoCobrar={saldoCobrar}
       />
     </div>
   )

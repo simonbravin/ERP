@@ -3,6 +3,7 @@
 import { getSession } from '@/lib/session'
 import { getOrgContext } from '@/lib/org-context'
 import { requireRole } from '@/lib/rbac'
+import { assertProjectAccess, canEditProjectArea, PROJECT_AREAS } from '@/lib/project-permissions'
 import { prisma } from '@repo/database'
 import { revalidatePath } from 'next/cache'
 import { Decimal } from '@prisma/client/runtime/library'
@@ -34,6 +35,15 @@ export async function createScheduleFromWBS(
   const org = await getOrgContext(session.user.id)
   if (!org) return { success: false, error: 'Unauthorized' }
   requireRole(org.role, 'EDITOR')
+
+  try {
+    const access = await assertProjectAccess(projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.SCHEDULE)) {
+      return { success: false, error: 'No tenés permiso para editar el cronograma de este proyecto' }
+    }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Acceso denegado' }
+  }
 
   try {
     // Validación: proyecto debe tener presupuesto aprobado o baseline
@@ -257,6 +267,14 @@ export async function updateTaskDates(
     if (!task || task.schedule.orgId !== org.orgId) {
       return { success: false, error: 'Task not found' }
     }
+    try {
+      const access = await assertProjectAccess(task.schedule.projectId, org)
+      if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.SCHEDULE)) {
+        return { success: false, error: 'No tenés permiso para editar el cronograma de este proyecto' }
+      }
+    } catch (e) {
+      return { success: false, error: e instanceof Error ? e.message : 'Acceso denegado' }
+    }
 
     if (task.schedule.status !== 'DRAFT') {
       return { success: false, error: 'Solo se puede editar cronogramas en DRAFT' }
@@ -369,6 +387,14 @@ export async function addTaskDependency(data: {
     if (!schedule) {
       return { success: false, error: 'Schedule not found' }
     }
+    try {
+      const access = await assertProjectAccess(schedule.projectId, org)
+      if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.SCHEDULE)) {
+        return { success: false, error: 'No tenés permiso para editar el cronograma de este proyecto' }
+      }
+    } catch (e) {
+      return { success: false, error: e instanceof Error ? e.message : 'Acceso denegado' }
+    }
 
     if (schedule.status !== 'DRAFT') {
       return { success: false, error: 'Solo se puede editar en DRAFT' }
@@ -442,6 +468,14 @@ export async function removeTaskDependency(dependencyId: string) {
     if (!dependency || dependency.schedule.orgId !== org.orgId) {
       return { success: false, error: 'Dependency not found' }
     }
+    try {
+      const access = await assertProjectAccess(dependency.schedule.projectId, org)
+      if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.SCHEDULE)) {
+        return { success: false, error: 'No tenés permiso para editar el cronograma de este proyecto' }
+      }
+    } catch (e) {
+      return { success: false, error: e instanceof Error ? e.message : 'Acceso denegado' }
+    }
 
     if (dependency.schedule.status !== 'DRAFT') {
       return { success: false, error: 'Solo se puede editar en DRAFT' }
@@ -490,6 +524,14 @@ export async function updateTaskProgress(
 
     if (!task || task.schedule.orgId !== org.orgId) {
       return { success: false, error: 'Task not found' }
+    }
+    try {
+      const access = await assertProjectAccess(task.schedule.projectId, org)
+      if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.SCHEDULE)) {
+        return { success: false, error: 'No tenés permiso para editar el cronograma de este proyecto' }
+      }
+    } catch (e) {
+      return { success: false, error: e instanceof Error ? e.message : 'Acceso denegado' }
     }
 
     if (data.progressPercent < 0 || data.progressPercent > 100) {
@@ -739,6 +781,14 @@ export async function setScheduleAsBaseline(scheduleId: string) {
     if (!schedule) {
       return { success: false, error: 'Schedule not found' }
     }
+    try {
+      const access = await assertProjectAccess(schedule.projectId, org)
+      if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.SCHEDULE)) {
+        return { success: false, error: 'No tenés permiso para editar el cronograma de este proyecto' }
+      }
+    } catch (e) {
+      return { success: false, error: e instanceof Error ? e.message : 'Acceso denegado' }
+    }
 
     await prisma.schedule.updateMany({
       where: {
@@ -835,6 +885,11 @@ export async function getScheduleForView(scheduleId: string) {
     })
 
     if (!schedule) return null
+    try {
+      await assertProjectAccess(schedule.projectId, org)
+    } catch {
+      return null
+    }
 
     return JSON.parse(
       JSON.stringify({
@@ -898,6 +953,11 @@ export async function exportScheduleToPDF(scheduleId: string) {
 
     if (!schedule) {
       return { success: false, error: 'Schedule not found' }
+    }
+    try {
+      await assertProjectAccess(schedule.projectId, org)
+    } catch (e) {
+      return { success: false, error: e instanceof Error ? e.message : 'Acceso denegado' }
     }
 
     const orgProfile = await prisma.orgProfile.findFirst({

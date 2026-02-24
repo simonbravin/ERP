@@ -3,8 +3,11 @@
 import { revalidatePath } from 'next/cache'
 import { prisma, Prisma } from '@repo/database'
 import { requireRole } from '@/lib/rbac'
-import { requirePermission, getAuthContext } from '@/lib/auth-helpers'
+import { requirePermission, getAuthContext, requireOrgFinanceAccess } from '@/lib/auth-helpers'
+import { getVisibleProjectIds } from '@/lib/org-context'
+import { assertProjectAccess, canEditProjectArea, PROJECT_AREAS } from '@/lib/project-permissions'
 import { publishOutboxEvent } from '@/lib/events/event-publisher'
+import { createAuditLog } from '@/lib/audit-log'
 import {
   createFinanceTransactionSchema,
   updateFinanceTransactionSchema,
@@ -72,7 +75,7 @@ export type GetProjectTransactionsFilters = {
 }
 
 export async function listFinanceTransactions(filters: ListFinanceTransactionsFilters = {}) {
-  const { org } = await getAuthContext()
+  const { org } = await requireOrgFinanceAccess()
   const where: Record<string, unknown> = { orgId: org.orgId, deleted: false }
   if (filters.type) where.type = filters.type
   if (filters.status) where.status = filters.status
@@ -100,7 +103,7 @@ export async function listFinanceTransactions(filters: ListFinanceTransactionsFi
 }
 
 export async function getFinanceTransaction(id: string) {
-  const { org } = await getAuthContext()
+  const { org } = await requireOrgFinanceAccess()
   const tx = await prisma.financeTransaction.findFirst({
     where: { id, orgId: org.orgId, deleted: false },
     include: {
@@ -133,15 +136,20 @@ export async function getFinanceTransaction(id: string) {
 
 export async function listProjectsForFinance() {
   const { org } = await getAuthContext()
+  const allowedProjectIds = await getVisibleProjectIds(org)
   return prisma.project.findMany({
-    where: { orgId: org.orgId, active: true },
+    where: {
+      orgId: org.orgId,
+      active: true,
+      ...(Array.isArray(allowedProjectIds) ? { id: { in: allowedProjectIds } } : {}),
+    },
     select: { id: true, name: true },
     orderBy: { name: 'asc' },
   })
 }
 
 export async function listPartiesForFinance() {
-  const { org } = await getAuthContext()
+  const { org } = await requireOrgFinanceAccess()
   return prisma.party.findMany({
     where: { orgId: org.orgId },
     select: { id: true, name: true },
@@ -151,7 +159,7 @@ export async function listPartiesForFinance() {
 }
 
 export async function listCurrencies() {
-  const { org } = await getAuthContext()
+  const { org } = await requireOrgFinanceAccess()
   const currencies = await prisma.currency.findMany({
     where: { active: true },
     select: { code: true, name: true, symbol: true },
@@ -162,6 +170,11 @@ export async function listCurrencies() {
 
 export async function listWbsNodesForProject(projectId: string) {
   const { org } = await getAuthContext()
+  try {
+    await assertProjectAccess(projectId, org)
+  } catch {
+    return []
+  }
   const project = await prisma.project.findFirst({
     where: { id: projectId, orgId: org.orgId },
     select: { id: true },
@@ -177,7 +190,7 @@ export async function listWbsNodesForProject(projectId: string) {
 
 export async function createFinanceTransaction(data: CreateFinanceTransactionInput) {
   await requirePermission('FINANCE', 'create')
-  const { org } = await getAuthContext()
+  const { org } = await requireOrgFinanceAccess()
   requireRole(org.role, 'ACCOUNTANT')
 
   const parsed = createFinanceTransactionSchema.safeParse(data)
@@ -246,7 +259,7 @@ export async function createFinanceTransactionWithLines(
   lines: { description: string; amount: number; wbsNodeId?: string | null; unit?: string | null; quantity?: number }[]
 ) {
   await requirePermission('FINANCE', 'create')
-  const { org } = await getAuthContext()
+  const { org } = await requireOrgFinanceAccess()
   requireRole(org.role, 'ACCOUNTANT')
 
   const parsed = createFinanceTransactionSchema.safeParse(data)
@@ -350,7 +363,7 @@ export async function createFinanceTransactionWithLines(
 
 export async function updateFinanceTransaction(id: string, data: UpdateFinanceTransactionInput) {
   await requirePermission('FINANCE', 'edit')
-  const { org } = await getAuthContext()
+  const { org } = await requireOrgFinanceAccess()
   requireRole(org.role, 'ACCOUNTANT')
 
   const existing = await prisma.financeTransaction.findFirst({
@@ -417,7 +430,7 @@ export async function updateFinanceTransaction(id: string, data: UpdateFinanceTr
 }
 
 export async function addFinanceLine(transactionId: string, data: CreateFinanceLineInput) {
-  const { org } = await getAuthContext()
+  const { org } = await requireOrgFinanceAccess()
   requireRole(org.role, 'ACCOUNTANT')
 
   const tx = await prisma.financeTransaction.findFirst({
@@ -480,7 +493,7 @@ export async function addFinanceLine(transactionId: string, data: CreateFinanceL
 }
 
 export async function updateFinanceLine(lineId: string, data: UpdateFinanceLineInput) {
-  const { org } = await getAuthContext()
+  const { org } = await requireOrgFinanceAccess()
   requireRole(org.role, 'ACCOUNTANT')
 
   const line = await prisma.financeLine.findFirst({
@@ -530,7 +543,7 @@ export async function updateFinanceLine(lineId: string, data: UpdateFinanceLineI
 
 export async function deleteFinanceLine(lineId: string) {
   await requirePermission('FINANCE', 'delete')
-  const { org } = await getAuthContext()
+  const { org } = await requireOrgFinanceAccess()
   requireRole(org.role, 'ACCOUNTANT')
 
   const line = await prisma.financeLine.findFirst({
@@ -564,7 +577,7 @@ export async function deleteFinanceLine(lineId: string) {
 }
 
 export async function submitFinanceTransaction(id: string) {
-  const { org } = await getAuthContext()
+  const { org } = await requireOrgFinanceAccess()
   requireRole(org.role, 'ACCOUNTANT')
 
   const tx = await prisma.financeTransaction.findFirst({
@@ -594,7 +607,7 @@ export async function submitFinanceTransaction(id: string) {
 }
 
 export async function approveFinanceTransaction(id: string) {
-  const { org } = await getAuthContext()
+  const { org } = await requireOrgFinanceAccess()
   requireRole(org.role, 'ADMIN')
 
   const tx = await prisma.financeTransaction.findFirst({
@@ -624,7 +637,7 @@ export async function approveFinanceTransaction(id: string) {
 }
 
 export async function rejectFinanceTransaction(id: string, reason: string) {
-  const { org } = await getAuthContext()
+  const { org } = await requireOrgFinanceAccess()
   requireRole(org.role, 'ADMIN')
 
   const tx = await prisma.financeTransaction.findFirst({
@@ -654,7 +667,7 @@ export async function rejectFinanceTransaction(id: string, reason: string) {
 }
 
 export async function markFinanceTransactionPaid(id: string, paymentDate: Date) {
-  const { org } = await getAuthContext()
+  const { org } = await requireOrgFinanceAccess()
   requireRole(org.role, 'ACCOUNTANT')
 
   const tx = await prisma.financeTransaction.findFirst({
@@ -684,7 +697,7 @@ export async function markFinanceTransactionPaid(id: string, paymentDate: Date) 
 }
 
 export async function voidFinanceTransaction(id: string, reason: string) {
-  const { org } = await getAuthContext()
+  const { org } = await requireOrgFinanceAccess()
   requireRole(org.role, 'ADMIN')
 
   const tx = await prisma.financeTransaction.findFirst({
@@ -719,10 +732,14 @@ export async function voidFinanceTransaction(id: string, reason: string) {
 
 export async function getProjectTransactions(projectId: string, filters: GetProjectTransactionsFilters = {}) {
   const { org } = await getAuthContext()
-  const where: { projectId: string; orgId: string; deleted: boolean; issueDate?: { gte?: Date; lte?: Date }; partyId?: string; type?: string } = {
+  try {
+    await assertProjectAccess(projectId, org)
+  } catch {
+    return []
+  }
+  const where: { projectId: string; orgId: string; issueDate?: { gte?: Date; lte?: Date }; partyId?: string; type?: string } = {
     projectId,
     orgId: org.orgId,
-    deleted: false,
   }
   if (filters.dateFrom || filters.dateTo) {
     where.issueDate = {}
@@ -742,13 +759,33 @@ export async function getProjectTransactions(projectId: string, filters: GetProj
     },
     orderBy: { issueDate: 'desc' },
   })
-  return list.map((t) => serializeTransaction({
-    ...t,
-    total: t.total,
-    subtotal: t.subtotal,
-    taxTotal: t.taxTotal,
-    amountBaseCurrency: t.amountBaseCurrency,
-  }))
+
+  const ids = list.map((t) => t.id)
+  const attachmentCounts =
+    ids.length > 0
+      ? await prisma.documentLink.groupBy({
+          by: ['entityId'],
+          where: {
+            entityType: 'FINANCE_TRANSACTION',
+            entityId: { in: ids },
+          },
+          _count: { documentId: true },
+        })
+      : []
+  const countByTxId = Object.fromEntries(
+    attachmentCounts.map((c) => [c.entityId, c._count.documentId])
+  )
+
+  return list.map((t) =>
+    serializeTransaction({
+      ...t,
+      total: t.total,
+      subtotal: t.subtotal,
+      taxTotal: t.taxTotal,
+      amountBaseCurrency: t.amountBaseCurrency,
+      attachmentCount: countByTxId[t.id] ?? 0,
+    })
+  )
 }
 
 export async function getProjectTransaction(id: string) {
@@ -763,6 +800,13 @@ export async function getProjectTransaction(id: string) {
     },
   })
   if (!tx) return null
+  if (tx.projectId) {
+    try {
+      await assertProjectAccess(tx.projectId, org)
+    } catch {
+      return null
+    }
+  }
   return serializeTransaction({
     ...tx,
     total: tx.total,
@@ -778,6 +822,11 @@ export async function getPartiesForProject(
   partyType: 'SUPPLIER' | 'CLIENT'
 ): Promise<{ id: string; name: string }[]> {
   const { org } = await getAuthContext()
+  try {
+    await assertProjectAccess(projectId, org)
+  } catch {
+    return []
+  }
   const project = await prisma.project.findFirst({
     where: { id: projectId, orgId: org.orgId },
     select: { id: true },
@@ -794,6 +843,11 @@ export async function getPartiesForProject(
 /** List all parties (suppliers + clients) for the project's org, for filter dropdown */
 export async function getPartiesForProjectFilter(projectId: string): Promise<{ id: string; name: string; partyType: string }[]> {
   const { org } = await getAuthContext()
+  try {
+    await assertProjectAccess(projectId, org)
+  } catch {
+    return []
+  }
   const project = await prisma.project.findFirst({
     where: { id: projectId, orgId: org.orgId },
     select: { id: true },
@@ -813,7 +867,7 @@ export async function createPartyForTransaction(
   name: string
 ): Promise<{ success: true; partyId: string; name: string } | { error: string }> {
   await requirePermission('FINANCE', 'create')
-  const { org } = await getAuthContext()
+  const { org } = await requireOrgFinanceAccess()
   requireRole(org.role, 'ACCOUNTANT')
 
   const trimmed = name.trim()
@@ -855,7 +909,7 @@ export async function createProjectTransaction(
   data: ProjectTransactionCreateInput
 ) {
   await requirePermission('FINANCE', 'create')
-  const { org } = await getAuthContext()
+  const { org, session } = await getAuthContext()
   requireRole(org.role, 'ACCOUNTANT')
 
   const parsed = projectTransactionCreateSchema.safeParse(data)
@@ -866,6 +920,14 @@ export async function createProjectTransaction(
     select: { id: true },
   })
   if (!project) return { error: { _form: ['Project not found'] } }
+  try {
+    const access = await assertProjectAccess(projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.FINANCE)) {
+      return { error: { _form: ['No tenés permiso para editar finanzas de este proyecto'] } }
+    }
+  } catch (e) {
+    return { error: { _form: [e instanceof Error ? e.message : 'Acceso denegado'] } }
+  }
 
   const currency = await prisma.currency.findFirst({
     where: { code: parsed.data.currency },
@@ -956,6 +1018,16 @@ export async function createProjectTransaction(
     return created
   })
 
+  await createAuditLog({
+    orgId: org.orgId,
+    userId: session.user.id,
+    action: 'CREATE',
+    entity: 'FinanceTransaction',
+    entityId: tx.id,
+    projectId,
+    newValues: { type: tx.type, transactionNumber: tx.transactionNumber, status: tx.status },
+  })
+
   revalidatePath(`/projects/${projectId}/finance/transactions`)
   revalidatePath(`/projects/${projectId}/finance`)
   return { success: true, transaction: serializeTransaction(tx) }
@@ -963,7 +1035,7 @@ export async function createProjectTransaction(
 
 export async function updateProjectTransaction(id: string, data: ProjectTransactionUpdateInput) {
   await requirePermission('FINANCE', 'edit')
-  const { org } = await getAuthContext()
+  const { org, session } = await getAuthContext()
   requireRole(org.role, 'ACCOUNTANT')
 
   const existing = await prisma.financeTransaction.findFirst({
@@ -971,6 +1043,16 @@ export async function updateProjectTransaction(id: string, data: ProjectTransact
     select: { id: true, projectId: true, status: true, currency: true, total: true, issueDate: true },
   })
   if (!existing) return { error: { _form: ['Transaction not found'] } }
+  if (existing.projectId) {
+    try {
+      const access = await assertProjectAccess(existing.projectId, org)
+      if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.FINANCE)) {
+        return { error: { _form: ['No tenés permiso para editar finanzas de este proyecto'] } }
+      }
+    } catch (e) {
+      return { error: { _form: [e instanceof Error ? e.message : 'Acceso denegado'] } }
+    }
+  }
 
   const parsed = projectTransactionUpdateSchema.safeParse(data)
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
@@ -1032,6 +1114,20 @@ export async function updateProjectTransaction(id: string, data: ProjectTransact
     return result
   })
 
+  if (payload.status !== undefined && payload.status !== existing.status) {
+    await createAuditLog({
+      orgId: org.orgId,
+      userId: session.user.id,
+      action: 'UPDATE',
+      entity: 'FinanceTransaction',
+      entityId: id,
+      projectId: existing.projectId ?? undefined,
+      oldValues: { status: existing.status },
+      newValues: { status: payload.status },
+      description: `Estado cambiado de ${existing.status} a ${payload.status}`,
+    })
+  }
+
   if (existing.projectId) {
     revalidatePath(`/projects/${existing.projectId}/finance/transactions`)
     revalidatePath(`/projects/${existing.projectId}/finance`)
@@ -1040,39 +1136,82 @@ export async function updateProjectTransaction(id: string, data: ProjectTransact
   return { success: true, transaction: serializeTransaction(updated) }
 }
 
-export async function deleteProjectTransaction(id: string) {
-  await requirePermission('FINANCE', 'delete')
-  const { org } = await getAuthContext()
-  requireRole(org.role, 'ACCOUNTANT')
+export async function deleteProjectTransaction(id: string): Promise<{ success: true } | { success: false; error: string }> {
+  try {
+    await requirePermission('FINANCE', 'delete')
+    const { org, session } = await getAuthContext()
+    requireRole(org.role, 'ACCOUNTANT')
 
-  const existing = await prisma.financeTransaction.findFirst({
-    where: { id, orgId: org.orgId, deleted: false },
-    select: { id: true, projectId: true },
-  })
-  if (!existing) throw new Error('Transacción no encontrada')
-
-  await prisma.$transaction(async (db) => {
-    await db.financeTransaction.update({
-      where: { id },
-      data: {
-        deleted: true,
-        deletedAt: new Date(),
-        deletedByOrgMemberId: org.memberId,
-      },
+    const existing = await prisma.financeTransaction.findFirst({
+      where: { id, orgId: org.orgId, deleted: false },
+      select: { id: true, projectId: true },
     })
-    await publishOutboxEvent(db, {
-      orgId: org.orgId,
-      eventType: 'FINANCE_TRANSACTION.UPDATED',
-      entityType: 'FinanceTransaction',
-      entityId: id,
-      payload: { deleted: true, projectId: existing.projectId },
-    })
-  })
+    if (!existing) return { success: false, error: 'Transacción no encontrada' }
+    if (existing.projectId) {
+      try {
+        const access = await assertProjectAccess(existing.projectId, org)
+        if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.FINANCE)) {
+          return { success: false, error: 'No tenés permiso para editar finanzas de este proyecto' }
+        }
+      } catch (e) {
+        return { success: false, error: e instanceof Error ? e.message : 'Acceso denegado' }
+      }
+    }
 
-  if (existing.projectId) {
-    revalidatePath(`/projects/${existing.projectId}/finance/transactions`)
-    revalidatePath(`/projects/${existing.projectId}/finance`)
+    await prisma.$transaction(async (db) => {
+      await db.financeTransaction.update({
+        where: { id },
+        data: {
+          deleted: true,
+          deletedAt: new Date(),
+          deletedByOrgMemberId: org.memberId,
+        },
+      })
+      try {
+        await publishOutboxEvent(db, {
+          orgId: org.orgId,
+          eventType: 'FINANCE_TRANSACTION.UPDATED',
+          entityType: 'FinanceTransaction',
+          entityId: id,
+          payload: { deleted: true, projectId: existing.projectId ?? undefined },
+        })
+      } catch (e) {
+        console.error('Outbox event on void transaction:', e)
+      }
+    })
+
+    if (session?.user?.id) {
+      try {
+        await createAuditLog({
+          orgId: org.orgId,
+          userId: session.user.id,
+          action: 'DELETE',
+          entity: 'FinanceTransaction',
+          entityId: id,
+          projectId: existing.projectId ?? undefined,
+          description: 'Transacción anulada',
+        })
+      } catch (e) {
+        console.error('Audit log on void transaction:', e)
+      }
+    }
+
+    if (existing.projectId) {
+      revalidatePath(`/projects/${existing.projectId}/finance/transactions`)
+      revalidatePath(`/projects/${existing.projectId}/finance`)
+    }
+    revalidatePath(`/finance/transactions`)
+    return { success: true }
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Error al anular'
+    console.error('deleteProjectTransaction:', e)
+    return { success: false, error: message }
   }
-  revalidatePath(`/finance/transactions`)
-  return { success: true }
+}
+
+/** Audit log for a transaction (creation, status changes, anulación). */
+export async function getTransactionAuditLogs(transactionId: string) {
+  const { org } = await getAuthContext()
+  const { getEntityAuditLogs } = await import('@/lib/audit-log')
+  return getEntityAuditLogs('FinanceTransaction', transactionId, org.orgId)
 }

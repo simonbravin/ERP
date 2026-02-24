@@ -39,7 +39,7 @@ export const ROLE_PERMISSIONS: Record<OrgRole, Partial<Record<Module, Permission
     dashboard: ['view', 'export'],
     projects: ['view', 'create', 'edit', 'delete'],
     budget: ['view', 'create', 'edit', 'approve'],
-    finance: ['view', 'create', 'edit', 'approve', 'export'],
+    finance: ['view', 'create', 'edit', 'delete', 'approve', 'export'],
     certifications: ['view', 'create', 'edit', 'approve'],
     inventory: ['view', 'create', 'edit', 'delete'],
     quality: ['view', 'create', 'edit', 'delete'],
@@ -92,6 +92,8 @@ export const ROLE_PERMISSIONS: Record<OrgRole, Partial<Record<Module, Permission
 /** Custom permissions: module (lowercase) -> list of permissions. Overrides role base for that module. */
 export type CustomPermissionsMap = Partial<Record<Module, Permission[]>> | null
 
+const MODULE_VALUES = new Set(Object.values(MODULES)) as Set<Module>
+
 /** Obtener permisos efectivos (rol base + custom overrides). */
 export function getEffectivePermissions(
   role: OrgRole,
@@ -103,7 +105,8 @@ export function getEffectivePermissions(
   }
   const effective: Partial<Record<Module, Permission[]>> = { ...base }
   for (const [module, permissions] of Object.entries(customPermissions)) {
-    if (module in MODULES && Array.isArray(permissions)) {
+    // customPermissions usa valores de MODULES como clave ('reports', 'dashboard', ...), no las claves ('REPORTS', 'DASHBOARD')
+    if (MODULE_VALUES.has(module as Module) && Array.isArray(permissions)) {
       effective[module as Module] = permissions as Permission[]
     }
   }

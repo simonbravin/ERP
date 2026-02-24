@@ -5,6 +5,8 @@ interface DashboardLayoutProps {
   orgName: string
   orgLogoUrl?: string | null
   user: { name: string; email?: string | null }
+  /** When true (EDITOR/VIEWER restricted): sidebar shows only Dashboard + Projects */
+  restrictedToProjects?: boolean
 }
 
 /**
@@ -13,9 +15,9 @@ interface DashboardLayoutProps {
  * - Minimal header: page title + search (+ hamburger on mobile)
  * - Mobile: sidebar as overlay drawer
  */
-export function DashboardLayout({ children, orgName, orgLogoUrl, user }: DashboardLayoutProps) {
+export function DashboardLayout({ children, orgName, orgLogoUrl, user, restrictedToProjects }: DashboardLayoutProps) {
   return (
-    <DashboardShell orgName={orgName} orgLogoUrl={orgLogoUrl} user={user}>
+    <DashboardShell orgName={orgName} orgLogoUrl={orgLogoUrl} user={user} restrictedToProjects={restrictedToProjects}>
       {children}
     </DashboardShell>
   )

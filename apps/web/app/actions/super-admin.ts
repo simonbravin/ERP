@@ -419,6 +419,58 @@ export async function toggleUserStatus(
   }
 }
 
+/** Cambiar rol de un miembro en una organización (solo super-admin). No permite cambiar OWNER. */
+export async function setOrgMemberRole(
+  userId: string,
+  orgId: string,
+  newRole: 'ADMIN' | 'EDITOR' | 'ACCOUNTANT' | 'VIEWER'
+): Promise<{ success: true } | { success: false; error: string }> {
+  const superAdmin = await requireSuperAdmin()
+  try {
+    const orgMember = await prisma.orgMember.findFirst({
+      where: { userId, orgId },
+      include: {
+        user: { select: { fullName: true, email: true } },
+        organization: { select: { name: true } },
+      },
+    })
+    if (!orgMember) {
+      return { success: false, error: 'Miembro no encontrado en esta organización' }
+    }
+    if (userId === superAdmin.id) {
+      return { success: false, error: 'No puedes cambiar tu propio rol' }
+    }
+    if (orgMember.role === 'OWNER') {
+      return { success: false, error: 'No se puede cambiar el rol del dueño de la organización' }
+    }
+    await prisma.orgMember.update({
+      where: { id: orgMember.id },
+      data: { role: newRole },
+    })
+    await createSuperAdminLog(
+      superAdmin.id,
+      superAdmin.email ?? '',
+      'SET_ORG_MEMBER_ROLE',
+      'USER',
+      userId,
+      {
+        orgId,
+        orgName: orgMember.organization.name,
+        userName: orgMember.user.fullName,
+        previousRole: orgMember.role,
+        newRole,
+      }
+    )
+    revalidatePath('/super-admin/users')
+    revalidatePath('/team')
+    revalidatePath('/settings/team')
+    return { success: true }
+  } catch (error) {
+    console.error('Error setting org member role:', error)
+    return { success: false, error: 'Error al cambiar el rol' }
+  }
+}
+
 /** Resetear contraseña de usuario */
 export async function resetUserPassword(userId: string, newPassword: string) {
   const superAdmin = await requireSuperAdmin()

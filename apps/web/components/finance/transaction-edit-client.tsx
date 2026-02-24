@@ -223,7 +223,7 @@ export function TransactionEditClient({
 
       <div className="rounded-xl border border-border/60 bg-card p-5 shadow-sm">
         <h3 className="mb-4 text-base font-semibold text-foreground">{t('lines')}</h3>
-        <TransactionLineForm wbsOptions={wbsOptions} onAdd={onAddLine} />
+        <TransactionLineForm wbsOptions={wbsOptions} onAdd={onAddLine} projectId={transaction.projectId ?? null} />
         {transaction.lines.length > 0 && (
           <div className="mt-4">
             <table className="w-full text-sm">

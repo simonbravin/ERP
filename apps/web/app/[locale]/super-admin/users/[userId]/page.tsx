@@ -22,7 +22,7 @@ export default async function SuperAdminUserDetailPage({
   }
   return (
     <div className="p-6">
-      <UserEditClient user={result.user} />
+      <UserEditClient user={result.user} currentUserId={session.user.id} />
     </div>
   )
 }

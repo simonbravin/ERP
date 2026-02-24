@@ -25,7 +25,7 @@ import {
 import { ExportDialog } from '@/components/export/export-dialog'
 import { TransactionFormDialog } from './transaction-form-dialog'
 import { DOCUMENT_TYPE_LABELS, TYPE_LABELS, getStatusLabel } from '@/lib/finance-labels'
-import { FileDown } from 'lucide-react'
+import { FileDown, TrendingUp } from 'lucide-react'
 
 export type CompanyTransactionRow = {
   id: string
@@ -60,12 +60,15 @@ interface Props {
   initialTransactions: CompanyTransactionRow[]
   filterOptions: FilterOptions
   canCreate: boolean
+  /** Balance de la empresa (ingresos − gastos pagados). Se muestra arriba como en Balance del proyecto. */
+  companyBalance?: number
 }
 
 export function CompanyTransactionsListClient({
   initialTransactions,
   filterOptions,
   canCreate,
+  companyBalance,
 }: Props) {
   const router = useRouter()
   const t = useTranslations('finance')
@@ -156,6 +159,28 @@ export function CompanyTransactionsListClient({
 
   return (
     <div className="space-y-4">
+      {companyBalance !== undefined && (
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-border bg-card px-4 py-3">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium text-muted-foreground">
+              Balance de la empresa:
+            </span>
+            <span
+              className={`tabular-nums font-semibold ${
+                companyBalance >= 0
+                  ? 'text-emerald-600 dark:text-emerald-400'
+                  : 'text-red-600 dark:text-red-400'
+              }`}
+            >
+              {formatCurrency(companyBalance, 'ARS')}
+            </span>
+          </div>
+          <Button variant="link" size="sm" className="h-auto p-0" asChild>
+            <Link href="/finance">Ver Dashboard</Link>
+          </Button>
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h2 className="text-lg font-semibold text-foreground">{t('transactions')}</h2>
         <div className="flex gap-2">

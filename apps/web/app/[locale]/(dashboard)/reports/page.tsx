@@ -48,6 +48,13 @@ export default async function ReportsPage() {
       icon: '📊',
     },
     {
+      id: 'progress-vs-cost',
+      name: 'Avance vs Costo',
+      description: 'Consumido vs avance de obra por proyecto',
+      category: 'BUDGET',
+      icon: '📈',
+    },
+    {
       id: 'top-materials',
       name: 'Top 10 Materiales más Caros',
       description: 'Análisis de materiales por costo total en presupuestos',

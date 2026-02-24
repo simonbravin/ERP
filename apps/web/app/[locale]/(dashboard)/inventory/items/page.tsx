@@ -3,7 +3,6 @@ import { getSession } from '@/lib/session'
 import { getOrgContext } from '@/lib/org-context'
 import { prisma } from '@repo/database'
 import { serializeForClient } from '@/lib/utils/serialization'
-import { PageHeader } from '@/components/layout/page-header'
 import { ItemsListClient } from '@/components/inventory/items-list-client'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
@@ -137,26 +136,26 @@ export default async function InventoryItemsListPage({
   const itemsPlain = filteredItems.map((item: any) => serializeForClient(item))
 
   return (
-    <div className="h-full">
-      <PageHeader
-        title="Items de Inventario"
-        subtitle={`${itemsPlain.length} items encontrados`}
-        actions={
-          <div className="flex gap-2">
-            <Button asChild variant="outline">
-              <Link href="/inventory/movements/new">Nuevo Movimiento</Link>
-            </Button>
-            <Button asChild variant="default">
-              <Link href="/inventory/items/new">
-                <Plus className="mr-2 h-4 w-4" />
-                Nuevo Item
-              </Link>
-            </Button>
-          </div>
-        }
-      />
+    <div className="erp-view-container space-y-6 bg-background">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="erp-section-header">
+          <h1 className="erp-page-title">Items de Inventario</h1>
+          <p className="erp-section-desc">{itemsPlain.length} items encontrados</p>
+        </div>
+        <div className="flex shrink-0 gap-2">
+          <Button asChild variant="outline">
+            <Link href="/inventory/movements/new">Nuevo Movimiento</Link>
+          </Button>
+          <Button asChild variant="default">
+            <Link href="/inventory/items/new">
+              <Plus className="mr-2 h-4 w-4" />
+              Nuevo Item
+            </Link>
+          </Button>
+        </div>
+      </div>
 
-      <div className="p-6">
+      <div className="rounded-xl border border-border/60 bg-card p-4 shadow-sm md:p-6">
         <ItemsListClient items={itemsPlain} categories={categoryOptions} />
       </div>
     </div>

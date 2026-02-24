@@ -1091,12 +1091,13 @@ export async function exportProjectCashflowToExcel(
   if (!session?.user?.id) return { success: false, error: 'Unauthorized' }
   const org = await getOrgContext(session.user.id)
   if (!org?.orgId) return { success: false, error: 'Unauthorized' }
+  const project = await getProject(params.projectId)
+  if (!project) return { success: false, error: 'Proyecto no encontrado' }
   try {
     const { getProjectCashflow } = await import('./finance')
     const from = new Date(params.dateFrom)
     const to = new Date(params.dateTo)
     const timeline = await getProjectCashflow(params.projectId, { from, to })
-    const project = await getProject(params.projectId)
     const allColumns = [
       { field: 'month', label: 'Mes', type: 'text' as const, width: 12 },
       { field: 'income', label: 'Ingresos', type: 'currency' as const, width: 14, align: 'right' as const },
@@ -1116,7 +1117,7 @@ export async function exportProjectCashflowToExcel(
       balance: row.balance,
     }))
     const config: ExcelConfig = {
-      title: `Flujo de caja — ${project?.name ?? params.projectId}`,
+      title: `Flujo de caja — ${project.name}`,
       subtitle: `Período ${from.toLocaleDateString('es-AR')} - ${to.toLocaleDateString('es-AR')} · Exportado el ${new Date().toLocaleDateString('es-AR')}`,
       includeCompanyHeader: false,
       metadata: { date: new Date(), generatedBy: 'Sistema' },

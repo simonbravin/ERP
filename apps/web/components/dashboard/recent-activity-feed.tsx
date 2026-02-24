@@ -56,13 +56,11 @@ export function RecentActivityFeed({ activities, hideProjectName = false }: Rece
 
   const getActivityLabel = (action: string, entityType: string) => {
     const key = `activity_${action}_${entityType}`.toLowerCase()
-    try {
-      const translated = t(key)
-      if (translated !== key) return translated
-    } catch {
-      // Fall through to fallback when key is missing
-    }
-    
+    // Use t.raw to avoid throwing on missing keys (next-intl throws MISSING_MESSAGE in strict mode)
+    const raw = t.raw(key) as string
+    const missingKey = `dashboard.${key}`
+    if (raw !== missingKey) return raw
+
     // Fallback: format as readable text
     const actionLabels: Record<string, string> = {
       CREATE: 'creó',

@@ -39,9 +39,10 @@ type Member = Awaited<ReturnType<typeof import('@/app/actions/team').getOrgMembe
 interface TeamMembersClientProps {
   initialMembers: Member[]
   canInvite: boolean
+  currentUserId?: string
 }
 
-export function TeamMembersClient({ initialMembers, canInvite }: TeamMembersClientProps) {
+export function TeamMembersClient({ initialMembers, canInvite, currentUserId }: TeamMembersClientProps) {
   const [members, setMembers] = useState(initialMembers)
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false)
 
@@ -59,8 +60,8 @@ export function TeamMembersClient({ initialMembers, canInvite }: TeamMembersClie
 
   const handleToggleStatus = async (memberId: string) => {
     const res = await toggleMemberStatus(memberId)
-    if (!res.success) {
-      toast.error(res.error ?? 'Error al actualizar')
+    if (!res?.success) {
+      toast.error(res?.error ?? 'Error al actualizar')
       return
     }
     setMembers((prev) =>
@@ -137,7 +138,7 @@ export function TeamMembersClient({ initialMembers, canInvite }: TeamMembersClie
                       onValueChange={(value) =>
                         handleRoleChange(member.id, value as OrgRole)
                       }
-                      disabled={!canInvite}
+                      disabled={!canInvite || member.userId === currentUserId}
                     >
                       <SelectTrigger className="w-[140px]">
                         <SelectValue />
@@ -165,19 +166,24 @@ export function TeamMembersClient({ initialMembers, canInvite }: TeamMembersClie
                 {canInvite && (
                   <TableCell>
                     {member.role !== 'OWNER' ? (
-                      <Button variant="ghost" size="sm" asChild>
-                        <Link href={`/team/${member.id}/permissions`}>
-                          <Shield className="mr-1.5 h-4 w-4" />
+                      member.userId === currentUserId ? (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      ) : (
+                        <Link
+                          href={`/team/${member.id}/permissions`}
+                          className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-medium text-primary hover:bg-accent hover:text-accent-foreground"
+                        >
+                          <Shield className="h-4 w-4" />
                           Permisos
                         </Link>
-                      </Button>
+                      )
                     ) : (
                       <span className="text-xs text-muted-foreground">—</span>
                     )}
                   </TableCell>
                 )}
                 <TableCell>
-                  {member.role !== 'OWNER' && canInvite && (
+                  {member.role !== 'OWNER' && canInvite && member.userId !== currentUserId && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon">

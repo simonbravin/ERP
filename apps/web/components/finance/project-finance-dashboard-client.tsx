@@ -80,8 +80,50 @@ export function ProjectFinanceDashboardClient({ data, alerts = [] }: ProjectFina
     total: s.total,
   }))
 
+  const consumedPct =
+    data.budgeted > 0 ? Math.min(100, (data.consumed / data.budgeted) * 100) : 0
+
   return (
     <div className="space-y-6">
+      {(data.budgeted > 0 || data.consumed > 0) && (
+        <div className="rounded-lg border border-border bg-card p-4">
+          <h3 className="mb-3 text-sm font-semibold text-foreground">
+            {t('budgetVsConsumed', { defaultValue: 'Presupuesto / Consumido' })}
+          </h3>
+          <div className="flex flex-wrap items-center gap-6">
+            <div>
+              <p className="text-xs text-muted-foreground">
+                {t('budgeted', { defaultValue: 'Presupuesto' })}
+              </p>
+              <p className="text-lg font-semibold tabular-nums text-foreground">
+                {formatCurrency(data.budgeted, 'ARS')}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">
+                {t('consumed', { defaultValue: 'Consumido' })}
+              </p>
+              <p className="text-lg font-semibold tabular-nums text-foreground">
+                {formatCurrency(data.consumed, 'ARS')}
+              </p>
+            </div>
+            {data.budgeted > 0 && (
+              <div className="min-w-[120px] flex-1">
+                <p className="mb-1 text-xs text-muted-foreground">
+                  {t('consumedPct', { defaultValue: 'Consumido' })} ({consumedPct.toFixed(0)}%)
+                </p>
+                <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-primary transition-all"
+                    style={{ width: `${consumedPct}%` }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <CompanyFinanceKPICards data={kpisData} />
 
       {alerts.length > 0 && (

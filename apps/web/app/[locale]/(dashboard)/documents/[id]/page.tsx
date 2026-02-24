@@ -10,6 +10,7 @@ import {
   deleteDocument,
 } from '@/app/actions/documents'
 import { DocumentDeleteButton } from '@/components/documents/document-delete-button'
+import { getTranslations } from 'next-intl/server'
 
 type PageProps = {
   params: Promise<{ id: string }>
@@ -22,6 +23,7 @@ export default async function DocumentDetailPage({ params }: PageProps) {
   const org = await getOrgContext(session.user.id)
   if (!org) return notFound()
 
+  const t = await getTranslations('documents')
   const { id: docId } = await params
 
   const doc = await prisma.document.findFirst({
@@ -60,7 +62,7 @@ export default async function DocumentDetailPage({ params }: PageProps) {
           href={doc.projectId ? `/projects/${doc.projectId}/documents` : '/documents'}
           className="text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
         >
-          ← {doc.projectId ? 'Project Documents' : 'Documents'}
+          ← {doc.projectId ? t('projectDocuments') : t('backToDocuments')}
         </Link>
         {doc.project && (
           <>
@@ -90,9 +92,9 @@ export default async function DocumentDetailPage({ params }: PageProps) {
             </p>
           )}
           <p className="mt-2 text-xs text-gray-500">
-            Created by {doc.createdBy.user.fullName} on{' '}
-            {new Date(doc.createdAt).toLocaleDateString(undefined, {
-              dateStyle: 'medium',
+            {t('createdByOn', {
+              name: doc.createdBy.user.fullName,
+              date: new Date(doc.createdAt).toLocaleDateString(undefined, { dateStyle: 'medium' }),
             })}
           </p>
         </div>

@@ -72,7 +72,7 @@ export function InviteUserDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="erp-form-modal max-w-xl">
+      <DialogContent className="erp-form-modal w-[min(calc(100vw-2rem),56rem)] max-w-[56rem] gap-6 py-6">
         <DialogHeader>
           <DialogTitle>Invitar Usuario</DialogTitle>
           <DialogDescription>
@@ -86,13 +86,13 @@ export function InviteUserDialog({
         >
           <div className="rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-900">
             <div className="space-y-6">
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="invite-email">Email</Label>
                 <Input
                   id="invite-email"
                   type="email"
                   placeholder="usuario@ejemplo.com"
-                  className="mt-1"
+                  className="mt-1 w-full"
                   {...form.register('email')}
                 />
                 {form.formState.errors.email && (
@@ -105,23 +105,27 @@ export function InviteUserDialog({
                 </p>
               </div>
 
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="invite-role">Rol</Label>
                 <Select
                   value={form.watch('role')}
                   onValueChange={(v) => form.setValue('role', v as FormData['role'])}
                 >
-                  <SelectTrigger id="invite-role" className="mt-1">
+                  <SelectTrigger id="invite-role" className="mt-1 min-h-10 w-full [&>span]:line-clamp-2 [&>span]:text-left">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent
+                    align="start"
+                    position="popper"
+                    className="max-w-[calc(100vw-2rem)] w-[var(--radix-select-trigger-width)]"
+                  >
                     {(
                       Object.entries(ROLE_DESCRIPTIONS) as [OrgRole, string][]
                     ).map(
                       ([role, desc]) =>
                         role !== 'OWNER' && (
-                          <SelectItem key={role} value={role}>
-                            {role} — {desc}
+                          <SelectItem key={role} value={role} className="whitespace-normal py-2">
+                            {desc}
                           </SelectItem>
                         )
                     )}

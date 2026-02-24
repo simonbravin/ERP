@@ -10,8 +10,8 @@ import {
 import type { OrgRole } from '@/types/next-auth'
 import { prisma } from '@repo/database'
 import { getSession } from '@/lib/session'
-import { getOrgContext, type OrgContext } from '@/lib/org-context'
-import { redirectToLogin } from '@/lib/i18n-redirect'
+import { getOrgContext, isRestrictedToProjects, type OrgContext } from '@/lib/org-context'
+import { redirectToLogin, redirectTo } from '@/lib/i18n-redirect'
 
 type ModuleKey = keyof typeof MODULES
 
@@ -89,4 +89,16 @@ export async function getAuthContext(): Promise<{ session: NonNullable<Awaited<R
   const org = await getOrgContext(session.user.id)
   if (!org) return redirectToLogin()
   return { session, org }
+}
+
+/**
+ * Use for org-level Finance actions and pages. Redirects restricted users (EDITOR/VIEWER with
+ * restrictedToProjects) to /projects. OWNER, ADMIN, ACCOUNTANT are never redirected.
+ */
+export async function requireOrgFinanceAccess(): Promise<{ session: NonNullable<Awaited<ReturnType<typeof getSession>>>; org: OrgContext }> {
+  const ctx = await getAuthContext()
+  if (isRestrictedToProjects(ctx.org)) {
+    await redirectTo('/projects')
+  }
+  return ctx
 }

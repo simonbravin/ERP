@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { formatDateDDMMYYYY } from '@/lib/format-utils'
 import { uploadDailyReportFiles } from '@/app/actions/daily-reports'
+import { DocumentThumbnail } from '@/components/documents/document-thumbnail'
 
 type Report = Awaited<ReturnType<typeof import('@/app/actions/daily-reports').getDailyReport>>
 
@@ -316,14 +317,27 @@ export function DailyReportDetailClient({
         {report.photos.length > 0 && (
           <>
             <h2 className="mt-6 text-lg font-semibold text-gray-900 dark:text-white">{t('photosAndDocs')}</h2>
-            <ul className="mt-2 list-disc pl-6 text-sm text-gray-600 dark:text-gray-400">
-              {report.photos.map((p) => (
-                <li key={p.id}>
-                  {p.document.title}
-                  {p.caption && ` — ${p.caption}`}
-                </li>
-              ))}
-            </ul>
+            <div className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
+              {report.photos.map((p) => {
+                const version = (p.document as { versions?: { id: string; mimeType: string; fileName: string }[] })
+                  ?.versions?.[0]
+                return version ? (
+                  <DocumentThumbnail
+                    key={p.id}
+                    versionId={version.id}
+                    mimeType={version.mimeType}
+                    fileName={version.fileName}
+                    title={(p.document as { title?: string }).title}
+                    caption={p.caption ?? undefined}
+                  />
+                ) : (
+                  <div key={p.id} className="rounded-lg border border-border p-2 text-center text-sm text-muted-foreground">
+                    {(p.document as { title?: string }).title}
+                    {p.caption && ` — ${p.caption}`}
+                  </div>
+                )
+              })}
+            </div>
           </>
         )}
         {canEditReport && report.photos.length < 10 && (

@@ -44,6 +44,7 @@ export {
   createProjectTransaction,
   updateProjectTransaction,
   deleteProjectTransaction,
+  getTransactionAuditLogs,
 } from './finance-transactions'
 export type {
   ListFinanceTransactionsFilters,
@@ -59,6 +60,7 @@ export {
   getProjectCashflowMonthComparison,
   getWBSActualCosts,
   getWBSActualCost,
+  getWBSBudgetAndConsumed,
   getCompanyCashflow,
   getCompanyCashflowDetailed,
   getCashflowMonthComparison,
@@ -73,6 +75,7 @@ export type {
   ProjectCashflowSummary,
   ProjectCashflowBreakdownByWbsItem,
   ProjectCashflowBreakdownByWbsResult,
+  WBSBudgetAndConsumed,
 } from './finance-cashflow'
 
 // Overhead
@@ -83,17 +86,22 @@ export {
   getOverheadDashboard,
   getApprovedBudgetTotalByProject,
   getOverheadAllocatedToProject,
+  getProjectOverheadBudgeted,
+  getProjectOverheadConsumed,
+  getProjectOverheadItems,
   deleteOverheadAllocation,
   updateOverheadAllocation,
 } from './finance-overhead'
 export type {
   OverheadTransactionWithAllocations,
   OverheadDashboard,
+  ProjectOverheadItem,
 } from './finance-overhead'
 
 // KPIs & Dashboards
 export {
   getCompanyTransactions,
+  getCompanyFinanceBalance,
   getCompanyFinanceDashboard,
   getFinanceExecutiveDashboard,
   getProjectFinanceExecutiveDashboard,

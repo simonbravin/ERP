@@ -1,6 +1,5 @@
 'use client'
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Link } from '@/i18n/navigation'
 import { formatCurrency, formatDateShort } from '@/lib/format-utils'
@@ -28,23 +27,25 @@ function toNum(v: unknown): number {
   return (v as { toNumber?: () => number })?.toNumber?.() ?? 0
 }
 
+const CARD_CLASS = 'rounded-xl border border-border/60 bg-card shadow-sm min-w-0'
+
 export function RecentMovements({ movements }: RecentMovementsProps) {
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-base font-medium">Movimientos recientes</CardTitle>
+    <div className={CARD_CLASS}>
+      <div className="flex flex-row items-center justify-between border-b border-border px-5 py-4">
+        <h3 className="text-base font-medium">Movimientos recientes</h3>
         <Link
           href="/inventory/movements"
           className="text-sm font-medium text-primary hover:underline"
         >
           Ver historial
         </Link>
-      </CardHeader>
-      <CardContent>
+      </div>
+      <div className="px-5 py-4">
         {movements.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted-foreground">No hay movimientos recientes</p>
         ) : (
-          <div className="overflow-hidden rounded-md border border-border">
+          <div className="max-h-[400px] overflow-y-auto overflow-x-hidden rounded-md border border-border">
             <table className="w-full text-sm">
               <thead className="border-b border-border bg-muted/50">
                 <tr>
@@ -83,7 +84,7 @@ export function RecentMovements({ movements }: RecentMovementsProps) {
             </table>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }

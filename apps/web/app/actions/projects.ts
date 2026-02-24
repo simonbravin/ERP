@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { prisma } from '@repo/database'
 import { requireRole } from '@/lib/rbac'
 import { requirePermission, getAuthContext } from '@/lib/auth-helpers'
+import { isRestrictedToProjects, getVisibleProjectIds } from '@/lib/org-context'
 import { createAuditLog } from '@/lib/audit-log'
 import { publishOutboxEvent } from '@/lib/events/event-publisher'
 import {
@@ -41,15 +42,20 @@ export type ListProjectsFilters = {
 export async function listProjects(filters: ListProjectsFilters = {}) {
   const { org } = await getAuthContext()
   const where: Prisma.ProjectWhereInput = { orgId: org.orgId, active: true }
-  
+
+  const allowedProjectIds = await getVisibleProjectIds(org)
+  if (Array.isArray(allowedProjectIds)) {
+    where.id = { in: allowedProjectIds }
+  }
+
   if (filters.status && filters.status !== 'all') {
     where.status = filters.status
   }
-  
+
   if (filters.phase && filters.phase !== 'all') {
     where.phase = filters.phase as 'PRE_CONSTRUCTION' | 'CONSTRUCTION' | 'CLOSEOUT' | 'COMPLETE'
   }
-  
+
   if (filters.search?.trim()) {
     where.OR = [
       { name: { contains: filters.search.trim(), mode: 'insensitive' } },
@@ -57,7 +63,7 @@ export async function listProjects(filters: ListProjectsFilters = {}) {
       { clientName: { contains: filters.search.trim(), mode: 'insensitive' } },
     ]
   }
-  
+
   const projects = await prisma.project.findMany({
     where,
     orderBy: { createdAt: 'desc' },
@@ -114,6 +120,31 @@ export async function createProject(data: CreateProjectInput) {
         active: true,
       },
     })
+    const rootFolder = await tx.documentFolder.create({
+      data: {
+        orgId: org.orgId,
+        projectId: project.id,
+        parentId: null,
+        name: project.name,
+      },
+    })
+    const defaultSubfolderNames = [
+      'Planos',
+      'Renders',
+      'Legales',
+      'Documentos comerciales',
+      'Obra',
+    ]
+    for (const name of defaultSubfolderNames) {
+      await tx.documentFolder.create({
+        data: {
+          orgId: org.orgId,
+          projectId: project.id,
+          parentId: rootFolder.id,
+          name,
+        },
+      })
+    }
     await publishOutboxEvent(tx, {
       orgId: org.orgId,
       eventType: 'PROJECT.CREATED',
@@ -172,6 +203,32 @@ export async function createProjectFromTemplate(data: {
         active: true,
       },
     })
+
+    const rootFolder = await prisma.documentFolder.create({
+      data: {
+        orgId: org.orgId,
+        projectId: project.id,
+        parentId: null,
+        name: project.name,
+      },
+    })
+    const defaultSubfolderNames = [
+      'Planos',
+      'Renders',
+      'Legales',
+      'Documentos comerciales',
+      'Obra',
+    ]
+    for (const name of defaultSubfolderNames) {
+      await prisma.documentFolder.create({
+        data: {
+          orgId: org.orgId,
+          projectId: project.id,
+          parentId: rootFolder.id,
+          name,
+        },
+      })
+    }
 
     const wbsTemplates = await prisma.wbsTemplate.findMany({
       where: { projectTemplateId: data.templateId },
@@ -256,6 +313,10 @@ export async function getProject(projectId: string) {
     },
   })
   if (!project) return null
+  if (isRestrictedToProjects(org)) {
+    const allowedIds = await getVisibleProjectIds(org)
+    if (allowedIds !== null && !allowedIds.includes(projectId)) return null
+  }
   return project
 }
 
@@ -271,9 +332,7 @@ export async function updateProject(projectId: string, data: UpdateProjectInput)
   const { org, session } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
 
-  const existing = await prisma.project.findFirst({
-    where: { id: projectId, orgId: org.orgId },
-  })
+  const existing = await getProject(projectId)
   if (!existing) {
     return { error: { _form: ['Project not found'] } }
   }
@@ -355,9 +414,7 @@ export async function deleteProject(projectId: string) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
 
-  const existing = await prisma.project.findFirst({
-    where: { id: projectId, orgId: org.orgId },
-  })
+  const existing = await getProject(projectId)
   if (!existing) {
     throw new Error('Project not found')
   }

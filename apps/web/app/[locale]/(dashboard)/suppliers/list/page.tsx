@@ -11,7 +11,7 @@ import { Plus } from 'lucide-react'
 import { Link } from '@/i18n/navigation'
 
 type PageProps = {
-  searchParams: Promise<{ q?: string; category?: string; tab?: string }>
+  searchParams: Promise<{ q?: string; category?: string; tab?: string; filter?: string }>
 }
 
 export default async function SuppliersListPage({ searchParams }: PageProps) {

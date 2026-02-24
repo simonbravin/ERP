@@ -1,13 +1,32 @@
 'use server'
 
 import { prisma } from '@repo/database'
-import { getAuthContext } from '@/lib/auth-helpers'
+import { requireOrgFinanceAccess } from '@/lib/auth-helpers'
 import { serializeTransaction } from './finance-helpers'
 import { getOverheadDashboard, type OverheadDashboard } from './finance-overhead'
 
 // ====================
 // FINANZAS GLOBAL DE EMPRESA (módulo top-level, multi-tenant estricto)
 // ====================
+
+/** Balance de la empresa (ingresos pagados − gastos pagados). Para mostrar en Transacciones de la empresa. */
+export async function getCompanyFinanceBalance(): Promise<number> {
+  const { org } = await requireOrgFinanceAccess()
+  const baseWhere = { orgId: org.orgId, deleted: false }
+  const [totalIncome, totalExpense] = await Promise.all([
+    prisma.financeTransaction.aggregate({
+      where: { ...baseWhere, type: { in: ['INCOME', 'SALE'] }, status: 'PAID' },
+      _sum: { amountBaseCurrency: true },
+    }),
+    prisma.financeTransaction.aggregate({
+      where: { ...baseWhere, type: { in: ['EXPENSE', 'PURCHASE', 'OVERHEAD'] }, status: 'PAID' },
+      _sum: { amountBaseCurrency: true },
+    }),
+  ])
+  const ti = Number(totalIncome._sum.amountBaseCurrency ?? 0)
+  const te = Number(totalExpense._sum.amountBaseCurrency ?? 0)
+  return ti - te
+}
 
 export type CompanyTransactionsFilters = {
   projectId?: string | null // 'null' o null = solo overhead
@@ -22,7 +41,7 @@ export type CompanyTransactionsFilters = {
 }
 
 export async function getCompanyTransactions(filters: CompanyTransactionsFilters = {}) {
-  const { org } = await getAuthContext()
+  const { org } = await requireOrgFinanceAccess()
   if (filters.projectId && filters.projectId !== 'null') {
     const project = await prisma.project.findFirst({
       where: { id: filters.projectId, orgId: org.orgId },
@@ -137,7 +156,7 @@ export type CompanyFinanceDashboard = {
 }
 
 export async function getCompanyFinanceDashboard(): Promise<CompanyFinanceDashboard> {
-  const { org } = await getAuthContext()
+  const { org } = await requireOrgFinanceAccess()
   const now = new Date()
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
   const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
@@ -290,7 +309,7 @@ export type FinanceExecutiveDashboard = {
 }
 
 export async function getFinanceExecutiveDashboard(): Promise<FinanceExecutiveDashboard> {
-  const { org } = await getAuthContext()
+  const { org } = await requireOrgFinanceAccess()
   const now = new Date()
   const currentYear = now.getFullYear()
   const currentMonth = now.getMonth()
@@ -463,6 +482,10 @@ export async function getFinanceExecutiveDashboard(): Promise<FinanceExecutiveDa
 
 export type ProjectFinanceExecutiveDashboard = {
   summary: CompanyFinanceDashboard
+  /** Presupuesto aprobado del proyecto (suma salePriceTotal de versión APPROVED). */
+  budgeted: number
+  /** Gasto real pagado del proyecto (EXPENSE/PURCHASE/OVERHEAD PAID). */
+  consumed: number
   monthlyTrend: Array<{ month: string; income: number; expense: number; balance: number }>
   expensesByType: Array<{ type: string; total: number; count: number }>
   topSuppliers: Array<{ supplierId: string; supplierName: string; total: number; count: number }>
@@ -471,7 +494,7 @@ export type ProjectFinanceExecutiveDashboard = {
 export async function getProjectFinanceExecutiveDashboard(
   projectId: string
 ): Promise<ProjectFinanceExecutiveDashboard> {
-  const { org } = await getAuthContext()
+  const { org } = await requireOrgFinanceAccess()
   const project = await prisma.project.findFirst({
     where: { id: projectId, orgId: org.orgId },
     select: { id: true },
@@ -491,9 +514,7 @@ export async function getProjectFinanceExecutiveDashboard(
 
   const baseWhere = { orgId: org.orgId, projectId, deleted: false }
 
-  const [
-    totalIncome,
-    totalExpense,
+  const [approvedBudgetVersion, totalIncome, totalExpense,
     pendingIncome,
     pendingExpense,
     currentMonthIncome,
@@ -503,6 +524,14 @@ export async function getProjectFinanceExecutiveDashboard(
     expensesByTypeRaw,
     txBySupplier,
   ] = await Promise.all([
+    prisma.budgetVersion.findFirst({
+      where: { projectId, orgId: org.orgId, status: 'APPROVED' },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        budgetLines: { select: { salePriceTotal: true } },
+      },
+    }),
     prisma.financeTransaction.aggregate({
       where: { ...baseWhere, type: { in: ['INCOME', 'SALE'] }, status: 'PAID' },
       _sum: { amountBaseCurrency: true },
@@ -574,8 +603,14 @@ export async function getProjectFinanceExecutiveDashboard(
     }),
   ])
 
+  const budgeted =
+    approvedBudgetVersion?.budgetLines.reduce(
+      (s, bl) => s + Number(bl.salePriceTotal),
+      0
+    ) ?? 0
   const ti = Number(totalIncome._sum.amountBaseCurrency ?? 0)
   const te = Number(totalExpense._sum.amountBaseCurrency ?? 0)
+  const consumed = te
   const cmi = Number(currentMonthIncome._sum.amountBaseCurrency ?? 0)
   const cme = Number(currentMonthExpense._sum.amountBaseCurrency ?? 0)
 
@@ -651,7 +686,7 @@ export async function getProjectFinanceExecutiveDashboard(
     topProjects: [],
   }
 
-  return { summary, monthlyTrend, expensesByType, topSuppliers }
+  return { summary, budgeted, consumed, monthlyTrend, expensesByType, topSuppliers }
 }
 
 // ====================
@@ -661,7 +696,7 @@ export async function getProjectFinanceExecutiveDashboard(
 export async function getActiveProjects(): Promise<
   Array<{ id: string; name: string; projectNumber: string }>
 > {
-  const { org } = await getAuthContext()
+  const { org } = await requireOrgFinanceAccess()
   return prisma.project.findMany({
     where: { orgId: org.orgId, active: true },
     select: { id: true, name: true, projectNumber: true },
@@ -672,7 +707,7 @@ export async function getActiveProjects(): Promise<
 export async function getAllProjects(): Promise<
   Array<{ id: string; name: string; projectNumber: string }>
 > {
-  const { org } = await getAuthContext()
+  const { org } = await requireOrgFinanceAccess()
   return prisma.project.findMany({
     where: { orgId: org.orgId },
     select: { id: true, name: true, projectNumber: true },
@@ -684,7 +719,7 @@ export async function getFinanceFilterOptions(): Promise<{
   projects: Array<{ id: string; name: string; projectNumber: string }>
   parties: Array<{ id: string; name: string; partyType: string }>
 }> {
-  const { org } = await getAuthContext()
+  const { org } = await requireOrgFinanceAccess()
   const [projects, parties] = await Promise.all([
     prisma.project.findMany({
       where: { orgId: org.orgId, active: true },

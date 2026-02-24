@@ -1,6 +1,6 @@
 'use client'
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
 import { formatCurrency, formatCurrencyForDisplay } from '@/lib/format-utils'
 import { TrendingUp, TrendingDown, ArrowUpCircle, ArrowDownCircle } from 'lucide-react'
 
@@ -17,6 +17,9 @@ interface CompanyFinanceKPICardsProps {
     unallocatedOverhead: number
   }
 }
+
+const CARD_WRAPPER =
+  'rounded-xl border border-border/60 bg-card p-5 shadow-sm transition-shadow hover:shadow-md min-w-0'
 
 export function CompanyFinanceKPICards({ data }: CompanyFinanceKPICardsProps) {
   const cards = [
@@ -57,23 +60,41 @@ export function CompanyFinanceKPICards({ data }: CompanyFinanceKPICardsProps) {
     default: 'text-slate-600 dark:text-slate-400',
   }
 
+  const iconBgClasses = {
+    success: 'text-green-600 bg-green-100 dark:bg-green-950/50 dark:text-green-400',
+    destructive: 'text-red-600 bg-red-100 dark:bg-red-950/50 dark:text-red-400',
+    warning: 'text-amber-600 bg-amber-100 dark:bg-amber-950/50 dark:text-amber-400',
+    default: 'text-slate-600 bg-slate-100 dark:bg-slate-950/50 dark:text-slate-400',
+  }
+
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {cards.map((card) => (
-        <Card key={card.title}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{card.title}</CardTitle>
-            <card.icon className={`h-4 w-4 ${variantClasses[card.variant]}`} />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold erp-kpi-value min-w-0 ${card.value >= 0 ? variantClasses.success : variantClasses.destructive}`}>
-              {formatCurrencyForDisplay(card.value, 'ARS')}
+        <div key={card.title} className={CARD_WRAPPER}>
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-muted-foreground">{card.title}</p>
+              <p
+                className={cn(
+                  'mt-1.5 min-w-0 font-semibold tabular-nums text-foreground',
+                  'text-xl lg:text-lg',
+                  card.value >= 0 ? variantClasses.success : variantClasses.destructive
+                )}
+              >
+                {formatCurrencyForDisplay(card.value, 'ARS')}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">{card.description}</p>
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {card.description}
-            </p>
-          </CardContent>
-        </Card>
+            <div
+              className={cn(
+                'flex h-11 w-11 shrink-0 items-center justify-center rounded-lg',
+                iconBgClasses[card.variant]
+              )}
+            >
+              <card.icon className="h-5 w-5" />
+            </div>
+          </div>
+        </div>
       ))}
     </div>
   )

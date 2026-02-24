@@ -25,11 +25,14 @@ export default async function TeamPage() {
   const canInvite = ['OWNER', 'ADMIN'].includes(orgContext.role)
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-foreground">{t('team')}</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Gestiona los miembros de tu organización
+    <div className="erp-view-container space-y-6 bg-background">
+      <div className="erp-section-header">
+        <h1 className="erp-page-title">{t('team')}</h1>
+        <p className="erp-section-desc">
+          Gestiona los miembros de tu organización y sus permisos globales.
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Este es el equipo a nivel empresa. El equipo de cada proyecto se gestiona dentro del proyecto (Equipo del Proyecto). Podés asignar a un usuario solo a uno o pocos proyectos y limitar sus permisos desde aquí (por ejemplo, subcontratistas que solo ven esos proyectos).
         </p>
       </div>
 
@@ -47,6 +50,7 @@ export default async function TeamPage() {
           <TeamMembersClient
             initialMembers={members}
             canInvite={canInvite}
+            currentUserId={session.user.id}
           />
         </TabsContent>
 

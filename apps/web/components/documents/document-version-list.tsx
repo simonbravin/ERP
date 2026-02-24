@@ -1,11 +1,14 @@
 'use client'
 
 import { useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { getDocumentDownloadUrl } from '@/app/actions/documents'
 import { uploadNewVersion } from '@/app/actions/documents'
 import { useRouter } from 'next/navigation'
 import { FileUploader } from './file-uploader'
+import { DocumentViewerModal } from './document-viewer-modal'
+import { toast } from 'sonner'
 
 export type DocumentVersionRow = {
   id: string
@@ -44,17 +47,29 @@ export function DocumentVersionList({
   const router = useRouter()
   const [showUpload, setShowUpload] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [viewingVersion, setViewingVersion] = useState<{
+    id: string
+    mimeType: string
+    fileName: string
+  } | null>(null)
+
+  const t = useTranslations('documents')
+
+  const canPreview = (mime: string, name: string) =>
+    mime === 'application/pdf' ||
+    name.toLowerCase().endsWith('.pdf') ||
+    mime.startsWith('image/')
 
   async function handleDownload(versionId: string) {
     try {
       const { url } = await getDocumentDownloadUrl(versionId)
       if (url.startsWith('#mock-')) {
-        alert('Downloads require R2 configuration. Set R2_* env vars for production.')
+        toast.warning(t('downloadsRequireR2'))
         return
       }
       window.open(url, '_blank')
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Download failed')
+      toast.error(err instanceof Error ? err.message : t('downloadFailed'))
     }
   }
 
@@ -66,8 +81,9 @@ export function DocumentVersionList({
       await uploadNewVersion(documentId, formData)
       setShowUpload(false)
       router.refresh()
+      toast.success(t('uploadDocument'))
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Upload failed')
+      toast.error(err instanceof Error ? err.message : t('uploadFailed'))
     } finally {
       setUploading(false)
     }
@@ -77,7 +93,7 @@ export function DocumentVersionList({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-medium text-gray-900 dark:text-white">
-          Versions
+          {t('versions')}
         </h2>
         {canUpload && (
           <Button
@@ -86,7 +102,7 @@ export function DocumentVersionList({
             className="h-8 text-sm"
             onClick={() => setShowUpload(!showUpload)}
           >
-            {showUpload ? 'Cancel' : 'Upload new version'}
+            {showUpload ? t('cancel') : t('uploadNewVersion')}
           </Button>
         )}
       </div>
@@ -96,11 +112,11 @@ export function DocumentVersionList({
           onSubmit={handleUploadNewVersion}
           className="erp-form-page rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/50"
         >
-          <h3 className="mb-3 text-sm font-medium">New version</h3>
+          <h3 className="mb-3 text-sm font-medium">{t('newVersion')}</h3>
           <div className="space-y-3">
             <FileUploader name="file" required />
             <div>
-              <label className="block text-sm font-medium">Notes (optional)</label>
+              <label className="block text-sm font-medium">{t('notesOptional')}</label>
               <input
                 type="text"
                 name="notes"
@@ -109,14 +125,14 @@ export function DocumentVersionList({
             </div>
             <div className="flex gap-2">
               <Button type="submit" disabled={uploading}>
-                {uploading ? 'Uploading…' : 'Upload'}
+                {uploading ? t('uploading') : t('uploadButton')}
               </Button>
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setShowUpload(false)}
               >
-                Cancel
+                {t('cancel')}
               </Button>
             </div>
           </div>
@@ -124,25 +140,25 @@ export function DocumentVersionList({
       )}
 
       {versions.length === 0 ? (
-        <p className="text-sm text-gray-500">No versions yet.</p>
+        <p className="text-sm text-gray-500">{t('noVersionsYet')}</p>
       ) : (
         <div className="rounded-lg border border-gray-200 dark:border-gray-700">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50">
                 <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">
-                  Version
+                  {t('versions')}
                 </th>
                 <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">
                   File
                 </th>
                 <th className="px-3 py-2 text-right font-medium text-gray-600 dark:text-gray-400">
-                  Size
+                  {t('size')}
                 </th>
                 <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">
                   Uploaded
                 </th>
-                <th className="w-24 px-3 py-2" />
+                <th className="w-32 px-3 py-2" />
               </tr>
             </thead>
             <tbody>
@@ -164,20 +180,48 @@ export function DocumentVersionList({
                     {formatDate(v.uploadedAt)} by {v.uploadedBy.user.fullName}
                   </td>
                   <td className="px-3 py-2">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="h-8 px-2 text-xs"
-                      onClick={() => handleDownload(v.id)}
-                    >
-                      Download
-                    </Button>
+                    <div className="flex gap-1">
+                      {canPreview(v.mimeType, v.fileName) && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="h-8 px-2 text-xs"
+                          onClick={() =>
+                            setViewingVersion({
+                              id: v.id,
+                              mimeType: v.mimeType,
+                              fileName: v.fileName,
+                            })
+                          }
+                        >
+                          {t('view')}
+                        </Button>
+                      )}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="h-8 px-2 text-xs"
+                        onClick={() => handleDownload(v.id)}
+                      >
+                        {t('download')}
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+      )}
+
+      {viewingVersion && (
+        <DocumentViewerModal
+          versionId={viewingVersion.id}
+          mimeType={viewingVersion.mimeType}
+          fileName={viewingVersion.fileName}
+          open={!!viewingVersion}
+          onClose={() => setViewingVersion(null)}
+        />
       )}
     </div>
   )

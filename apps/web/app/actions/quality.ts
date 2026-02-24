@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { prisma } from '@repo/database'
 import { requireRole } from '@/lib/rbac'
 import { getAuthContext } from '@/lib/auth-helpers'
+import { assertProjectAccess, canEditProjectArea, PROJECT_AREAS } from '@/lib/project-permissions'
 
 async function generateRfiNumber(projectId: string): Promise<number> {
   const lastRfi = await prisma.rFI.findFirst({
@@ -32,6 +33,15 @@ export async function createRfi(
     where: { id: projectId, orgId: org.orgId },
   })
   if (!project) throw new Error('Project not found')
+  try {
+    const access = await assertProjectAccess(projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.QUALITY)) {
+      throw new Error('No tenés permiso para editar calidad de este proyecto')
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('permiso')) throw e
+    throw new Error(e instanceof Error ? e.message : 'Acceso denegado')
+  }
 
   const number = await generateRfiNumber(projectId)
 
@@ -64,6 +74,15 @@ export async function addRfiComment(rfiId: string, comment: string) {
     select: { projectId: true },
   })
   if (!rfi) throw new Error('RFI not found')
+  try {
+    const access = await assertProjectAccess(rfi.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.QUALITY)) {
+      throw new Error('No tenés permiso para editar calidad de este proyecto')
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('permiso')) throw e
+    throw new Error(e instanceof Error ? e.message : 'Acceso denegado')
+  }
 
   await prisma.rFIComment.create({
     data: {
@@ -87,6 +106,15 @@ export async function answerRfi(rfiId: string, answer: string) {
     select: { projectId: true },
   })
   if (!rfi) throw new Error('RFI not found')
+  try {
+    const access = await assertProjectAccess(rfi.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.QUALITY)) {
+      throw new Error('No tenés permiso para editar calidad de este proyecto')
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('permiso')) throw e
+    throw new Error(e instanceof Error ? e.message : 'Acceso denegado')
+  }
 
   await prisma.rFI.update({
     where: { id: rfiId },
@@ -111,6 +139,15 @@ export async function closeRfi(rfiId: string) {
     select: { projectId: true },
   })
   if (!rfi) throw new Error('RFI not found')
+  try {
+    const access = await assertProjectAccess(rfi.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.QUALITY)) {
+      throw new Error('No tenés permiso para editar calidad de este proyecto')
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('permiso')) throw e
+    throw new Error(e instanceof Error ? e.message : 'Acceso denegado')
+  }
 
   await prisma.rFI.update({
     where: { id: rfiId },
@@ -142,6 +179,15 @@ export async function createSubmittal(
     where: { id: projectId, orgId: org.orgId },
   })
   if (!project) throw new Error('Project not found')
+  try {
+    const access = await assertProjectAccess(projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.QUALITY)) {
+      throw new Error('No tenés permiso para editar calidad de este proyecto')
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('permiso')) throw e
+    throw new Error(e instanceof Error ? e.message : 'Acceso denegado')
+  }
 
   const lastSubmittal = await prisma.submittal.findFirst({
     where: { projectId },
@@ -179,6 +225,15 @@ export async function submitSubmittal(submittalId: string) {
     select: { projectId: true },
   })
   if (!submittal) throw new Error('Submittal not found')
+  try {
+    const access = await assertProjectAccess(submittal.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.QUALITY)) {
+      throw new Error('No tenés permiso para editar calidad de este proyecto')
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('permiso')) throw e
+    throw new Error(e instanceof Error ? e.message : 'Acceso denegado')
+  }
 
   await prisma.submittal.update({
     where: { id: submittalId },
@@ -208,6 +263,15 @@ export async function reviewSubmittal(
     select: { projectId: true, revisionNumber: true },
   })
   if (!submittal) throw new Error('Submittal not found')
+  try {
+    const access = await assertProjectAccess(submittal.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.QUALITY)) {
+      throw new Error('No tenés permiso para editar calidad de este proyecto')
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('permiso')) throw e
+    throw new Error(e instanceof Error ? e.message : 'Acceso denegado')
+  }
 
   const newRevision = ['REJECTED', 'REVISE_AND_RESUBMIT'].includes(data.status)
     ? submittal.revisionNumber + 1

@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { prisma, Prisma } from '@repo/database'
 import { requireRole, hasMinimumRole } from '@/lib/rbac'
 import { getAuthContext } from '@/lib/auth-helpers'
+import { assertProjectAccess, canEditProjectArea, PROJECT_AREAS } from '@/lib/project-permissions'
 import { type PrismaTransaction } from '@/lib/events/event-publisher'
 import { publishOutboxEvent } from '@/lib/events/event-publisher'
 import {
@@ -49,6 +50,11 @@ export type ListChangeOrdersFilters = { status?: string }
 
 export async function listChangeOrders(projectId: string, filters: ListChangeOrdersFilters = {}) {
   const { org } = await getAuthContext()
+  try {
+    await assertProjectAccess(projectId, org)
+  } catch {
+    return null
+  }
   const project = await ensureProjectInOrg(projectId, org.orgId)
   if (!project) return null
 
@@ -104,6 +110,11 @@ export async function getChangeOrder(coId: string) {
     },
   })
   if (!co) return null
+  try {
+    await assertProjectAccess(co.projectId, org)
+  } catch {
+    return null
+  }
   return {
     ...co,
     costImpact: Number(co.costImpact),
@@ -117,6 +128,14 @@ export async function createChangeOrder(projectId: string, data: CreateChangeOrd
 
   const project = await ensureProjectInOrg(projectId, org.orgId)
   if (!project) return { error: { _form: ['Project not found'] } }
+  try {
+    const access = await assertProjectAccess(projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.OVERVIEW)) {
+      return { error: { _form: ['No tenés permiso para editar órdenes de cambio de este proyecto'] } }
+    }
+  } catch (e) {
+    return { error: { _form: [e instanceof Error ? e.message : 'Acceso denegado'] } }
+  }
 
   const parsed = createChangeOrderSchema.safeParse(data)
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
@@ -190,6 +209,14 @@ export async function createChangeOrderLine(coId: string, data: CreateChangeOrde
   if (!isEditableCO(co.status)) {
     return { error: { _form: ['Cannot add lines to this change order.'] } }
   }
+  try {
+    const access = await assertProjectAccess(co.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.OVERVIEW)) {
+      return { error: { _form: ['No tenés permiso para editar órdenes de cambio de este proyecto'] } }
+    }
+  } catch (e) {
+    return { error: { _form: [e instanceof Error ? e.message : 'Acceso denegado'] } }
+  }
 
   const parsed = createChangeOrderLineSchema.safeParse(data)
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
@@ -250,6 +277,14 @@ export async function updateChangeOrderLine(lineId: string, data: UpdateChangeOr
   if (!isEditableCO(line.changeOrder.status)) {
     return { error: { _form: ['Cannot edit this change order.'] } }
   }
+  try {
+    const access = await assertProjectAccess(line.changeOrder.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.OVERVIEW)) {
+      return { error: { _form: ['No tenés permiso para editar órdenes de cambio de este proyecto'] } }
+    }
+  } catch (e) {
+    return { error: { _form: [e instanceof Error ? e.message : 'Acceso denegado'] } }
+  }
 
   const parsed = updateChangeOrderLineSchema.safeParse(data)
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
@@ -283,6 +318,15 @@ export async function deleteChangeOrderLine(lineId: string) {
   })
   if (!line) throw new Error('Line not found')
   if (!isEditableCO(line.changeOrder.status)) throw new Error('Cannot edit this change order.')
+  try {
+    const access = await assertProjectAccess(line.changeOrder.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.OVERVIEW)) {
+      throw new Error('No tenés permiso para editar órdenes de cambio de este proyecto')
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('permiso')) throw e
+    throw new Error(e instanceof Error ? e.message : 'Acceso denegado')
+  }
 
   await prisma.$transaction(async (tx) => {
     await tx.changeOrderLine.delete({ where: { id: lineId } })
@@ -318,6 +362,14 @@ export async function updateChangeOrderWithLines(
   })
   if (!co) return { error: { _form: ['Change order not found'] } }
   if (!isEditableCO(co.status)) return { error: { _form: ['Cannot edit this change order.'] } }
+  try {
+    const access = await assertProjectAccess(co.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.OVERVIEW)) {
+      return { error: { _form: ['No tenés permiso para editar órdenes de cambio de este proyecto'] } }
+    }
+  } catch (e) {
+    return { error: { _form: [e instanceof Error ? e.message : 'Acceso denegado'] } }
+  }
 
   const parsed = updateChangeOrderSchema.safeParse(data)
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
@@ -392,6 +444,14 @@ export async function updateChangeOrder(coId: string, data: UpdateChangeOrderInp
   if (!isEditableCO(co.status)) {
     return { error: { _form: ['Cannot edit this change order.'] } }
   }
+  try {
+    const access = await assertProjectAccess(co.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.OVERVIEW)) {
+      return { error: { _form: ['No tenés permiso para editar órdenes de cambio de este proyecto'] } }
+    }
+  } catch (e) {
+    return { error: { _form: [e instanceof Error ? e.message : 'Acceso denegado'] } }
+  }
 
   const parsed = updateChangeOrderSchema.safeParse(data)
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
@@ -448,6 +508,14 @@ export async function submitForApproval(coId: string) {
   if (co.status !== 'DRAFT' && co.status !== 'CHANGES_REQUESTED') {
     return { error: 'Only draft or changes-requested orders can be submitted.' }
   }
+  try {
+    const access = await assertProjectAccess(co.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.OVERVIEW)) {
+      return { error: 'No tenés permiso para editar órdenes de cambio de este proyecto' }
+    }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Acceso denegado' }
+  }
 
   await prisma.changeOrder.update({
     where: { id: coId },
@@ -487,6 +555,14 @@ export async function approveChangeOrder(coId: string) {
   })
   if (!co) return { error: 'Change order not found' }
   if (co.status !== 'SUBMITTED') return { error: 'Only submitted change orders can be approved.' }
+  try {
+    const access = await assertProjectAccess(co.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.OVERVIEW)) {
+      return { error: 'No tenés permiso para editar órdenes de cambio de este proyecto' }
+    }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Acceso denegado' }
+  }
 
   await prisma.$transaction(async (tx: PrismaTransaction) => {
     const latestVersion = await tx.budgetVersion.findFirst({
@@ -619,6 +695,14 @@ export async function rejectChangeOrder(coId: string, reason: string) {
   })
   if (!co) return { error: 'Change order not found' }
   if (co.status !== 'SUBMITTED') return { error: 'Only submitted change orders can be rejected.' }
+  try {
+    const access = await assertProjectAccess(co.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.OVERVIEW)) {
+      return { error: 'No tenés permiso para editar órdenes de cambio de este proyecto' }
+    }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Acceso denegado' }
+  }
 
   await prisma.$transaction([
     prisma.changeOrder.update({
@@ -650,6 +734,14 @@ export async function requestChanges(coId: string, feedback: string) {
   })
   if (!co) return { error: 'Change order not found' }
   if (co.status !== 'SUBMITTED') return { error: 'Only submitted change orders can be sent back.' }
+  try {
+    const access = await assertProjectAccess(co.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.OVERVIEW)) {
+      return { error: 'No tenés permiso para editar órdenes de cambio de este proyecto' }
+    }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Acceso denegado' }
+  }
 
   await prisma.$transaction([
     prisma.changeOrder.update({

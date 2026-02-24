@@ -69,7 +69,7 @@ export function ProjectsListClient({ projects, canEdit, showExport = false }: Pr
   const searchParams = useSearchParams()
 
   const [sorting, setSorting] = useState<SortingState>([])
-  const [viewMode, setViewMode] = useState<'table' | 'grid'>('table')
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>('grid')
   const [showExportDialog, setShowExportDialog] = useState(false)
 
   const exportColumns = [

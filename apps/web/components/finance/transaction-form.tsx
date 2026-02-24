@@ -197,7 +197,7 @@ export function TransactionForm({
 
       <div className="erp-card p-4">
         <h3 className="mb-4 text-sm font-medium text-foreground">Lines</h3>
-        <TransactionLineForm wbsOptions={wbsOptionsToUse} onAdd={handleAddLine} />
+        <TransactionLineForm wbsOptions={wbsOptionsToUse} onAdd={handleAddLine} projectId={projectId ?? null} />
         {lines.length > 0 && (
           <div className="mt-4">
             <table className="erp-table w-full text-sm">

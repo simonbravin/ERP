@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import Link from 'next/link'
 import { useTranslations } from 'next-intl'
+import { Link } from '@/i18n/navigation'
 import { formatCurrency, formatDateShort } from '@/lib/format-utils'
 import {
   getCompanyAccountsReceivable,
@@ -21,12 +21,15 @@ import {
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { DOCUMENT_TYPE_LABELS } from '@/lib/finance-labels'
+import { ArrowUpCircle } from 'lucide-react'
 
 interface Props {
   initialItems: AccountsReceivableItem[]
   filterOptions: { projects: Array<{ id: string; name: string; projectNumber: string }>; parties: Array<{ id: string; name: string; partyType: string }> }
   projectId?: string | null
   title?: string
+  /** Saldo a cobrar al día (total inicial sin filtros). Se muestra arriba cuando es ámbito proyecto. */
+  saldoCobrar?: number
 }
 
 export function AccountsReceivableListClient({
@@ -34,6 +37,7 @@ export function AccountsReceivableListClient({
   filterOptions,
   projectId = null,
   title = 'Cuentas por cobrar',
+  saldoCobrar,
 }: Props) {
   const [items, setItems] = useState<AccountsReceivableItem[]>(initialItems)
   const [isPending, startTransition] = useTransition()
@@ -62,6 +66,20 @@ export function AccountsReceivableListClient({
 
   return (
     <div className="space-y-4">
+      {projectId && saldoCobrar !== undefined && (
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-border bg-card px-4 py-3">
+          <div className="flex items-center gap-2">
+            <ArrowUpCircle className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium text-muted-foreground">Saldo a cobrar:</span>
+            <span className="tabular-nums font-semibold text-foreground">
+              {formatCurrency(saldoCobrar, 'ARS')}
+            </span>
+          </div>
+          <Button variant="link" size="sm" className="h-auto p-0" asChild>
+            <Link href={`/projects/${projectId}/finance/cash-projection`}>Ver proyección de caja</Link>
+          </Button>
+        </div>
+      )}
       <h2 className="text-lg font-semibold text-foreground">{title}</h2>
 
       <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-3">

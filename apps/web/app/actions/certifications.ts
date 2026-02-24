@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { prisma, Prisma } from '@repo/database'
 import { requireRole } from '@/lib/rbac'
 import { requirePermission, getAuthContext } from '@/lib/auth-helpers'
+import { assertProjectAccess, canEditProjectArea, PROJECT_AREAS } from '@/lib/project-permissions'
 import crypto from 'crypto'
 import { publishOutboxEvent } from '@/lib/events/event-publisher'
 
@@ -68,6 +69,15 @@ export async function createCertification(
     where: { id: projectId, orgId: org.orgId },
   })
   if (!project) throw new Error('Project not found')
+  try {
+    const access = await assertProjectAccess(projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.REPORTS)) {
+      throw new Error('No tenés permiso para editar certificaciones de este proyecto')
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('permiso')) throw e
+    throw new Error(e instanceof Error ? e.message : 'Acceso denegado')
+  }
 
   const number = await generateCertNumber(projectId)
   const issuedDateValue = data.issuedDate ? new Date(data.issuedDate) : undefined
@@ -115,6 +125,15 @@ export async function addCertificationLine(
     where: { id: certId, orgId: org.orgId, status: 'DRAFT' },
   })
   if (!cert) throw new Error('Certification not found or not editable')
+  try {
+    const access = await assertProjectAccess(cert.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.REPORTS)) {
+      throw new Error('No tenés permiso para editar certificaciones de este proyecto')
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('permiso')) throw e
+    throw new Error(e instanceof Error ? e.message : 'Acceso denegado')
+  }
 
   const budgetLine = await prisma.budgetLine.findUnique({
     where: { id: data.budgetLineId },
@@ -189,6 +208,15 @@ export async function deleteCertificationLine(lineId: string) {
   if (line.certification.status !== 'DRAFT') {
     throw new Error('Cannot delete line from issued or approved certification')
   }
+  try {
+    const access = await assertProjectAccess(line.certification.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.REPORTS)) {
+      throw new Error('No tenés permiso para editar certificaciones de este proyecto')
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('permiso')) throw e
+    throw new Error(e instanceof Error ? e.message : 'Acceso denegado')
+  }
 
   await prisma.$transaction(async (tx) => {
     await tx.certificationLine.delete({
@@ -223,6 +251,15 @@ export async function deleteCertification(certId: string) {
   if (cert.status === 'APPROVED') {
     throw new Error('No se puede eliminar una certificación aprobada')
   }
+  try {
+    const access = await assertProjectAccess(cert.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.REPORTS)) {
+      throw new Error('No tenés permiso para editar certificaciones de este proyecto')
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('permiso')) throw e
+    throw new Error(e instanceof Error ? e.message : 'Acceso denegado')
+  }
 
   await prisma.certificationLine.deleteMany({ where: { certificationId: certId } })
   await prisma.certification.delete({ where: { id: certId } })
@@ -244,6 +281,15 @@ export async function updateCertification(
     select: { id: true, projectId: true },
   })
   if (!cert) throw new Error('Certificación no encontrada o no está en borrador')
+  try {
+    const access = await assertProjectAccess(cert.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.REPORTS)) {
+      throw new Error('No tenés permiso para editar certificaciones de este proyecto')
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('permiso')) throw e
+    throw new Error(e instanceof Error ? e.message : 'Acceso denegado')
+  }
 
   const updateData: {
     notes?: string
@@ -297,6 +343,15 @@ export async function issueCertification(certId: string) {
 
   if (!cert) throw new Error('Certification not found')
   if (cert.lines.length === 0) throw new Error('Cannot issue empty certification')
+  try {
+    const access = await assertProjectAccess(cert.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.REPORTS)) {
+      throw new Error('No tenés permiso para editar certificaciones de este proyecto')
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('permiso')) throw e
+    throw new Error(e instanceof Error ? e.message : 'Acceso denegado')
+  }
 
   const data = JSON.stringify({
     id: cert.id,
@@ -402,11 +457,28 @@ export async function getCertification(certId: string) {
       },
     },
   })
+  if (cert?.projectId) {
+    try {
+      await assertProjectAccess(cert.projectId, org)
+    } catch {
+      return null
+    }
+  }
   return cert
 }
 
 export async function getBudgetLinesForCert(budgetVersionId: string) {
   const { org } = await getAuthContext()
+  const version = await prisma.budgetVersion.findFirst({
+    where: { id: budgetVersionId, orgId: org.orgId },
+    select: { projectId: true },
+  })
+  if (!version?.projectId) return []
+  try {
+    await assertProjectAccess(version.projectId, org)
+  } catch {
+    return []
+  }
   const lines = await prisma.budgetLine.findMany({
     where: {
       budgetVersionId,
@@ -434,7 +506,18 @@ export async function getPrevProgressForBudgetLines(
   periodYear: number,
   budgetLineIds: string[]
 ): Promise<Record<string, number>> {
-  await getAuthContext()
+  const { org } = await getAuthContext()
+  const version = await prisma.budgetVersion.findFirst({
+    where: { id: budgetVersionId, orgId: org.orgId },
+    select: { projectId: true },
+  })
+  if (version?.projectId) {
+    try {
+      await assertProjectAccess(version.projectId, org)
+    } catch {
+      return {}
+    }
+  }
   const result: Record<string, number> = {}
   for (const budgetLineId of budgetLineIds) {
     const { prevPct } = await calculatePrevProgress(budgetLineId, { month: periodMonth, year: periodYear })
@@ -454,6 +537,15 @@ export async function approveCertification(certId: string) {
   })
 
   if (!cert) throw new Error('Certification not found or not issued')
+  try {
+    const access = await assertProjectAccess(cert.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.REPORTS)) {
+      throw new Error('No tenés permiso para editar certificaciones de este proyecto')
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('permiso')) throw e
+    throw new Error(e instanceof Error ? e.message : 'Acceso denegado')
+  }
 
   await prisma.$transaction(async (tx) => {
     await tx.certification.update({
@@ -521,6 +613,15 @@ export async function rejectCertification(certId: string, notes?: string) {
   })
 
   if (!cert) throw new Error('Certification not found or not issued')
+  try {
+    const access = await assertProjectAccess(cert.projectId, org)
+    if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.REPORTS)) {
+      throw new Error('No tenés permiso para editar certificaciones de este proyecto')
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('permiso')) throw e
+    throw new Error(e instanceof Error ? e.message : 'Acceso denegado')
+  }
 
   await prisma.$transaction(async (tx) => {
     await tx.certification.update({
@@ -550,6 +651,11 @@ export async function rejectCertification(certId: string, notes?: string) {
 
 export async function getProjectCertifications(projectId: string) {
   const { org } = await getAuthContext()
+  try {
+    await assertProjectAccess(projectId, org)
+  } catch {
+    return []
+  }
   const certifications = await prisma.certification.findMany({
     where: { projectId, orgId: org.orgId },
     orderBy: { number: 'desc' },
