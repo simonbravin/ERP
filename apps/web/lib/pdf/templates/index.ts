@@ -4,6 +4,7 @@ import { transactionsTemplate } from './transactions.template'
 import { certificationTemplate } from './certification.template'
 import { budgetTemplate } from './budget.template'
 import { materialsTemplate } from './materials.template'
+import { scheduleTemplate } from './schedule.template'
 
 export const documentTemplates = {
   computo: computoTemplate,
@@ -11,6 +12,7 @@ export const documentTemplates = {
   certification: certificationTemplate,
   budget: budgetTemplate,
   materials: materialsTemplate,
+  schedule: scheduleTemplate,
 } as const
 
 export type DocumentTemplateId = keyof typeof documentTemplates

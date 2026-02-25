@@ -16,7 +16,6 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import {
-  exportScheduleToPDF,
   setScheduleAsBaseline,
   updateTaskDates,
 } from '@/app/actions/schedule'
@@ -211,27 +210,24 @@ export function ScheduleViewClient({
   async function handleExportPDF() {
     setExporting(true)
     try {
-      const result = await exportScheduleToPDF(schedule.id)
-      if (result.success && result.data && result.filename) {
-        const byteCharacters = atob(result.data)
-        const byteNumbers = new Array(byteCharacters.length)
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i)
-        }
-        const byteArray = new Uint8Array(byteNumbers)
-        const blob = new Blob([byteArray], { type: 'application/pdf' })
-        const url = window.URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = result.filename
-        document.body.appendChild(a)
-        a.click()
-        window.URL.revokeObjectURL(url)
-        document.body.removeChild(a)
-        toast.success(t('exportSuccess'), { description: t('pdfDownloaded') })
-      } else {
-        toast.error(result.error ?? t('exportError'))
+      const locale = typeof document !== 'undefined' ? document.documentElement.lang || 'es' : 'es'
+      const url = `/api/pdf?template=schedule&id=${encodeURIComponent(schedule.id)}&locale=${encodeURIComponent(locale)}`
+      const res = await fetch(url, { credentials: 'include' })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        toast.error(data?.error ?? t('exportError'))
+        return
       }
+      const blob = await res.blob()
+      const disposition = res.headers.get('Content-Disposition')
+      const match = disposition?.match(/filename="?([^";]+)"?/)
+      const filename = match?.[1] ?? `cronograma-${schedule.id}.pdf`
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(blob)
+      link.download = filename
+      link.click()
+      URL.revokeObjectURL(link.href)
+      toast.success(t('exportSuccess'), { description: t('pdfDownloaded') })
     } catch {
       toast.error(t('exportError'))
     } finally {
