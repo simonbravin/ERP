@@ -9,3 +9,5 @@
 ## Document Templates
 
 All PDFs are defined as **Document Templates** in `lib/pdf/templates/`. Each template implements the contract in `lib/pdf/document-template.ts` (id, buildPrintUrl, getFileName, validateAccess). The API `GET /api/pdf` accepts `?template=<id>` (or legacy `?doc=<id>`) and uses the registry only; it contains no document-specific logic. New exportable documents must be added by creating a new template file and registering it in `templates/index.ts`.
+
+**Supported template ids:** computo, transactions, certification, budget, materials, schedule, cashflow, finance-dashboard, project-dashboard, purchases-by-supplier.
