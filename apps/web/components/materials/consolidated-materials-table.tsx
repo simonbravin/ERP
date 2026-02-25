@@ -29,7 +29,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Search, ChevronDown, ChevronRight, FileDown, List, Grid3x3, FileText, Loader2 } from 'lucide-react'
 import { ExportDialog } from '@/components/export/export-dialog'
-import { exportMaterialsToExcel, exportMaterialsToPDF, exportMaterialsBySupplierToExcel } from '@/app/actions/export'
+import { exportMaterialsToExcel, exportMaterialsBySupplierToExcel } from '@/app/actions/export'
 import { generatePurchaseOrder } from '@/app/actions/materials'
 import { toast } from 'sonner'
 import type { ConsolidatedMaterial } from '@/lib/types/materials'
@@ -61,7 +61,23 @@ export function ConsolidatedMaterialsTable({
     if (format === 'excel') {
       return await exportMaterialsToExcel(budgetVersionId, selectedColumns)
     }
-    return await exportMaterialsToPDF(budgetVersionId, selectedColumns)
+    const locale = typeof window !== 'undefined' ? document.documentElement.lang || 'es' : 'es'
+    const url = `/api/pdf?template=materials&id=${encodeURIComponent(budgetVersionId)}&locale=${encodeURIComponent(locale)}`
+    const res = await fetch(url, { credentials: 'include' })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      return { success: false, error: data?.error ?? 'No se pudo generar el PDF' }
+    }
+    const blob = await res.blob()
+    const disposition = res.headers.get('Content-Disposition')
+    const match = disposition?.match(/filename="?([^";]+)"?/)
+    const filename = match?.[1] ?? `materiales-${budgetVersionId}.pdf`
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = filename
+    link.click()
+    URL.revokeObjectURL(link.href)
+    return { success: true, filename }
   }
 
   const [searchQuery, setSearchQuery] = useState('')

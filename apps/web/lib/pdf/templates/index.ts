@@ -2,11 +2,15 @@ import type { DocumentTemplate } from '@/lib/pdf/document-template'
 import { computoTemplate } from './computo.template'
 import { transactionsTemplate } from './transactions.template'
 import { certificationTemplate } from './certification.template'
+import { budgetTemplate } from './budget.template'
+import { materialsTemplate } from './materials.template'
 
 export const documentTemplates = {
   computo: computoTemplate,
   transactions: transactionsTemplate,
   certification: certificationTemplate,
+  budget: budgetTemplate,
+  materials: materialsTemplate,
 } as const
 
 export type DocumentTemplateId = keyof typeof documentTemplates

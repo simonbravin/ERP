@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { ExportDialog } from '@/components/export/export-dialog'
-import { exportBudgetToExcel, exportBudgetToPDF } from '@/app/actions/export'
+import { exportBudgetToExcel } from '@/app/actions/export'
 import { FileDown } from 'lucide-react'
 
 interface BudgetVersionExportProps {
@@ -32,7 +32,23 @@ export function BudgetVersionExport({ versionId, versionCode }: BudgetVersionExp
     if (format === 'excel') {
       return await exportBudgetToExcel(versionId, selectedColumns)
     }
-    return await exportBudgetToPDF(versionId, selectedColumns)
+    const locale = typeof window !== 'undefined' ? document.documentElement.lang || 'es' : 'es'
+    const url = `/api/pdf?template=budget&id=${encodeURIComponent(versionId)}&locale=${encodeURIComponent(locale)}`
+    const res = await fetch(url, { credentials: 'include' })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      return { success: false, error: data?.error ?? 'No se pudo generar el PDF' }
+    }
+    const blob = await res.blob()
+    const disposition = res.headers.get('Content-Disposition')
+    const match = disposition?.match(/filename="?([^";]+)"?/)
+    const filename = match?.[1] ?? `presupuesto-${versionId}.pdf`
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = filename
+    link.click()
+    URL.revokeObjectURL(link.href)
+    return { success: true, filename }
   }
 
   return (
