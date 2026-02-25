@@ -19,7 +19,6 @@ import { formatCurrency, formatDateShort } from '@/lib/format-utils'
 import { getCompanyTransactions } from '@/app/actions/finance'
 import {
   exportCompanyTransactionsToExcel,
-  exportCompanyTransactionsToPDF,
   type CompanyTransactionsExportFilters,
 } from '@/app/actions/export'
 import { ExportDialog } from '@/components/export/export-dialog'
@@ -143,7 +142,33 @@ export function CompanyTransactionsListClient({
   async function handleExport(format: 'excel' | 'pdf', selectedColumns: string[]) {
     const filters = buildExportFilters()
     if (format === 'excel') return exportCompanyTransactionsToExcel(filters, selectedColumns)
-    return exportCompanyTransactionsToPDF(filters, selectedColumns)
+    const locale = typeof window !== 'undefined' ? document.documentElement.lang || 'es' : 'es'
+    const params = new URLSearchParams({
+      template: 'transactions',
+      locale,
+    })
+    if (filters.projectId != null) params.set('projectId', String(filters.projectId))
+    if (filters.type) params.set('type', filters.type)
+    if (filters.partyId) params.set('partyId', filters.partyId)
+    if (filters.status) params.set('status', filters.status)
+    if (filters.dateFrom) params.set('dateFrom', filters.dateFrom)
+    if (filters.dateTo) params.set('dateTo', filters.dateTo)
+    if (filters.search) params.set('search', filters.search)
+    const res = await fetch(`/api/pdf?${params.toString()}`, { credentials: 'include' })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      return { success: false, error: data?.error ?? 'No se pudo generar el PDF' }
+    }
+    const blob = await res.blob()
+    const disposition = res.headers.get('Content-Disposition')
+    const match = disposition?.match(/filename="?([^";]+)"?/)
+    const filename = match?.[1] ?? 'transacciones-empresa.pdf'
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = filename
+    link.click()
+    URL.revokeObjectURL(link.href)
+    return { success: true, filename }
   }
 
   const exportColumns = [

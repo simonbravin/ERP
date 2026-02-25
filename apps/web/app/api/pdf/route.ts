@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
 
   if (!templateId) {
     return NextResponse.json(
-      { error: 'Parámetros inválidos: template (o doc) e id son requeridos' },
+      { error: 'Parámetros inválidos: template (o doc) es requerido' },
       { status: 400 }
     )
   }
@@ -82,10 +82,16 @@ export async function GET(request: NextRequest) {
   }
 
   const baseUrl = getBaseUrl()
+  const reserved = new Set(['template', 'doc', 'id', 'locale'])
+  const query: Record<string, string> = {}
+  request.nextUrl.searchParams.forEach((value, key) => {
+    if (!reserved.has(key)) query[key] = value
+  })
   const printUrl = template.buildPrintUrl({
     baseUrl,
     locale,
     id: id ?? undefined,
+    query: Object.keys(query).length ? query : undefined,
   })
   const cookies = getCookiesFromRequest(request)
 
