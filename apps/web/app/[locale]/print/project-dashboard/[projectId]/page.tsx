@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { getProject } from '@/app/actions/projects'
 import { getProjectDashboardData } from '@/app/actions/project-dashboard'
+import { PrintDocumentShell } from '@/components/print/print-document-shell'
 import { PrintTable } from '@/components/print/print-table'
 import { formatCurrency } from '@/lib/format-utils'
 
@@ -42,12 +43,17 @@ export default async function PrintProjectDashboardPage({ params }: PageProps) {
   ]
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-lg font-semibold">
-        Dashboard — {project.name}
-        {project.projectNumber ? ` (${project.projectNumber})` : ''}
-      </h2>
-      <div className="grid gap-4 text-sm">
+    <PrintDocumentShell
+      templateId="project-dashboard"
+      id={projectId}
+      project={{ name: project.name, projectNumber: project.projectNumber }}
+    >
+      <div className="space-y-6">
+        <h2 className="text-lg font-semibold">
+          Dashboard — {project.name}
+          {project.projectNumber ? ` (${project.projectNumber})` : ''}
+        </h2>
+        <div className="grid gap-4 text-sm">
         <p>
           <strong>Presupuesto:</strong> {formatCurrency(budget.total)} ·{' '}
           <strong>Gastado:</strong> {formatCurrency(budget.spent)} ·{' '}
@@ -69,6 +75,7 @@ export default async function PrintProjectDashboardPage({ params }: PageProps) {
           />
         </section>
       )}
-    </div>
+      </div>
+    </PrintDocumentShell>
   )
 }

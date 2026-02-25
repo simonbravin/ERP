@@ -1,5 +1,6 @@
 import { getAuthContext } from '@/lib/auth-helpers'
 import { getPurchasesBySupplierReport } from '@/app/actions/export-purchases'
+import { PrintDocumentShell } from '@/components/print/print-document-shell'
 import { PrintTable } from '@/components/print/print-table'
 import { formatCurrency } from '@/lib/format-utils'
 
@@ -22,10 +23,12 @@ export default async function PrintPurchasesBySupplierPage({ searchParams }: Pag
   const partyId = typeof sp.partyId === 'string' ? sp.partyId : undefined
   if (!partyId) {
     return (
-      <div className="space-y-4">
-        <h2 className="text-lg font-semibold">Compras por proveedor</h2>
-        <p className="text-muted-foreground">Seleccione un proveedor (partyId) en la URL.</p>
-      </div>
+      <PrintDocumentShell templateId="purchases-by-supplier">
+        <div className="space-y-4">
+          <h2 className="text-lg font-semibold">Compras por proveedor</h2>
+          <p className="text-muted-foreground">Seleccione un proveedor (partyId) en la URL.</p>
+        </div>
+      </PrintDocumentShell>
     )
   }
 
@@ -55,14 +58,16 @@ export default async function PrintPurchasesBySupplierPage({ searchParams }: Pag
   const total = rows.reduce((sum, r) => sum + r.totalCost, 0)
 
   return (
-    <div className="space-y-4">
-      <h2 className="text-lg font-semibold">Compras por proveedor</h2>
-      <PrintTable<Row>
-        columns={columns}
-        rows={rows}
-        totals={{ totalCost: formatCurrency(total) }}
-        totalsLabel="Total"
-      />
-    </div>
+    <PrintDocumentShell templateId="purchases-by-supplier" query={{ partyId }}>
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold">Compras por proveedor</h2>
+        <PrintTable<Row>
+          columns={columns}
+          rows={rows}
+          totals={{ totalCost: formatCurrency(total) }}
+          totalsLabel="Total"
+        />
+      </div>
+    </PrintDocumentShell>
   )
 }

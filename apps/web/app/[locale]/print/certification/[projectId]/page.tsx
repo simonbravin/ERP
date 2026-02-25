@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { getProject } from '@/app/actions/projects'
 import { getProjectCertifications } from '@/app/actions/certifications'
+import { PrintDocumentShell } from '@/components/print/print-document-shell'
 import { PrintTable } from '@/components/print/print-table'
 import { formatCurrency } from '@/lib/certification-utils'
 
@@ -55,17 +56,23 @@ export default async function PrintCertificationPage({ params }: PageProps) {
   ]
 
   return (
-    <div className="space-y-4">
-      <h2 className="text-lg font-semibold">
-        Certificaciones de Obra — {project.name}
-        {project.projectNumber ? ` (${project.projectNumber})` : ''}
-      </h2>
-      <PrintTable<CertRow>
-        columns={columns}
-        rows={rows}
-        totals={{ totalAmount: formatCurrency(totalAmount) }}
-        totalsLabel="Total certificado"
-      />
-    </div>
+    <PrintDocumentShell
+      templateId="certification"
+      id={projectId}
+      project={{ name: project.name, projectNumber: project.projectNumber }}
+    >
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold">
+          Certificaciones de Obra — {project.name}
+          {project.projectNumber ? ` (${project.projectNumber})` : ''}
+        </h2>
+        <PrintTable<CertRow>
+          columns={columns}
+          rows={rows}
+          totals={{ totalAmount: formatCurrency(totalAmount) }}
+          totalsLabel="Total certificado"
+        />
+      </div>
+    </PrintDocumentShell>
   )
 }

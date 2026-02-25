@@ -1,4 +1,5 @@
 import { getCompanyTransactions, type CompanyTransactionsFilters } from '@/app/actions/finance'
+import { PrintDocumentShell } from '@/components/print/print-document-shell'
 import { PrintTable } from '@/components/print/print-table'
 import { formatCurrency } from '@/lib/format-utils'
 import { getStatusLabel, TYPE_LABELS } from '@/lib/finance-labels'
@@ -70,15 +71,21 @@ export default async function PrintTransactionsPage({ searchParams }: PageProps)
     { key: 'status' as const, label: 'Estado', align: 'left' as const },
   ]
 
+  const query: Record<string, string | undefined> = {}
+  if (dateFrom) query.dateFrom = dateFrom
+  if (dateTo) query.dateTo = dateTo
+
   return (
-    <div className="space-y-4">
-      <h2 className="text-lg font-semibold">Transacciones de Empresa</h2>
-      <PrintTable<Row>
-        columns={columns}
-        rows={rows}
-        totals={{ total: formatCurrency(total) }}
-        totalsLabel="Total"
-      />
-    </div>
+    <PrintDocumentShell templateId="transactions" query={query}>
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold">Transacciones de Empresa</h2>
+        <PrintTable<Row>
+          columns={columns}
+          rows={rows}
+          totals={{ total: formatCurrency(total) }}
+          totalsLabel="Total"
+        />
+      </div>
+    </PrintDocumentShell>
   )
 }

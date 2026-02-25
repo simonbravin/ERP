@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { getBudgetVersion, listBudgetLines } from '@/app/actions/budget'
 import { getProject } from '@/app/actions/projects'
+import { PrintDocumentShell } from '@/components/print/print-document-shell'
 import { PrintTable } from '@/components/print/print-table'
 import { formatCurrency } from '@/lib/format-utils'
 
@@ -65,17 +66,23 @@ export default async function PrintBudgetPage({ params }: PageProps) {
   ]
 
   return (
-    <div className="space-y-4">
-      <h2 className="text-lg font-semibold">
-        Presupuesto — {project.name}
-        {project.projectNumber ? ` (${project.projectNumber})` : ''} — {version.versionCode}
-      </h2>
-      <PrintTable<BudgetRow>
-        columns={columns}
-        rows={rows}
-        totals={{ totalCost: formatCurrency(grandTotal) }}
-        totalsLabel="Total presupuesto"
-      />
-    </div>
+    <PrintDocumentShell
+      templateId="budget"
+      id={versionId}
+      project={{ name: project.name, projectNumber: project.projectNumber }}
+    >
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold">
+          Presupuesto — {project.name}
+          {project.projectNumber ? ` (${project.projectNumber})` : ''} — {version.versionCode}
+        </h2>
+        <PrintTable<BudgetRow>
+          columns={columns}
+          rows={rows}
+          totals={{ totalCost: formatCurrency(grandTotal) }}
+          totalsLabel="Total presupuesto"
+        />
+      </div>
+    </PrintDocumentShell>
   )
 }

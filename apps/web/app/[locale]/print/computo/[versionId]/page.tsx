@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { getBudgetVersion, listBudgetLines } from '@/app/actions/budget'
 import { getProject } from '@/app/actions/projects'
+import { PrintDocumentShell } from '@/components/print/print-document-shell'
 import { PrintTable } from '@/components/print/print-table'
 import { formatCurrency } from '@/lib/format-utils'
 
@@ -73,7 +74,11 @@ export default async function PrintComputoPage({ params }: PageProps) {
   }
 
   return (
-    <>
+    <PrintDocumentShell
+      templateId="computo"
+      id={versionId}
+      project={{ name: project.name, projectNumber: project.projectNumber }}
+    >
       <div className="mb-6">
         <h2 className="text-lg font-semibold text-foreground">
           Planilla de cómputo
@@ -88,6 +93,6 @@ export default async function PrintComputoPage({ params }: PageProps) {
         totals={totalsRow}
         totalsLabel="Total"
       />
-    </>
+    </PrintDocumentShell>
   )
 }

@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import { getScheduleForView } from '@/app/actions/schedule'
+import { PrintDocumentShell } from '@/components/print/print-document-shell'
 import { PrintTable } from '@/components/print/print-table'
 
 type PageProps = {
@@ -54,12 +55,22 @@ export default async function PrintSchedulePage({ params }: PageProps) {
   ]
 
   return (
-    <div className="space-y-4">
-      <h2 className="text-lg font-semibold">
-        Cronograma — {project?.name ?? 'Proyecto'}
-        {project?.projectNumber ? ` (${project.projectNumber})` : ''}
-      </h2>
-      <PrintTable<TaskRow> columns={columns} rows={rows} />
-    </div>
+    <PrintDocumentShell
+      templateId="schedule"
+      id={scheduleId}
+      project={
+        project?.name != null
+          ? { name: project.name, projectNumber: project.projectNumber }
+          : undefined
+      }
+    >
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold">
+          Cronograma — {project?.name ?? 'Proyecto'}
+          {project?.projectNumber ? ` (${project.projectNumber})` : ''}
+        </h2>
+        <PrintTable<TaskRow> columns={columns} rows={rows} />
+      </div>
+    </PrintDocumentShell>
   )
 }

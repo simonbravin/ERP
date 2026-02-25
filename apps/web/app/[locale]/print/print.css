@@ -43,6 +43,11 @@
   object-fit: contain;
 }
 
+.print-document-header__brand-text {
+  min-width: 0;
+  max-width: 65%;
+}
+
 .print-document-header__org {
   font-size: 1rem;
   font-weight: 700;
@@ -50,6 +55,22 @@
   margin: 0;
   text-transform: uppercase;
   letter-spacing: 0.02em;
+}
+
+.print-document-header__legal {
+  font-size: 0.6875rem;
+  line-height: 1.3;
+  color: hsl(var(--muted-foreground));
+  margin-top: 0.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.print-document-header__legal span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .print-document-header__project {
@@ -64,11 +85,16 @@
   align-items: flex-end;
   font-size: 0.75rem;
   color: hsl(var(--muted-foreground));
+  max-width: 35%;
+  min-width: 0;
 }
 
 .print-document-header__date,
-.print-document-header__folio {
+.print-document-header__folio,
+.print-document-header__issued-by {
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Main content area: reserve space so Puppeteer footer doesn't overlap */

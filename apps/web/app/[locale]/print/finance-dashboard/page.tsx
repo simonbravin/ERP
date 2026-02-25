@@ -1,4 +1,5 @@
 import { getFinanceExecutiveDashboard } from '@/app/actions/finance'
+import { PrintDocumentShell } from '@/components/print/print-document-shell'
 import { PrintTable } from '@/components/print/print-table'
 import { formatCurrency } from '@/lib/format-utils'
 
@@ -49,8 +50,9 @@ export default async function PrintFinanceDashboardPage() {
   ]
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-lg font-semibold">Dashboard Finanzas — Resumen</h2>
+    <PrintDocumentShell templateId="finance-dashboard">
+      <div className="space-y-6">
+        <h2 className="text-lg font-semibold">Dashboard Finanzas — Resumen</h2>
       <div className="grid gap-4 text-sm">
         <p>
           <strong>Ingresos totales:</strong> {formatCurrency(summary.totalIncome)} ·{' '}
@@ -75,6 +77,7 @@ export default async function PrintFinanceDashboardPage() {
           />
         </section>
       )}
-    </div>
+      </div>
+    </PrintDocumentShell>
   )
 }

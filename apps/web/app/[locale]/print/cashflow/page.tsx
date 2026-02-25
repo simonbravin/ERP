@@ -1,4 +1,5 @@
 import { getCompanyCashflowDetailed } from '@/app/actions/finance'
+import { PrintDocumentShell } from '@/components/print/print-document-shell'
 import { PrintTable } from '@/components/print/print-table'
 import { formatCurrency } from '@/lib/format-utils'
 
@@ -67,12 +68,18 @@ export default async function PrintCashflowPage({ searchParams }: PageProps) {
     },
   ]
 
+  const query: Record<string, string | undefined> = {}
+  if (fromStr) query.from = fromStr
+  if (toStr) query.to = toStr
+
   return (
-    <div className="space-y-4">
-      <h2 className="text-lg font-semibold">
-        Flujo de caja consolidado — {fromDate.toLocaleDateString('es-AR')} a {toDate.toLocaleDateString('es-AR')}
-      </h2>
-      <PrintTable<Row> columns={columns} rows={rows} />
-    </div>
+    <PrintDocumentShell templateId="cashflow" query={query}>
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold">
+          Flujo de caja consolidado — {fromDate.toLocaleDateString('es-AR')} a {toDate.toLocaleDateString('es-AR')}
+        </h2>
+        <PrintTable<Row> columns={columns} rows={rows} />
+      </div>
+    </PrintDocumentShell>
   )
 }
