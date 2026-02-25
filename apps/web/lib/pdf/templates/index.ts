@@ -5,6 +5,10 @@ import { certificationTemplate } from './certification.template'
 import { budgetTemplate } from './budget.template'
 import { materialsTemplate } from './materials.template'
 import { scheduleTemplate } from './schedule.template'
+import { cashflowTemplate } from './cashflow.template'
+import { financeDashboardTemplate } from './finance-dashboard.template'
+import { projectDashboardTemplate } from './project-dashboard.template'
+import { purchasesBySupplierTemplate } from './purchases-by-supplier.template'
 
 export const documentTemplates = {
   computo: computoTemplate,
@@ -13,6 +17,10 @@ export const documentTemplates = {
   budget: budgetTemplate,
   materials: materialsTemplate,
   schedule: scheduleTemplate,
+  cashflow: cashflowTemplate,
+  'finance-dashboard': financeDashboardTemplate,
+  'project-dashboard': projectDashboardTemplate,
+  'purchases-by-supplier': purchasesBySupplierTemplate,
 } as const
 
 export type DocumentTemplateId = keyof typeof documentTemplates

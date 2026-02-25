@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button'
 import { ExportDialog } from '@/components/export/export-dialog'
 import {
   exportCompanyCashflowToExcel,
-  exportCompanyCashflowToPDF,
   type CashflowExportParams,
 } from '@/app/actions/export'
 import { FileDown } from 'lucide-react'
@@ -36,7 +35,23 @@ export function CashflowExportToolbar({ dateFrom, dateTo }: Props) {
 
   async function handleExport(format: 'excel' | 'pdf', selectedColumns: string[]) {
     if (format === 'excel') return exportCompanyCashflowToExcel(params, selectedColumns)
-    return exportCompanyCashflowToPDF(params, selectedColumns)
+    const locale = typeof window !== 'undefined' ? document.documentElement.lang || 'es' : 'es'
+    const url = `/api/pdf?template=cashflow&locale=${encodeURIComponent(locale)}&from=${encodeURIComponent(params.dateFrom)}&to=${encodeURIComponent(params.dateTo)}`
+    const res = await fetch(url, { credentials: 'include' })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      return { success: false, error: data?.error ?? 'No se pudo generar el PDF' }
+    }
+    const blob = await res.blob()
+    const disposition = res.headers.get('Content-Disposition')
+    const match = disposition?.match(/filename="?([^";]+)"?/)
+    const filename = match?.[1] ?? 'cashflow-consolidado.pdf'
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = filename
+    link.click()
+    URL.revokeObjectURL(link.href)
+    return { success: true, filename }
   }
 
   return (
