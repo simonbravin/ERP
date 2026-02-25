@@ -1,13 +1,8 @@
 /**
  * Contract for PDF document templates.
  * All PDFs are defined via this interface; the PDF engine has no document-specific logic.
+ * Template ids are derived from the registry (see templates/index.ts).
  */
-
-export type DocumentTemplates =
-  | 'computo'
-  | 'transactions'
-  | 'certification'
-  | 'gantt'
 
 /** Session context passed to validateAccess (API provides userId + orgId from JWT + org member). */
 export interface DocumentTemplateSession {
@@ -16,7 +11,7 @@ export interface DocumentTemplateSession {
 }
 
 export interface DocumentTemplate {
-  id: DocumentTemplates
+  id: string
 
   buildPrintUrl(params: {
     baseUrl: string
