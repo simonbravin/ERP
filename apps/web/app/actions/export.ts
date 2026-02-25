@@ -4,13 +4,14 @@ import { getSession } from '@/lib/session'
 import { getOrgContext } from '@/lib/org-context'
 import { prisma } from '@repo/database'
 import { exportToExcel } from '@/lib/export/excel-exporter'
-import { exportToPDF } from '@/lib/export/pdf-exporter'
-import type { ExcelConfig, PDFConfig } from '@/lib/types/export'
-import { exportDashboardToPDF, type ChartExportConfig } from '@/lib/export/chart-to-pdf'
+import type { ExcelConfig } from '@/lib/types/export'
 import { getFinanceExecutiveDashboard } from '@/app/actions/finance'
 import { getProject } from '@/app/actions/projects'
 import { getProjectDashboardData } from '@/app/actions/project-dashboard'
 import { formatCurrency } from '@/lib/format-utils'
+
+const PDF_MIGRATION_MSG =
+  'Exportación PDF en proceso de migración. Use la planilla de cómputo (Exportar PDF) para exportar a PDF.'
 
 type OrgData = {
   name: string
@@ -147,81 +148,10 @@ export async function exportMaterialsToExcel(
 }
 
 export async function exportMaterialsToPDF(
-  budgetVersionId: string,
-  selectedColumns: string[]
+  _budgetVersionId: string,
+  _selectedColumns: string[]
 ) {
-  const session = await getSession()
-  if (!session?.user?.id) {
-    return { success: false, error: 'Unauthorized' }
-  }
-
-  const org = await getOrgContext(session.user.id)
-  if (!org?.orgId) return { success: false, error: 'Unauthorized' }
-
-  const orgData = await getOrganizationData(org.orgId)
-
-  try {
-    const version = await prisma.budgetVersion.findFirst({
-      where: { id: budgetVersionId, orgId: org.orgId },
-      include: { project: true },
-    })
-
-    if (!version) {
-      return { success: false, error: 'Version not found' }
-    }
-
-    const { getConsolidatedMaterials } = await import('./materials')
-    const materials = await getConsolidatedMaterials(budgetVersionId)
-
-    const allColumns = [
-      { field: 'name', label: 'Material', type: 'text' as const, align: 'left' as const },
-      { field: 'unit', label: 'Und', type: 'text' as const, align: 'center' as const },
-      { field: 'totalQuantity', label: 'Cantidad', type: 'number' as const, align: 'right' as const },
-      { field: 'averageUnitCost', label: 'P.Unit', type: 'currency' as const, align: 'right' as const },
-      { field: 'totalCost', label: 'Total', type: 'currency' as const, align: 'right' as const },
-    ]
-
-    const columns = allColumns.map((col) => ({
-      ...col,
-      visible: selectedColumns.includes(col.field),
-    }))
-
-    const config: PDFConfig = {
-      title: 'LISTADO DE MATERIALES',
-      subtitle: version.project.name,
-      includeCompanyHeader: true,
-      project: {
-        name: version.project.name,
-        number: version.project.projectNumber,
-        client: version.project.clientName ?? undefined,
-      },
-      metadata: {
-        version: version.versionCode,
-        date: new Date(),
-      },
-      columns,
-      data: materials,
-      totals: {
-        label: 'TOTAL',
-        fields: ['totalCost'],
-      },
-      orientation: 'portrait',
-      pageSize: 'A4',
-      showPageNumbers: true,
-    }
-
-    const buffer = await exportToPDF(config)
-    const base64 = buffer.toString('base64')
-
-    return {
-      success: true,
-      data: base64,
-      filename: `materiales_${version.project.projectNumber}_${version.versionCode}_${Date.now()}.pdf`,
-    }
-  } catch (error) {
-    console.error('Error exporting materials PDF:', error)
-    return { success: false, error: 'Error al exportar PDF' }
-  }
+  return { success: false, error: PDF_MIGRATION_MSG }
 }
 
 export async function exportBudgetToExcel(
@@ -327,105 +257,10 @@ export async function exportBudgetToExcel(
 }
 
 export async function exportBudgetToPDF(
-  budgetVersionId: string,
-  selectedColumns: string[]
+  _budgetVersionId: string,
+  _selectedColumns: string[]
 ) {
-  const session = await getSession()
-  if (!session?.user?.id) {
-    return { success: false, error: 'Unauthorized' }
-  }
-
-  const org = await getOrgContext(session.user.id)
-  if (!org?.orgId) return { success: false, error: 'Unauthorized' }
-
-  const orgData = await getOrganizationData(org.orgId)
-
-  try {
-    const version = await prisma.budgetVersion.findFirst({
-      where: { id: budgetVersionId, orgId: org.orgId },
-      include: {
-        project: true,
-        budgetLines: {
-          include: { wbsNode: true },
-          orderBy: [{ wbsNode: { sortOrder: 'asc' } }, { wbsNode: { code: 'asc' } }],
-        },
-      },
-    })
-
-    if (!version) {
-      return { success: false, error: 'Version not found' }
-    }
-
-    const data = version.budgetLines.map((line) => {
-      const qty = Number(line.quantity) || 1
-      const directCost = Number(line.directCostTotal)
-      return {
-        code: line.wbsNode.code,
-        description: line.description,
-        unit: line.unit,
-        quantity: qty,
-        unitPrice: qty > 0 ? directCost / qty : 0,
-        totalCost: directCost,
-        overheadPct: Number(line.overheadPct),
-        profitPct: Number(line.profitPct),
-        taxPct: Number(line.taxPct),
-      }
-    })
-
-    const allColumns = [
-      { field: 'code', label: 'Código', type: 'text' as const, align: 'left' as const },
-      { field: 'description', label: 'Descripción', type: 'text' as const, align: 'left' as const },
-      { field: 'unit', label: 'Und', type: 'text' as const, align: 'center' as const },
-      { field: 'quantity', label: 'Cantidad', type: 'number' as const, align: 'right' as const },
-      { field: 'unitPrice', label: 'P.Unit', type: 'currency' as const, align: 'right' as const },
-      { field: 'totalCost', label: 'Total', type: 'currency' as const, align: 'right' as const },
-      { field: 'overheadPct', label: 'GG %', type: 'percentage' as const, align: 'right' as const },
-      { field: 'profitPct', label: 'Benef %', type: 'percentage' as const, align: 'right' as const },
-      { field: 'taxPct', label: 'IVA %', type: 'percentage' as const, align: 'right' as const },
-    ]
-
-    const columns = allColumns.map((col) => ({
-      ...col,
-      visible: selectedColumns.includes(col.field),
-    }))
-
-    const config: PDFConfig = {
-      title: 'PRESUPUESTO OFICIAL',
-      subtitle: `${version.project.name} - ${version.versionCode}`,
-      includeCompanyHeader: true,
-      project: {
-        name: version.project.name,
-        number: version.project.projectNumber,
-        client: version.project.clientName ?? undefined,
-      },
-      metadata: {
-        version: version.versionCode,
-        date: new Date(),
-        generatedBy: orgData?.legalName ?? orgData?.name ?? 'Sistema',
-      },
-      columns,
-      data,
-      totals: {
-        label: 'TOTAL PRESUPUESTO',
-        fields: ['totalCost'],
-      },
-      orientation: 'portrait',
-      pageSize: 'A4',
-      showPageNumbers: true,
-    }
-
-    const buffer = await exportToPDF(config)
-    const base64 = buffer.toString('base64')
-
-    return {
-      success: true,
-      data: base64,
-      filename: `presupuesto_${version.project.projectNumber}_${version.versionCode}_${Date.now()}.pdf`,
-    }
-  } catch (error) {
-    console.error('Error exporting budget PDF:', error)
-    return { success: false, error: 'Error al exportar presupuesto PDF' }
-  }
+  return { success: false, error: PDF_MIGRATION_MSG }
 }
 
 /**
@@ -902,62 +737,10 @@ export async function exportCompanyTransactionsToExcel(
 }
 
 export async function exportCompanyTransactionsToPDF(
-  filters: CompanyTransactionsExportFilters,
-  selectedColumns: string[]
+  _filters: CompanyTransactionsExportFilters,
+  _selectedColumns: string[]
 ) {
-  const session = await getSession()
-  if (!session?.user?.id) return { success: false, error: 'Unauthorized' }
-  const org = await getOrgContext(session.user.id)
-  if (!org?.orgId) return { success: false, error: 'Unauthorized' }
-  const orgData = await getOrganizationData(org.orgId)
-  try {
-    const { getCompanyTransactions } = await import('./finance')
-    const list = await getCompanyTransactions(filters)
-    const allColumns = [
-      { field: 'issueDate', label: 'Fecha', type: 'date' as const, align: 'left' as const },
-      { field: 'transactionNumber', label: 'Número', type: 'text' as const, align: 'left' as const },
-      { field: 'type', label: 'Tipo', type: 'text' as const, align: 'left' as const },
-      { field: 'projectName', label: 'Proyecto', type: 'text' as const, align: 'left' as const },
-      { field: 'description', label: 'Descripción', type: 'text' as const, align: 'left' as const },
-      { field: 'partyName', label: 'Proveedor/Cliente', type: 'text' as const, align: 'left' as const },
-      { field: 'total', label: 'Monto', type: 'currency' as const, align: 'right' as const },
-      { field: 'status', label: 'Estado', type: 'text' as const, align: 'left' as const },
-    ]
-    const columns = allColumns.map((col) => ({
-      ...col,
-      visible: selectedColumns.includes(col.field),
-    }))
-    const data = list.map((t: Record<string, unknown>) => ({
-      issueDate: t.issueDate,
-      transactionNumber: t.transactionNumber,
-      type: t.type,
-      projectName: (t.project as { name?: string })?.name ?? 'Generales',
-      description: t.description,
-      partyName: (t.party as { name?: string })?.name ?? '—',
-      total: typeof t.total === 'number' ? t.total : Number(t.total ?? 0),
-      status: t.status,
-    }))
-    const config: PDFConfig = {
-      title: 'Transacciones de Empresa',
-      subtitle: `Exportado el ${new Date().toLocaleDateString('es-AR')}`,
-      includeCompanyHeader: true,
-      metadata: { date: new Date(), generatedBy: orgData?.legalName ?? orgData?.name ?? 'Sistema' },
-      columns,
-      data,
-      orientation: 'landscape',
-      pageSize: 'A4',
-      showPageNumbers: true,
-    }
-    const buffer = await exportToPDF(config)
-    return {
-      success: true,
-      data: buffer.toString('base64'),
-      filename: `transacciones-empresa-${new Date().toISOString().split('T')[0]}.pdf`,
-    }
-  } catch (error) {
-    console.error('Error exporting company transactions PDF:', error)
-    return { success: false, error: 'Error al exportar PDF' }
-  }
+  return { success: false, error: PDF_MIGRATION_MSG }
 }
 
 // ==================== Cashflow consolidado ====================
@@ -1025,60 +808,10 @@ export async function exportCompanyCashflowToExcel(
 }
 
 export async function exportCompanyCashflowToPDF(
-  params: CashflowExportParams,
-  selectedColumns: string[]
+  _params: CashflowExportParams,
+  _selectedColumns: string[]
 ) {
-  const session = await getSession()
-  if (!session?.user?.id) return { success: false, error: 'Unauthorized' }
-  const org = await getOrgContext(session.user.id)
-  if (!org?.orgId) return { success: false, error: 'Unauthorized' }
-  const orgData = await getOrganizationData(org.orgId)
-  try {
-    const { getCompanyCashflowDetailed } = await import('./finance')
-    const from = new Date(params.dateFrom)
-    const to = new Date(params.dateTo)
-    const { timeline } = await getCompanyCashflowDetailed({ from, to })
-    const allColumns = [
-      { field: 'month', label: 'Mes', type: 'text' as const, align: 'left' as const },
-      { field: 'income', label: 'Ingresos', type: 'currency' as const, align: 'right' as const },
-      { field: 'expense', label: 'Gastos', type: 'currency' as const, align: 'right' as const },
-      { field: 'overhead', label: 'Generales', type: 'currency' as const, align: 'right' as const },
-      { field: 'projectExpense', label: 'Gastos proyectos', type: 'currency' as const, align: 'right' as const },
-      { field: 'balance', label: 'Balance', type: 'currency' as const, align: 'right' as const },
-    ]
-    const columns = allColumns.map((col) => ({
-      ...col,
-      visible: selectedColumns.includes(col.field),
-    }))
-    const data = timeline.map((row) => ({
-      month: row.month,
-      income: row.income,
-      expense: row.expense,
-      overhead: row.overhead,
-      projectExpense: row.expense - row.overhead,
-      balance: row.balance,
-    }))
-    const config: PDFConfig = {
-      title: 'Flujo de caja consolidado',
-      subtitle: `Período ${from.toLocaleDateString('es-AR')} - ${to.toLocaleDateString('es-AR')} · Exportado el ${new Date().toLocaleDateString('es-AR')}`,
-      includeCompanyHeader: true,
-      metadata: { date: new Date(), generatedBy: orgData?.legalName ?? orgData?.name ?? 'Sistema' },
-      columns,
-      data,
-      orientation: 'landscape',
-      pageSize: 'A4',
-      showPageNumbers: true,
-    }
-    const buffer = await exportToPDF(config)
-    return {
-      success: true,
-      data: buffer.toString('base64'),
-      filename: `cashflow-${params.dateFrom}-${params.dateTo}.pdf`,
-    }
-  } catch (error) {
-    console.error('Error exporting cashflow PDF:', error)
-    return { success: false, error: 'Error al exportar PDF de flujo de caja' }
-  }
+  return { success: false, error: PDF_MIGRATION_MSG }
 }
 
 export type ProjectCashflowExportParams = CashflowExportParams & { projectId: string }
@@ -1320,182 +1053,24 @@ export async function exportCertificationsToExcel(
 }
 
 export async function exportCertificationsToPDF(
-  projectId: string,
-  selectedColumns: string[]
+  _projectId: string,
+  _selectedColumns: string[]
 ) {
-  const session = await getSession()
-  if (!session?.user?.id) return { success: false, error: 'Unauthorized' }
-  const org = await getOrgContext(session.user.id)
-  if (!org?.orgId) return { success: false, error: 'Unauthorized' }
-  const orgData = await getOrganizationData(org.orgId)
-  try {
-    const { getProjectCertifications } = await import('./certifications')
-    const { getProject } = await import('./projects')
-    const certifications = await getProjectCertifications(projectId)
-    const projectData = await getProject(projectId)
-    if (!projectData) return { success: false, error: 'Proyecto no encontrado' }
-    const allColumns = [
-      { field: 'number', label: 'Número', type: 'number' as const, align: 'left' as const },
-      { field: 'period', label: 'Período', type: 'text' as const, align: 'left' as const },
-      { field: 'budgetVersion', label: 'Presupuesto', type: 'text' as const, align: 'left' as const },
-      { field: 'issuedDate', label: 'Fecha Emisión', type: 'date' as const, align: 'left' as const },
-      { field: 'totalAmount', label: 'Monto', type: 'currency' as const, align: 'right' as const },
-      { field: 'status', label: 'Estado', type: 'text' as const, align: 'left' as const },
-    ]
-    const columns = allColumns.map((col) => ({
-      ...col,
-      visible: selectedColumns.includes(col.field),
-    }))
-    const data = certifications.map((cert: Record<string, unknown>) => ({
-      number: cert.number,
-      period: `${cert.periodMonth ?? ''}/${cert.periodYear ?? ''}`,
-      budgetVersion: (cert.budgetVersion as { versionCode?: string })?.versionCode ?? '—',
-      issuedDate: cert.issuedDate,
-      totalAmount: cert.totalAmount ?? 0,
-      status: cert.status,
-    }))
-    const config: PDFConfig = {
-      title: 'Certificaciones de Obra',
-      subtitle: `Proyecto: ${projectData.name} • ${projectData.projectNumber}`,
-      includeCompanyHeader: true,
-      project: { name: projectData.name, number: projectData.projectNumber },
-      metadata: { date: new Date(), generatedBy: orgData?.legalName ?? orgData?.name ?? 'Sistema' },
-      columns,
-      data,
-      orientation: 'landscape',
-      pageSize: 'A4',
-      showPageNumbers: true,
-    }
-    const buffer = await exportToPDF(config)
-    return {
-      success: true,
-      data: buffer.toString('base64'),
-      filename: `certificaciones-${projectData.projectNumber}-${new Date().toISOString().split('T')[0]}.pdf`,
-    }
-  } catch (error) {
-    console.error('Error exporting certifications PDF:', error)
-    return { success: false, error: 'Error al exportar PDF' }
-  }
+  return { success: false, error: PDF_MIGRATION_MSG }
 }
 
-// ====================
-// EXPORTAR DASHBOARD DE FINANZAS A PDF
-// ====================
-
-export async function exportFinanceDashboardToPDF(chartImages: {
+export async function exportFinanceDashboardToPDF(_chartImages: {
   trend: string
   category: string
   suppliers: string
   projects: string
 }) {
-  const session = await getSession()
-  if (!session?.user?.id) throw new Error('No autorizado')
-
-  const dashboardData = await getFinanceExecutiveDashboard()
-
-  const config: ChartExportConfig = {
-    title: 'Dashboard Financiero de Empresa',
-    subtitle: 'Reporte Ejecutivo',
-    metadata: {
-      generatedAt: new Date(),
-      generatedBy: session.user.name ?? session.user.email ?? 'Usuario',
-    },
-    charts: [
-      { title: 'Tendencia Mensual', imageData: chartImages.trend, height: 80 },
-      { title: 'Gastos por Categoría', imageData: chartImages.category, height: 80 },
-      { title: 'Top 5 Proveedores', imageData: chartImages.suppliers, height: 70 },
-      { title: 'Top 5 Proyectos por Gasto', imageData: chartImages.projects, height: 70 },
-    ],
-    tables:
-      dashboardData.upcomingDue.length > 0
-        ? [
-            {
-              title: 'Próximos Vencimientos',
-              headers: ['Descripción', 'Proveedor', 'Proyecto', 'Vencimiento', 'Monto'],
-              rows: dashboardData.upcomingDue.map((p) => [
-                p.description ?? '—',
-                p.supplier,
-                p.project,
-                p.dueDate ? new Date(p.dueDate).toLocaleDateString('es') : '—',
-                formatCurrency(p.amount, 'ARS'),
-              ]),
-            },
-          ]
-        : undefined,
-  }
-
-  const buffer = await exportDashboardToPDF(config)
-  const base64 = buffer.toString('base64')
-
-  return {
-    success: true,
-    data: base64,
-    filename: `dashboard-finanzas-${new Date().toISOString().split('T')[0]}.pdf`,
-  }
+  return { success: false, error: PDF_MIGRATION_MSG }
 }
 
-// ====================
-// EXPORTAR DASHBOARD DE PROYECTO A PDF
-// ====================
-
 export async function exportProjectDashboardToPDF(
-  projectId: string,
-  chartImages: {
-    wbs: string
-    cashflow: string
-    certifications: string
-  }
+  _projectId: string,
+  _chartImages: { wbs: string; cashflow: string; certifications: string }
 ) {
-  const session = await getSession()
-  if (!session?.user?.id) throw new Error('No autorizado')
-
-  const project = await getProject(projectId)
-  if (!project) throw new Error('Proyecto no encontrado')
-
-  const dashboardData = await getProjectDashboardData(projectId)
-
-  const config: ChartExportConfig = {
-    title: 'Dashboard del Proyecto',
-    subtitle: `${project.projectNumber} - ${project.name}`,
-    metadata: {
-      project: { name: project.name, number: project.projectNumber },
-      generatedAt: new Date(),
-      generatedBy: session.user.name ?? session.user.email ?? 'Usuario',
-    },
-    charts: [
-      { title: 'Presupuesto vs Real por Partida', imageData: chartImages.wbs, height: 90 },
-      { title: 'Cashflow del Proyecto', imageData: chartImages.cashflow, height: 80 },
-      { title: 'Evolución de Certificaciones', imageData: chartImages.certifications, height: 70 },
-    ],
-    tables: [
-      {
-        title: 'Resumen Presupuestario',
-        headers: ['Concepto', 'Monto'],
-        rows: [
-          ['Presupuesto Total', formatCurrency(dashboardData.budget.total)],
-          ['Gastado', formatCurrency(dashboardData.budget.spent)],
-          ['Comprometido', formatCurrency(dashboardData.budget.committed)],
-          ['Varianza', formatCurrency(dashboardData.budget.variance)],
-        ],
-      },
-      {
-        title: 'Top Proveedores',
-        headers: ['Proveedor', 'Total Gastado', 'Transacciones'],
-        rows: dashboardData.expensesBySupplier.map((s) => [
-          s.supplierName,
-          formatCurrency(s.total),
-          s.count.toString(),
-        ]),
-      },
-    ],
-  }
-
-  const buffer = await exportDashboardToPDF(config)
-  const base64 = buffer.toString('base64')
-
-  return {
-    success: true,
-    data: base64,
-    filename: `dashboard-${project.projectNumber}-${new Date().toISOString().split('T')[0]}.pdf`,
-  }
+  return { success: false, error: PDF_MIGRATION_MSG }
 }

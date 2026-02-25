@@ -924,79 +924,12 @@ export async function getScheduleForView(scheduleId: string) {
 }
 
 /**
- * Exportar cronograma a PDF
+ * Exportar cronograma a PDF. Temporalmente deshabilitado (migración al nuevo sistema /print + /api/pdf).
  */
-export async function exportScheduleToPDF(scheduleId: string) {
-  const session = await getSession()
-  if (!session?.user?.id) {
-    return { success: false, error: 'Unauthorized' }
-  }
-
-  const org = await getOrgContext(session.user.id)
-  if (!org) return { success: false, error: 'Unauthorized' }
-
-  try {
-    const schedule = await prisma.schedule.findFirst({
-      where: { id: scheduleId, orgId: org.orgId },
-      include: {
-        project: {
-          select: { name: true, projectNumber: true },
-        },
-        tasks: {
-          include: {
-            wbsNode: { select: { code: true, name: true } },
-          },
-          orderBy: [{ wbsNode: { sortOrder: 'asc' } }, { wbsNode: { code: 'asc' } }],
-        },
-      },
-    })
-
-    if (!schedule) {
-      return { success: false, error: 'Schedule not found' }
-    }
-    try {
-      await assertProjectAccess(schedule.projectId, org)
-    } catch (e) {
-      return { success: false, error: e instanceof Error ? e.message : 'Acceso denegado' }
-    }
-
-    const orgProfile = await prisma.orgProfile.findFirst({
-      where: { orgId: org.orgId },
-      select: { legalName: true },
-    })
-
-    const pdfConfig = {
-      projectName: schedule.project.name,
-      projectNumber: schedule.project.projectNumber,
-      scheduleName: schedule.name,
-      projectStartDate: new Date(schedule.projectStartDate),
-      projectEndDate: new Date(schedule.projectEndDate),
-      companyName: orgProfile?.legalName ?? org.orgName,
-      tasks: schedule.tasks.map((task) => ({
-        code: task.wbsNode.code,
-        name: task.wbsNode.name,
-        startDate: new Date(task.plannedStartDate),
-        endDate: new Date(task.plannedEndDate),
-        duration: task.plannedDuration,
-        progress: Number(task.progressPercent),
-        isCritical: task.isCritical,
-        level: task.wbsNode.code.split('.').length - 1,
-      })),
-    }
-
-    const { exportGanttToPDF } = await import(
-      '@/lib/export/gantt-pdf-exporter'
-    )
-    const buffer = await exportGanttToPDF(pdfConfig)
-    const base64 = buffer.toString('base64')
-
-    return {
-      success: true,
-      data: base64,
-      filename: `cronograma_${schedule.project.projectNumber}_${Date.now()}.pdf`,
-    }
-  } catch (error) {
-    console.error('Error exporting schedule to PDF:', error)
-    return { success: false, error: 'Error al exportar cronograma' }
+export async function exportScheduleToPDF(_scheduleId: string) {
+  return {
+    success: false,
+    error:
+      'Exportación a PDF del cronograma está temporalmente deshabilitada. Estamos migrando al nuevo sistema.',
   }
 }

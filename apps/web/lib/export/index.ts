@@ -4,5 +4,4 @@
  */
 
 export { ExcelExporter, exportToExcel } from './excel-exporter'
-export { PDFExporter, exportToPDF } from './pdf-exporter'
 export type { ExportConfig, ExportColumn, PDFConfig, ExcelConfig, ReportQuery } from '@/lib/types/export'

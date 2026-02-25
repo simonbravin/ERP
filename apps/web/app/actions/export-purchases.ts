@@ -4,8 +4,7 @@ import { getSession } from '@/lib/session'
 import { getOrgContext } from '@/lib/org-context'
 import { prisma } from '@repo/database'
 import { exportToExcel } from '@/lib/export/excel-exporter'
-import { exportToPDF } from '@/lib/export/pdf-exporter'
-import type { ExcelConfig, PDFConfig } from '@/lib/types/export'
+import type { ExcelConfig } from '@/lib/types/export'
 
 export interface PurchaseRow {
   project: string
@@ -155,64 +154,16 @@ export async function exportPurchasesBySupplierToExcel(
   }
 }
 
-/**
- * Export purchases-by-supplier report to PDF
- */
+/** Export purchases-by-supplier to PDF. Temporarily disabled (migration to new /print + /api/pdf). */
 export async function exportPurchasesBySupplierToPDF(
-  orgId: string,
-  partyId: string,
-  selectedColumns: string[],
-  data: PurchaseRow[]
+  _orgId: string,
+  _partyId: string,
+  _selectedColumns: string[],
+  _data: PurchaseRow[]
 ) {
-  const session = await getSession()
-  if (!session?.user?.id) return { success: false, error: 'Unauthorized' }
-
-  const org = await getOrgContext(session.user.id)
-  if (!org?.orgId || org.orgId !== orgId) return { success: false, error: 'Unauthorized' }
-
-  const party = await prisma.party.findFirst({
-    where: { id: partyId, orgId },
-    select: { name: true },
-  })
-  if (!party) return { success: false, error: 'Proveedor no encontrado' }
-
-  const allColumns = [
-    { field: 'project', label: 'Proyecto', type: 'text' as const, align: 'left' as const },
-    { field: 'projectNumber', label: 'Nro.', type: 'text' as const, align: 'left' as const },
-    { field: 'material', label: 'Material', type: 'text' as const, align: 'left' as const },
-    { field: 'quantity', label: 'Cant.', type: 'number' as const, align: 'right' as const },
-    { field: 'unit', label: 'Und', type: 'text' as const, align: 'center' as const },
-    { field: 'unitCost', label: 'P.Unit', type: 'currency' as const, align: 'right' as const },
-    { field: 'totalCost', label: 'Total', type: 'currency' as const, align: 'right' as const },
-  ]
-
-  const columns = allColumns.map((col) => ({
-    ...col,
-    visible: selectedColumns.includes(col.field),
-  }))
-
-  const config: PDFConfig = {
-    title: 'COMPRAS POR PROVEEDOR (MULTI-PROYECTO)',
-    subtitle: party.name,
-    includeCompanyHeader: true,
-    metadata: {
-      date: new Date(),
-      filters: [`Proveedor: ${party.name}`],
-    },
-    columns,
-    data,
-    totals: { label: 'TOTAL', fields: ['totalCost'] },
-    orientation: 'landscape',
-    pageSize: 'A4',
-    showPageNumbers: true,
-  }
-
-  const buffer = await exportToPDF(config)
-  const base64 = buffer.toString('base64')
-  const safeName = party.name.replace(/\s+/g, '_').slice(0, 30)
   return {
-    success: true,
-    data: base64,
-    filename: `compras_${safeName}_${Date.now()}.pdf`,
+    success: false,
+    error:
+      'Exportación PDF en proceso de migración. Use la planilla de cómputo (Exportar PDF) para exportar a PDF.',
   }
 }

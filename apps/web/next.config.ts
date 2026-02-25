@@ -15,7 +15,7 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   transpilePackages: ['@repo/validators'],
 
-  serverExternalPackages: ['@prisma/client', 'pdfkit', '@sparticuz/chromium', 'puppeteer-core'],
+  serverExternalPackages: ['@prisma/client', '@sparticuz/chromium', 'puppeteer-core'],
 
   // Allow Vercel deploy when scanner blocks on CVE (use with env bypass vars)
   skipMiddlewareUrlNormalize: true,
