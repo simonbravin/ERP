@@ -10,9 +10,6 @@ import { getProject } from '@/app/actions/projects'
 import { getProjectDashboardData } from '@/app/actions/project-dashboard'
 import { formatCurrency } from '@/lib/format-utils'
 
-const PDF_MIGRATION_MSG =
-  'Exportación PDF en proceso de migración. Use la planilla de cómputo (Exportar PDF) para exportar a PDF.'
-
 type OrgData = {
   name: string
   legalName: string | null
@@ -147,13 +144,6 @@ export async function exportMaterialsToExcel(
   }
 }
 
-export async function exportMaterialsToPDF(
-  _budgetVersionId: string,
-  _selectedColumns: string[]
-) {
-  return { success: false, error: PDF_MIGRATION_MSG }
-}
-
 export async function exportBudgetToExcel(
   budgetVersionId: string,
   selectedColumns: string[]
@@ -254,13 +244,6 @@ export async function exportBudgetToExcel(
     console.error('Error exporting budget:', error)
     return { success: false, error: 'Error al exportar presupuesto' }
   }
-}
-
-export async function exportBudgetToPDF(
-  _budgetVersionId: string,
-  _selectedColumns: string[]
-) {
-  return { success: false, error: PDF_MIGRATION_MSG }
 }
 
 /**
@@ -736,13 +719,6 @@ export async function exportCompanyTransactionsToExcel(
   }
 }
 
-export async function exportCompanyTransactionsToPDF(
-  _filters: CompanyTransactionsExportFilters,
-  _selectedColumns: string[]
-) {
-  return { success: false, error: PDF_MIGRATION_MSG }
-}
-
 // ==================== Cashflow consolidado ====================
 
 export type CashflowExportParams = {
@@ -805,13 +781,6 @@ export async function exportCompanyCashflowToExcel(
     console.error('Error exporting cashflow:', error)
     return { success: false, error: 'Error al exportar flujo de caja' }
   }
-}
-
-export async function exportCompanyCashflowToPDF(
-  _params: CashflowExportParams,
-  _selectedColumns: string[]
-) {
-  return { success: false, error: PDF_MIGRATION_MSG }
 }
 
 export type ProjectCashflowExportParams = CashflowExportParams & { projectId: string }
@@ -1050,27 +1019,4 @@ export async function exportCertificationsToExcel(
     console.error('Error exporting certifications:', error)
     return { success: false, error: 'Error al exportar certificaciones' }
   }
-}
-
-export async function exportCertificationsToPDF(
-  _projectId: string,
-  _selectedColumns: string[]
-) {
-  return { success: false, error: PDF_MIGRATION_MSG }
-}
-
-export async function exportFinanceDashboardToPDF(_chartImages: {
-  trend: string
-  category: string
-  suppliers: string
-  projects: string
-}) {
-  return { success: false, error: PDF_MIGRATION_MSG }
-}
-
-export async function exportProjectDashboardToPDF(
-  _projectId: string,
-  _chartImages: { wbs: string; cashflow: string; certifications: string }
-) {
-  return { success: false, error: PDF_MIGRATION_MSG }
 }

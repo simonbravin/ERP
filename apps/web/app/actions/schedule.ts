@@ -922,14 +922,3 @@ export async function getScheduleForView(scheduleId: string) {
     return null
   }
 }
-
-/**
- * Exportar cronograma a PDF. Temporalmente deshabilitado (migración al nuevo sistema /print + /api/pdf).
- */
-export async function exportScheduleToPDF(_scheduleId: string) {
-  return {
-    success: false,
-    error:
-      'Exportación a PDF del cronograma está temporalmente deshabilitada. Estamos migrando al nuevo sistema.',
-  }
-}

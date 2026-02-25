@@ -153,17 +153,3 @@ export async function exportPurchasesBySupplierToExcel(
     filename: `compras_${safeName}_${Date.now()}.xlsx`,
   }
 }
-
-/** Export purchases-by-supplier to PDF. Temporarily disabled (migration to new /print + /api/pdf). */
-export async function exportPurchasesBySupplierToPDF(
-  _orgId: string,
-  _partyId: string,
-  _selectedColumns: string[],
-  _data: PurchaseRow[]
-) {
-  return {
-    success: false,
-    error:
-      'Exportación PDF en proceso de migración. Use la planilla de cómputo (Exportar PDF) para exportar a PDF.',
-  }
-}
