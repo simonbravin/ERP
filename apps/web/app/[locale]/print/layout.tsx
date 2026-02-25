@@ -20,6 +20,7 @@ export default async function PrintLayout({
   let orgProfile: {
     legalName: string | null
     taxId: string | null
+    country: string | null
     address: string | null
     email: string | null
     phone: string | null
@@ -42,6 +43,7 @@ export default async function PrintLayout({
       orgProfile = {
         legalName: profile.legalName ?? null,
         taxId: profile.taxId ?? null,
+        country: profile.country ?? null,
         address: profile.address ?? null,
         email: profile.email ?? null,
         phone: profile.phone ?? null,

@@ -2,6 +2,7 @@
 
 import { DocumentHeader } from '@/components/print/document-header'
 import { usePrintContext } from '@/components/print/print-context'
+import { getLegalIdDisplay } from '@/lib/print/legal-id'
 import { getHeaderMeta, type HeaderMetaParams } from '@/lib/pdf/templates/header-meta'
 
 type PrintDocumentShellProps = {
@@ -23,6 +24,10 @@ export function PrintDocumentShell({
 
   const params: HeaderMetaParams = { id, ...query }
   const meta = getHeaderMeta(templateId, params)
+  const legalIdDisplay = getLegalIdDisplay({
+    taxId: orgProfile?.taxId ?? null,
+    country: orgProfile?.country ?? null,
+  })
 
   const issuedBy =
     user?.fullName?.trim() || user?.email?.trim()
@@ -35,7 +40,7 @@ export function PrintDocumentShell({
         orgName={org.orgName ?? 'Organización'}
         orgLegalName={orgProfile?.legalName ?? undefined}
         logoUrl={logoUrl}
-        taxId={orgProfile?.taxId ?? undefined}
+        legalIdDisplay={legalIdDisplay}
         address={orgProfile?.address ?? undefined}
         email={orgProfile?.email ?? undefined}
         phone={orgProfile?.phone ?? undefined}

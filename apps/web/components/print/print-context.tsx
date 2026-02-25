@@ -10,6 +10,7 @@ export type PrintOrg = {
 export type PrintOrgProfile = {
   legalName: string | null
   taxId: string | null
+  country: string | null
   address: string | null
   email: string | null
   phone: string | null

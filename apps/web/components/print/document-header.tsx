@@ -1,11 +1,15 @@
 /**
  * Reusable document header for print layout.
  * Shows org name/logo, optional legal details, project, date, folio block, and "Emitido por".
+ * Legal/tax ID: use legalIdDisplay (from getLegalIdDisplay) when present; else fallback to taxId with "ID Fiscal".
  */
 type DocumentHeaderProps = {
   orgName: string
   orgLegalName?: string | null
   logoUrl?: string | null
+  /** Preferred: label + value by jurisdiction (RUC / CUIT / ID Fiscal). From getLegalIdDisplay(). */
+  legalIdDisplay?: { label: string; value: string } | null
+  /** Legacy: raw tax ID when legalIdDisplay not provided; shown as "ID Fiscal: {taxId}". */
   taxId?: string | null
   address?: string | null
   email?: string | null
@@ -26,6 +30,7 @@ export function DocumentHeader({
   orgName,
   orgLegalName,
   logoUrl,
+  legalIdDisplay,
   taxId,
   address,
   email,
@@ -45,7 +50,14 @@ export function DocumentHeader({
     year: 'numeric',
   })
 
-  const hasLegal = [taxId, address, email, phone].some((v) => v != null && String(v).trim() !== '')
+  const legalLine =
+    legalIdDisplay != null
+      ? `${legalIdDisplay.label}: ${legalIdDisplay.value}`
+      : taxId != null && String(taxId).trim() !== ''
+        ? `ID Fiscal: ${String(taxId).trim()}`
+        : null
+
+  const hasLegal = [legalLine, address, email, phone].some((v) => v != null && String(v).trim() !== '')
   const showFolioBlock =
     (folioLabel != null && folioValue != null && folioLabel !== '' && folioValue !== '') ||
     (folio != null && folio !== '')
@@ -72,7 +84,7 @@ export function DocumentHeader({
             <h1 className="print-document-header__org">{displayName}</h1>
             {hasLegal && (
               <div className="print-document-header__legal">
-                {taxId ? <span>RUC/CUIT: {taxId}</span> : null}
+                {legalLine ? <span>{legalLine}</span> : null}
                 {address ? <span>{address}</span> : null}
                 {email ? <span>{email}</span> : null}
                 {phone ? <span>{phone}</span> : null}
