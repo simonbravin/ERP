@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 import { prisma } from '@repo/database'
 import { renderUrlToPdf } from '@/lib/pdf/render-pdf'
+import { getDocumentTemplate } from '@/lib/pdf/templates'
 
 function getBaseUrl(): string {
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`
@@ -37,32 +38,55 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   }
 
-  const doc = request.nextUrl.searchParams.get('doc')
+  const templateParam = request.nextUrl.searchParams.get('template')
+  const docParam = request.nextUrl.searchParams.get('doc')
+  const templateId = templateParam ?? docParam
   const id = request.nextUrl.searchParams.get('id')
   const locale = request.nextUrl.searchParams.get('locale') || 'es'
 
-  if (doc !== 'computo' || !id) {
+  if (!templateId) {
+    return NextResponse.json(
+      { error: 'Parámetros inválidos: template (o doc) e id son requeridos' },
+      { status: 400 }
+    )
+  }
+
+  let template
+  try {
+    template = getDocumentTemplate(templateId)
+  } catch {
+    return NextResponse.json(
+      { error: `Plantilla desconocida: ${templateId}` },
+      { status: 400 }
+    )
+  }
+
+  if (template.id === 'computo' && !id) {
     return NextResponse.json(
       { error: 'Parámetros inválidos: doc e id son requeridos' },
       { status: 400 }
     )
   }
 
-  if (doc === 'computo') {
-    const version = await prisma.budgetVersion.findFirst({
-      where: { id, orgId: member.orgId },
-      select: { id: true },
-    })
-    if (!version) {
-      return NextResponse.json(
-        { error: 'Versión no encontrada o sin acceso' },
-        { status: 404 }
-      )
-    }
+  const session = { userId: token.sub, orgId: member.orgId }
+
+  try {
+    await template.validateAccess({ session, id: id ?? undefined })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Sin acceso'
+    const isNotFound = message.toLowerCase().includes('no encontrada') || message.toLowerCase().includes('no encontrado')
+    return NextResponse.json(
+      { error: message },
+      { status: isNotFound ? 404 : 403 }
+    )
   }
 
   const baseUrl = getBaseUrl()
-  const printUrl = `${baseUrl}/${locale}/print/computo/${id}`
+  const printUrl = template.buildPrintUrl({
+    baseUrl,
+    locale,
+    id: id ?? undefined,
+  })
   const cookies = getCookiesFromRequest(request)
 
   try {
@@ -71,7 +95,7 @@ export async function GET(request: NextRequest) {
       printBackground: true,
     })
 
-    const filename = `computo-${id}.pdf`
+    const filename = template.getFileName({ id: id ?? undefined })
     return new NextResponse(pdfBuffer, {
       status: 200,
       headers: {
