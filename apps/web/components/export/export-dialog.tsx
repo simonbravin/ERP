@@ -84,6 +84,10 @@ export function ExportDialog({
           downloadFile(result.data, result.filename, exportFormat)
           toast.success(t('fileDownloaded'))
           onOpenChange(false)
+        } else if (result.success && result.filename) {
+          // PDF (or other) already triggered download in onExport
+          toast.success(t('fileDownloaded'))
+          onOpenChange(false)
         } else {
           toast.error(result.error ?? t('exportError'))
         }

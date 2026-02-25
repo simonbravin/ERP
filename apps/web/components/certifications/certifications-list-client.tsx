@@ -16,7 +16,7 @@ import { CertStatusBadge } from './cert-status-badge'
 import { formatPeriod, formatCurrency } from '@/lib/certification-utils'
 import { PlusIcon, Eye, FileDown } from 'lucide-react'
 import { ExportDialog } from '@/components/export/export-dialog'
-import { exportCertificationsToExcel, exportCertificationsToPDF } from '@/app/actions/export'
+import { exportCertificationsToExcel } from '@/app/actions/export'
 
 export type CertificationRow = {
   id: string
@@ -191,7 +191,23 @@ export function CertificationsListClient({
         columns={EXPORT_COLUMNS}
         onExport={async (format, selectedColumns) => {
           if (format === 'excel') return exportCertificationsToExcel(projectId, selectedColumns)
-          return exportCertificationsToPDF(projectId, selectedColumns)
+          const locale = typeof window !== 'undefined' ? document.documentElement.lang || 'es' : 'es'
+          const url = `/api/pdf?template=certification&id=${encodeURIComponent(projectId)}&locale=${encodeURIComponent(locale)}`
+          const res = await fetch(url, { credentials: 'include' })
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}))
+            return { success: false, error: data?.error ?? 'No se pudo generar el PDF' }
+          }
+          const blob = await res.blob()
+          const disposition = res.headers.get('Content-Disposition')
+          const match = disposition?.match(/filename="?([^";]+)"?/)
+          const filename = match?.[1] ?? `certificaciones-${projectId}.pdf`
+          const link = document.createElement('a')
+          link.href = URL.createObjectURL(blob)
+          link.download = filename
+          link.click()
+          URL.revokeObjectURL(link.href)
+          return { success: true, filename }
         }}
       />
 
