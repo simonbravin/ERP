@@ -89,13 +89,27 @@ export function PurchasesBySupplierReport({ orgId }: PurchasesBySupplierReportPr
   ]
 
   async function handleExport(format: 'excel' | 'pdf', selectedColumns: string[]) {
-    const { exportPurchasesBySupplierToExcel, exportPurchasesBySupplierToPDF } = await import(
-      '@/app/actions/export-purchases'
-    )
+    const { exportPurchasesBySupplierToExcel } = await import('@/app/actions/export-purchases')
     if (format === 'excel') {
       return await exportPurchasesBySupplierToExcel(orgId, selectedSupplier, selectedColumns, data)
     }
-    return await exportPurchasesBySupplierToPDF(orgId, selectedSupplier, selectedColumns, data)
+    const locale = typeof window !== 'undefined' ? document.documentElement.lang || 'es' : 'es'
+    const url = `/api/pdf?template=purchases-by-supplier&locale=${encodeURIComponent(locale)}&partyId=${encodeURIComponent(selectedSupplier)}`
+    const res = await fetch(url, { credentials: 'include' })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      return { success: false, error: data?.error ?? 'No se pudo generar el PDF' }
+    }
+    const blob = await res.blob()
+    const disposition = res.headers.get('Content-Disposition')
+    const match = disposition?.match(/filename="?([^";]+)"?/)
+    const filename = match?.[1] ?? 'compras-por-proveedor.pdf'
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = filename
+    link.click()
+    URL.revokeObjectURL(link.href)
+    return { success: true, filename }
   }
 
   return (

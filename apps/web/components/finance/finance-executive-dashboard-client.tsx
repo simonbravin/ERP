@@ -27,8 +27,6 @@ import { formatCurrency, formatDateShort } from '@/lib/format-utils'
 import { Download, AlertTriangle } from 'lucide-react'
 import { Link } from '@/i18n/navigation'
 import { toast } from 'sonner'
-import { useChartExport } from '@/hooks/use-chart-export'
-import { exportFinanceDashboardToPDF } from '@/app/actions/export'
 import type { FinanceExecutiveDashboard, FinanceAlert } from '@/app/actions/finance'
 
 const COLORS = [
@@ -52,34 +50,27 @@ interface Props {
 
 export function FinanceExecutiveDashboardClient({ data, alerts = [] }: Props) {
   const [isExporting, setIsExporting] = useState(false)
-  const { captureChart, downloadFile } = useChartExport()
-
   const handleExportPDF = async () => {
     setIsExporting(true)
-    toast.info('Capturando gráficos...')
     try {
-      const [trend, category, suppliers, projects] = await Promise.all([
-        captureChart('chart-trend'),
-        captureChart('chart-category'),
-        captureChart('chart-suppliers'),
-        captureChart('chart-projects'),
-      ])
-      if (!trend || !category || !suppliers || !projects) {
-        throw new Error('Error al capturar gráficos')
+      const locale = typeof document !== 'undefined' ? document.documentElement.lang || 'es' : 'es'
+      const url = `/api/pdf?template=finance-dashboard&locale=${encodeURIComponent(locale)}`
+      const res = await fetch(url, { credentials: 'include' })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        toast.error(data?.error ?? 'Error al exportar')
+        return
       }
-      toast.info('Generando PDF...')
-      const result = await exportFinanceDashboardToPDF({
-        trend,
-        category,
-        suppliers,
-        projects,
-      })
-      if (result.success && result.data && result.filename) {
-        downloadFile(result.data, result.filename)
-        toast.success('Dashboard exportado correctamente')
-      } else {
-        toast.error((result as { error?: string }).error ?? 'Error al exportar')
-      }
+      const blob = await res.blob()
+      const disposition = res.headers.get('Content-Disposition')
+      const match = disposition?.match(/filename="?([^";]+)"?/)
+      const filename = match?.[1] ?? 'dashboard-finanzas.pdf'
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(blob)
+      link.download = filename
+      link.click()
+      URL.revokeObjectURL(link.href)
+      toast.success('Dashboard exportado correctamente')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al exportar')
     } finally {

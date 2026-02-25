@@ -24,8 +24,6 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { formatCurrency } from '@/lib/format-utils'
 import { TrendingUp, TrendingDown, AlertTriangle, Download } from 'lucide-react'
 import { toast } from 'sonner'
-import { useChartExport } from '@/hooks/use-chart-export'
-import { exportProjectDashboardToPDF } from '@/app/actions/export'
 import type { ProjectDashboardData } from '@/app/actions/project-dashboard'
 
 interface ProjectInfo {
@@ -50,7 +48,6 @@ interface Props {
 export function ProjectDashboardClient({ project, data }: Props) {
   const router = useRouter()
   const [isExporting, setIsExporting] = useState(false)
-  const { captureChart } = useChartExport()
 
   useMessageBus('FINANCE_TRANSACTION.CREATED', () => router.refresh())
   useMessageBus('FINANCE_TRANSACTION.UPDATED', () => router.refresh())
@@ -59,38 +56,31 @@ export function ProjectDashboardClient({ project, data }: Props) {
   const handleExportPDF = useCallback(async () => {
     setIsExporting(true)
     try {
-      const [wbs, cashflow, certifications] = await Promise.all([
-        captureChart('chart-wbs'),
-        captureChart('chart-cashflow'),
-        captureChart('chart-certifications'),
-      ])
-      if (!wbs || !cashflow || !certifications) {
-        toast.error('No se pudieron capturar los gráficos')
+      const locale = typeof document !== 'undefined' ? document.documentElement.lang || 'es' : 'es'
+      const url = `/api/pdf?template=project-dashboard&id=${encodeURIComponent(project.id)}&locale=${encodeURIComponent(locale)}`
+      const res = await fetch(url, { credentials: 'include' })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        toast.error(data?.error ?? 'Error al generar el PDF')
         return
       }
-      const result = await exportProjectDashboardToPDF(project.id, {
-        wbs,
-        cashflow,
-        certifications,
-      })
-      if (result?.success && result.data && result.filename) {
-        const link = document.createElement('a')
-        link.href = `data:application/pdf;base64,${result.data}`
-        link.download = result.filename
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        toast.success('PDF descargado')
-      } else {
-        toast.error('Error al generar el PDF')
-      }
+      const blob = await res.blob()
+      const disposition = res.headers.get('Content-Disposition')
+      const match = disposition?.match(/filename="?([^";]+)"?/)
+      const filename = match?.[1] ?? `dashboard-proyecto-${project.id}.pdf`
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(blob)
+      link.download = filename
+      link.click()
+      URL.revokeObjectURL(link.href)
+      toast.success('PDF descargado')
     } catch (err) {
       console.error(err)
       toast.error('Error al exportar el dashboard')
     } finally {
       setIsExporting(false)
     }
-  }, [project.id, captureChart])
+  }, [project.id])
 
   const budgetUsagePct =
     data.budget.total === 0 ? 0 : (data.budget.spent / data.budget.total) * 100
