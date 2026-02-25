@@ -1,8 +1,10 @@
 import type { DocumentTemplates, DocumentTemplate } from '@/lib/pdf/document-template'
 import { computoTemplate } from './computo.template'
+import { transactionsTemplate } from './transactions.template'
 
 export const documentTemplates: Partial<Record<DocumentTemplates, DocumentTemplate>> = {
   computo: computoTemplate,
+  transactions: transactionsTemplate,
 }
 
 /**
