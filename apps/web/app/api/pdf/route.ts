@@ -2,12 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 import { prisma } from '@repo/database'
 import { getOrgContext } from '@/lib/org-context'
-import { getBudgetVersionWithLines, listBudgetLines } from '@/app/actions/budget'
+import { getBudgetExportData } from '@/app/actions/budget'
 import { getProject } from '@/app/actions/projects'
 import { getDownloadUrl } from '@/lib/r2-client'
 import { buildBudgetPrintHtml } from '@/lib/pdf/build-budget-print-html'
 import { renderUrlToPdf, renderHtmlToPdf } from '@/lib/pdf/render-pdf'
 import { getDocumentTemplate } from '@/lib/pdf/templates'
+
+function escapePdfHeader(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
 
 function getBaseUrl(request: NextRequest): string {
   // Use request origin so the headless browser hits the same host/port (e.g. localhost:3333)
@@ -51,6 +55,9 @@ export async function GET(request: NextRequest) {
   const templateId = templateParam ?? docParam
   const id = request.nextUrl.searchParams.get('id')
   const locale = request.nextUrl.searchParams.get('locale') || 'es'
+  const showEmitidoParam = request.nextUrl.searchParams.get('showEmitidoPor')
+  const showFullCompanyParam = request.nextUrl.searchParams.get('showFullCompanyData')
+  const columnsParam = request.nextUrl.searchParams.get('columns')
 
   if (!templateId) {
     return NextResponse.json(
@@ -109,8 +116,7 @@ export async function GET(request: NextRequest) {
     let pdfBuffer: Buffer
 
     if (template.id === 'budget' && id) {
-      // Use same data source as Budget version page: getBudgetVersionWithLines loads version + budgetLines
-      // (with wbsNode) and filters to active WBS only. Do not use listBudgetLines alone for PDF.
+      // Same dataset as Planilla Final: full WBS tree flattened (one row per node) via getBudgetExportData.
       const org = await getOrgContext(token.sub)
       if (!org) {
         return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
@@ -139,40 +145,16 @@ export async function GET(request: NextRequest) {
       } catch {
         // optional
       }
-      const data = await getBudgetVersionWithLines(id)
+      const data = await getBudgetExportData(id)
       if (!data) {
         return NextResponse.json({ error: 'Versión no encontrada' }, { status: 404 })
       }
-      const { version, lines } = data
-      console.log('[PDF budget] lines count:', lines.length)
-      const listCount = (await listBudgetLines(id))?.length ?? 0
-      if (listCount !== lines.length) {
-        throw new Error(
-          `[PDF budget] data source mismatch: getBudgetVersionWithLines=${lines.length} listBudgetLines=${listCount}. PDF uses version-page source.`
-        )
-      }
-      if (lines.length === 0 && version) {
-        console.warn('[PDF budget] no lines for version', id, '- export may be empty')
-      }
+      const { version, rows, grandTotal } = data
+      console.log('[PDF budget] rows count (WBS nodes):', rows.length)
       const project = await getProject(version.projectId)
       if (!project) {
         return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 })
       }
-      const rows = lines.map((line: { wbsNode?: { code: string; name: string } | null; quantity: number; unit: string | null; description: string | null; directCostTotal?: unknown }) => {
-        const qty = typeof line.quantity === 'number' ? line.quantity : Number(line.quantity) || 1
-        const total = Number((line as { directCostTotal?: number }).directCostTotal ?? 0)
-        const unitPrice = qty > 0 ? total / qty : 0
-        const wbs = line.wbsNode
-        return {
-          code: wbs?.code ?? '—',
-          description: line.description ?? wbs?.name ?? '—',
-          unit: line.unit ?? '—',
-          quantity: qty,
-          unitPrice,
-          totalCost: total,
-        }
-      })
-      const grandTotal = rows.reduce((sum, r) => sum + r.totalCost, 0)
       const userName = (token as { name?: string }).name ?? (token as { email?: string }).email ?? ''
       const formatDate = (d: Date | string | null | undefined) =>
         d ? new Date(d).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : null
@@ -200,6 +182,11 @@ export async function GET(request: NextRequest) {
         phone: orgProfile?.phone ?? null,
         userNameOrEmail: userName || null,
       }
+      const pdfShowEmitidoPor = showEmitidoParam !== '0' && showEmitidoParam !== 'false'
+      const pdfShowFullCompanyData = showFullCompanyParam !== '0' && showFullCompanyParam !== 'false'
+      const selectedColumns = columnsParam ? columnsParam.split(',').map((c) => c.trim()) : []
+      const includeIncidenciaColumn = selectedColumns.includes('incidenciaPct')
+
       const page = {
         projectName: project.name,
         projectNumber: project.projectNumber ?? null,
@@ -208,10 +195,17 @@ export async function GET(request: NextRequest) {
         rows,
         grandTotal,
       }
-      const html = buildBudgetPrintHtml(layout, page)
+      const printOptions = {
+        showEmitidoPor: pdfShowEmitidoPor,
+        showFullCompanyData: pdfShowFullCompanyData,
+        includeIncidenciaColumn,
+      }
+      const html = buildBudgetPrintHtml(layout, page, printOptions)
+      const headerTemplate = `<div style="font-size:9px;color:#666;text-align:right;padding:0 20px;">${escapePdfHeader(project.name)}</div>`
       const budgetPdfOptions = {
         ...pdfOptions,
-        margin: { top: '80px', right: '30px', bottom: '70px', left: '30px' },
+        margin: { top: '60px', right: '10px', bottom: '58px', left: '10px' },
+        headerTemplate,
       }
       pdfBuffer = await renderHtmlToPdf(html, baseUrl + '/', budgetPdfOptions)
     } else {

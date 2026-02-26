@@ -1,5 +1,14 @@
 "use server";
 
+/**
+ * Excel import (future): WBS numbering rules for parsing a "Nº" / "Código" column:
+ * - Integer only (e.g. 1, 2, 3) → root-level task (parentId = null).
+ * - One dot (e.g. 1.1, 1.2) → child of that root (parentId = node with code "1").
+ * - Two dots (e.g. 2.1.1) → child of 2.1 (parentId = node with code "2.1").
+ * Parse by depth (number of dot-separated segments or level), assign parentId and code,
+ * validate no duplicate codes and consistent hierarchy. Create BudgetLine per row if applicable.
+ */
+
 import { revalidatePath } from 'next/cache'
 import { prisma, Prisma } from '@repo/database'
 import { getSession } from '@/lib/session'
@@ -64,7 +73,30 @@ async function ensureNoCircular(
   }
 }
 
-/** Recalculate codes for node and all descendants (by sortOrder). */
+const TEMP_CODE_PREFIX = '_reorder_'
+
+/** Set node and all descendants to temporary unique codes to avoid unique constraint during renumbering. */
+async function setSubtreeTempCodes(
+  tx: PrismaTransaction,
+  nodeId: string
+): Promise<void> {
+  const node = await tx.wbsNode.findUnique({
+    where: { id: nodeId },
+    select: { id: true },
+  })
+  if (!node) return
+  await tx.wbsNode.update({
+    where: { id: nodeId },
+    data: { code: TEMP_CODE_PREFIX + nodeId },
+  })
+  const children = await tx.wbsNode.findMany({
+    where: { parentId: nodeId, active: true },
+    select: { id: true },
+  })
+  for (const c of children) await setSubtreeTempCodes(tx, c.id)
+}
+
+/** Recalculate codes for node's children and descendants. Two-phase: temp codes then real codes to avoid unique constraint. */
 async function recalculateCodes(
   tx: PrismaTransaction,
   nodeId: string,
@@ -80,15 +112,24 @@ async function recalculateCodes(
     orderBy: { sortOrder: 'asc' },
     select: { id: true, sortOrder: true },
   })
-  let seq = 1
+  if (children.length === 0) return
+  // Phase 1: assign temp codes to all children and their descendants so real codes are free
   for (const child of children) {
-    const newCode = generateWBSCode(newParentCode, seq)
+    await tx.wbsNode.update({
+      where: { id: child.id },
+      data: { code: TEMP_CODE_PREFIX + child.id },
+    })
+    await setSubtreeTempCodes(tx, child.id)
+  }
+  // Phase 2: assign real codes in order
+  for (let i = 0; i < children.length; i++) {
+    const child = children[i]
+    const newCode = generateWBSCode(newParentCode, i + 1)
     await tx.wbsNode.update({
       where: { id: child.id },
       data: { code: newCode },
     })
     await recalculateCodes(tx, child.id, newCode)
-    seq++
   }
 }
 
@@ -472,6 +513,33 @@ export async function reorderWBSItems(
         data: { sortOrder: i },
       })
     }
+    // Renumber codes: two-phase to avoid unique constraint (project_id, code).
+    if (parentId === null) {
+      // Phase 1: set all root nodes and their subtrees to temp codes
+      for (const id of orderedNodeIds) {
+        await tx.wbsNode.update({
+          where: { id },
+          data: { code: TEMP_CODE_PREFIX + id },
+        })
+        await setSubtreeTempCodes(tx, id)
+      }
+      // Phase 2: assign real codes 1, 2, 3… and recalc children
+      for (let i = 0; i < orderedNodeIds.length; i++) {
+        const newCode = generateWBSCode(null, i + 1)
+        await tx.wbsNode.update({
+          where: { id: orderedNodeIds[i] },
+          data: { code: newCode },
+        })
+        await recalculateCodes(tx, orderedNodeIds[i], newCode)
+      }
+    } else {
+      const parent = await tx.wbsNode.findUnique({
+        where: { id: parentId },
+        select: { code: true },
+      })
+      const parentCode = parent?.code ?? null
+      await recalculateCodes(tx, parentId, parentCode)
+    }
     await publishOutboxEvent(tx, {
       orgId: org.orgId,
       eventType: 'WBS_NODE.REORDERED',
@@ -483,6 +551,7 @@ export async function reorderWBSItems(
 
   revalidatePath(`/projects/${projectId}/wbs`)
   revalidatePath(`/projects/${projectId}`)
+  revalidatePath(`/projects/${projectId}/budget`)
   return { success: true }
 }
 

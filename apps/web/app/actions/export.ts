@@ -159,36 +159,25 @@ export async function exportBudgetToExcel(
   const orgData = await getOrganizationData(org.orgId)
 
   try {
-    const version = await prisma.budgetVersion.findFirst({
-      where: { id: budgetVersionId, orgId: org.orgId },
-      include: {
-        project: true,
-        budgetLines: {
-          include: { wbsNode: true },
-          orderBy: [{ wbsNode: { sortOrder: 'asc' } }, { wbsNode: { code: 'asc' } }],
-        },
-      },
-    })
-
-    if (!version) {
+    const { getBudgetExportData } = await import('./budget')
+    const exportData = await getBudgetExportData(budgetVersionId)
+    if (!exportData) {
       return { success: false, error: 'Version not found' }
     }
-
-    const data = version.budgetLines.map((line) => {
-      const qty = Number(line.quantity) || 1
-      const directCost = Number(line.directCostTotal)
-      return {
-        code: line.wbsNode.code,
-        description: line.description,
-        unit: line.unit,
-        quantity: qty,
-        unitPrice: qty > 0 ? directCost / qty : 0,
-        totalCost: directCost,
-        overheadPct: Number(line.overheadPct),
-        profitPct: Number(line.profitPct),
-        taxPct: Number(line.taxPct),
-      }
-    })
+    const { version, rows } = exportData
+    const project = await getProject(version.projectId as string)
+    const data = rows.map((r) => ({
+      code: r.code,
+      description: r.description,
+      unit: r.unit,
+      quantity: r.quantity,
+      unitPrice: r.unitPrice,
+      totalCost: r.totalCost,
+      incidenciaPct: r.incidenciaPct ?? 0,
+      overheadPct: 0,
+      profitPct: 0,
+      taxPct: 0,
+    }))
 
     const allColumns = [
       { field: 'code', label: 'Código', type: 'text' as const, width: 12 },
@@ -197,6 +186,7 @@ export async function exportBudgetToExcel(
       { field: 'quantity', label: 'Cantidad', type: 'number' as const, width: 12, align: 'right' as const },
       { field: 'unitPrice', label: 'P.Unit', type: 'currency' as const, width: 15, align: 'right' as const },
       { field: 'totalCost', label: 'Total', type: 'currency' as const, width: 18, align: 'right' as const },
+      { field: 'incidenciaPct', label: 'Inc %', type: 'percentage' as const, width: 10, align: 'right' as const },
       { field: 'overheadPct', label: 'GG %', type: 'percentage' as const, width: 10, align: 'right' as const },
       { field: 'profitPct', label: 'Benef %', type: 'percentage' as const, width: 10, align: 'right' as const },
       { field: 'taxPct', label: 'IVA %', type: 'percentage' as const, width: 10, align: 'right' as const },
@@ -207,17 +197,18 @@ export async function exportBudgetToExcel(
       visible: selectedColumns.includes(col.field),
     }))
 
+    const v = version as { project: { name: string; projectNumber: string }; versionCode: string }
     const config: ExcelConfig = {
       title: 'PRESUPUESTO OFICIAL',
-      subtitle: `${version.project.name} - ${version.versionCode}`,
+      subtitle: `${v.project.name} - ${v.versionCode}`,
       includeCompanyHeader: true,
       project: {
-        name: version.project.name,
-        number: version.project.projectNumber,
-        client: version.project.clientName ?? undefined,
+        name: v.project.name,
+        number: v.project.projectNumber,
+        client: (project as { clientName?: string | null } | null)?.clientName ?? undefined,
       },
       metadata: {
-        version: version.versionCode,
+        version: v.versionCode,
         date: new Date(),
         generatedBy: orgData?.legalName ?? orgData?.name ?? 'Sistema',
       },
@@ -238,7 +229,7 @@ export async function exportBudgetToExcel(
     return {
       success: true,
       data: base64,
-      filename: `presupuesto_${version.project.projectNumber}_${version.versionCode}_${Date.now()}.xlsx`,
+      filename: `presupuesto_${v.project.projectNumber}_${v.versionCode}_${Date.now()}.xlsx`,
     }
   } catch (error) {
     console.error('Error exporting budget:', error)

@@ -43,8 +43,14 @@ export const updateProjectSchema = z.object({
     (v) => (v === '' || v === undefined ? undefined : v),
     PROJECT_PHASE_ENUM.optional()
   ),
-  startDate: z.preprocess(parseDateOnly, z.date().optional().nullable()),
-  plannedEndDate: z.preprocess(parseDateOnly, z.date().optional().nullable()),
+  startDate: z.preprocess(
+    (v) => (v === '' ? null : parseDateOnly(v)),
+    z.date().optional().nullable()
+  ),
+  plannedEndDate: z.preprocess(
+    (v) => (v === '' ? null : parseDateOnly(v)),
+    z.date().optional().nullable()
+  ),
   active: z.boolean().optional(),
 })
 

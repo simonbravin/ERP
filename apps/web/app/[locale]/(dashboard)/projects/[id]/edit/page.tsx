@@ -56,22 +56,16 @@ export default async function ProjectEditPage({ params }: PageProps) {
   }
 
   return (
-    <div className="p-6">
-      <div className="mx-auto max-w-4xl">
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
-          Editar proyecto
-        </h1>
-        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-          {project.projectNumber}
-        </p>
-        <div className="mt-6">
-          <ProjectForm
-            mode="edit"
-            projectId={id}
-            defaultValues={defaultValues}
-            onCancelHref={`/projects/${id}`}
-          />
-        </div>
+    <div className="erp-stack">
+      <div className="erp-card-elevated p-6">
+        <h2 className="erp-section-title mb-1">Editar proyecto</h2>
+        <p className="erp-section-desc mb-6">{project.projectNumber}</p>
+        <ProjectForm
+          mode="edit"
+          projectId={id}
+          defaultValues={defaultValues}
+          onCancelHref={`/projects/${id}`}
+        />
       </div>
     </div>
   )

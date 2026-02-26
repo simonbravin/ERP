@@ -564,9 +564,10 @@ model Project {
   m2                   Decimal?     @db.Decimal(15, 2)
   phase                ProjectPhase @default(PRE_CONSTRUCTION)
   status               String       @default("DRAFT")
-  startDate            DateTime?    @map("start_date") @db.Date
-  plannedEndDate       DateTime?    @map("planned_end_date") @db.Date
-  actualEndDate        DateTime?    @map("actual_end_date") @db.Date
+  startDate                DateTime?    @map("start_date") @db.Date
+  plannedEndDate           DateTime?    @map("planned_end_date") @db.Date
+  baselinePlannedEndDate   DateTime?    @map("baseline_planned_end_date") @db.Date
+  actualEndDate            DateTime?    @map("actual_end_date") @db.Date
   customFields         Json         @default("{}") @map("custom_fields")
   totalBudget          Decimal?     @map("total_budget") @db.Decimal(15, 2)
   active               Boolean      @default(true)

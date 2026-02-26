@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useTransition } from 'react'
+import React, { Fragment, useState, useTransition } from 'react'
 import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import {
@@ -37,6 +37,7 @@ import { ChevronDown, ChevronRight, Plus, Trash2, Calculator, GripVertical } fro
 import { AddWbsNodeDialog, type WbsTemplateForLibrary } from './add-wbs-node-dialog'
 import { APUEditorDialog } from './apu-editor-dialog'
 import { deleteWbsNodeWithRenumber, deleteWbsNodeCascade } from '@/app/actions/wbs'
+import { createBudgetLine } from '@/app/actions/budget'
 import type { BudgetTreeNode } from './budget-tree-table-admin'
 
 interface BudgetLinesCompactTableProps {
@@ -51,6 +52,8 @@ interface BudgetLinesCompactTableProps {
   columnView?: 'totals' | 'breakdown'
   /** When set, enables drag-and-drop reorder; called with (parentId, orderedWbsNodeIds) */
   onReorder?: (parentId: string | null, orderedWbsNodeIds: string[]) => Promise<void>
+  /** Hide Actions column (e.g. Planilla Final read-only) */
+  hideActions?: boolean
 }
 
 /** Filtra el árbol: se incluye un nodo si coincide código/nombre/descripción o si algún hijo coincide */
@@ -100,13 +103,14 @@ function getSiblingIds(nodes: BudgetTreeNode[], parentId: string | null): string
 function SortableBudgetRow({
   id,
   canDrag,
-  rowIndex,
+  displayLabel,
   className,
   children,
 }: {
   id: string
   canDrag: boolean
-  rowIndex?: number
+  /** WBS code to show in Nº column (e.g. 1, 1.1, 1.1.1) */
+  displayLabel?: string
   className?: string
   children: React.ReactNode
 }) {
@@ -117,18 +121,24 @@ function SortableBudgetRow({
   }
   return (
     <TableRow ref={setNodeRef} style={style} className={className}>
-      <TableCell className="w-12 min-w-[2.5rem] px-2 py-1 text-center font-mono text-xs text-muted-foreground tabular-nums">
-        {canDrag && (
-          <span
-            className="inline-flex cursor-grab touch-none rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground active:cursor-grabbing"
-            {...listeners}
-            {...attributes}
-            title="Arrastrar para reordenar"
-          >
-            <GripVertical className="h-3.5 w-3.5" />
+      <TableCell className="min-w-[5rem] w-[5rem] px-2 py-1 font-mono text-xs text-muted-foreground tabular-nums">
+        <div className="flex items-center gap-1.5">
+          {canDrag ? (
+            <span
+              className="inline-flex h-6 w-6 shrink-0 cursor-grab items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground active:cursor-grabbing"
+              {...listeners}
+              {...attributes}
+              title="Arrastrar para reordenar"
+            >
+              <GripVertical className="h-3.5 w-3.5" />
+            </span>
+          ) : (
+            <span className="w-6 shrink-0" aria-hidden />
+          )}
+          <span className="min-w-[2rem] flex-1 text-right">
+            {displayLabel != null && displayLabel !== '' ? displayLabel : '—'}
           </span>
-        )}
-        {rowIndex != null ? <span className={canDrag ? 'ml-1' : ''}>{rowIndex}</span> : '—'}
+        </div>
       </TableCell>
       {children}
     </TableRow>
@@ -145,9 +155,10 @@ export function BudgetLinesCompactTable({
   searchQuery = '',
   columnView = 'totals',
   onReorder,
+  hideActions = false,
 }: BudgetLinesCompactTableProps) {
   const showBreakdown = columnView === 'breakdown'
-  const canDrag = Boolean(canEdit && onReorder)
+  const canDrag = Boolean(canEdit && onReorder && !hideActions)
 
   function lineResourceSums(line: { resources: Array<{ resourceType: string; quantity: number; unitCost: number }> }) {
     let material = 0, labor = 0, equipment = 0
@@ -298,6 +309,7 @@ export function BudgetLinesCompactTable({
     })
   }
 
+  /** Roll-up: parents show only sum of children; leaves show lines total. */
   function calculateNodeTotal(node: BudgetTreeNode): number {
     const linesTotal = node.lines.reduce(
       (sum, line) => sum + Number(line.directCostTotal),
@@ -307,7 +319,8 @@ export function BudgetLinesCompactTable({
       (sum, child) => sum + calculateNodeTotal(child),
       0
     )
-    return linesTotal + childrenTotal
+    if (node.children.length > 0) return childrenTotal
+    return linesTotal
   }
 
   function calculateNodeActualTotal(node: BudgetTreeNode): number {
@@ -319,10 +332,22 @@ export function BudgetLinesCompactTable({
       (sum, child) => sum + calculateNodeActualTotal(child),
       0
     )
-    return linesTotal + childrenTotal
+    if (node.children.length > 0) return childrenTotal
+    return linesTotal
   }
 
-  function renderNode(node: BudgetTreeNode, level: number = 0, rowIndex?: number): React.ReactNode {
+  /** First budget line in this node or in any descendant; for showing APU on phase rows with no direct lines. */
+  function getFirstLineInNode(node: BudgetTreeNode): BudgetTreeNode['lines'][number] | null {
+    if (node.lines[0]) return node.lines[0]
+    for (const child of node.children) {
+      const found = getFirstLineInNode(child)
+      if (found) return found
+    }
+    return null
+  }
+
+  /** displayLabel = wbsNode.code for Nº column (e.g. 1, 1.1, 1.1.1) */
+  function renderNode(node: BudgetTreeNode, level: number = 0, displayLabel?: string): React.ReactNode {
     const isExpanded = expandedNodes.has(node.wbsNode.id)
     const singleLinePhase = node.lines.length === 1 && node.children.length === 0
     const hasChildren = node.children.length > 0 || node.lines.length > 0
@@ -379,131 +404,10 @@ export function BudgetLinesCompactTable({
               {formatCurrency(Number(line.actualCostTotal ?? 0))}
             </span>
           </TableCell>
-          <TableCell className="px-2 py-1">
-            {canEdit && (
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() =>
-                    handleAddClick(
-                      node.wbsNode.id,
-                      node.wbsNode.code,
-                      node.wbsNode.name
-                    )
-                  }
-                  className="h-6 w-6 p-0"
-                >
-                  <Plus className="h-3 w-3 text-primary" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() =>
-                    handleDeleteClick(
-                      node.wbsNode.id,
-                      node.wbsNode.code,
-                      node.wbsNode.name
-                    )
-                  }
-                  className="h-6 w-6 p-0"
-                >
-                  <Trash2 className="h-3 w-3 text-destructive" />
-                </Button>
-                <Button
-                  variant={hasAPU ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setEditingAPU(line.id)}
-                  className="h-6 text-[10px]"
-                >
-                  <Calculator className="mr-1 h-3 w-3" />
-                  APU
-                  {hasAPU && (
-                    <span className="ml-1 rounded bg-primary/20 px-1 text-[10px]">
-                      {line.resources.length}
-                    </span>
-                  )}
-                </Button>
-              </div>
-            )}
-          </TableCell>
-        </>
-      )
-      if (canDrag) {
-        return (
-          <SortableBudgetRow key={node.wbsNode.id} id={node.wbsNode.id} canDrag rowIndex={rowIndex} className={`${bgColor} h-8 hover:bg-muted/50`}>
-            {itemAndRest}
-          </SortableBudgetRow>
-        )
-      }
-      return (
-        <TableRow key={node.wbsNode.id} className={`${bgColor} h-8 hover:bg-muted/50`}>
-          <TableCell className="w-12 min-w-[2.5rem] px-2 py-1 text-center font-mono text-xs text-muted-foreground tabular-nums">
-            {rowIndex != null ? rowIndex : '—'}
-          </TableCell>
-          {itemAndRest}
-        </TableRow>
-      )
-    }
-
-    return (
-      <React.Fragment key={node.wbsNode.id}>
-        {canDrag ? (
-          <SortableBudgetRow id={node.wbsNode.id} canDrag rowIndex={rowIndex} className={`${bgColor} h-8 hover:bg-muted/50`}>
-            <TableCell
-              style={{ paddingLeft: `${level * 16 + 8}px` }}
-              className="px-2 py-1"
-            >
-              <div className="flex items-center gap-1">
-                {showChevron && (
-                  <button
-                    type="button"
-                    onClick={() => toggleNode(node.wbsNode.id)}
-                    className="rounded p-0.5 hover:bg-muted"
-                  >
-                    {isExpanded ? (
-                      <ChevronDown className="h-3 w-3" />
-                    ) : (
-                      <ChevronRight className="h-3 w-3" />
-                    )}
-                  </button>
-                )}
-                <span className="text-xs font-medium text-foreground">
-                  {node.wbsNode.name}
-                </span>
-              </div>
-            </TableCell>
-            <TableCell className="px-2 py-1" />
-            <TableCell className="px-2 py-1" />
-            {showBreakdown && (() => {
-              const sums = nodeResourceSums(node)
-              return (
-                <>
-                  <TableCell className="px-2 py-1 text-right font-mono text-xs tabular-nums">
-                    {formatCurrency(sums.material)}
-                  </TableCell>
-                  <TableCell className="px-2 py-1 text-right font-mono text-xs tabular-nums">
-                    {formatCurrency(sums.labor)}
-                  </TableCell>
-                  <TableCell className="px-2 py-1 text-right font-mono text-xs tabular-nums">
-                    {formatCurrency(sums.equipment)}
-                  </TableCell>
-                </>
-              )
-            })()}
-            <TableCell className="erp-table-cell-currency px-2 py-1">
-              <span className="font-mono text-xs font-semibold">
-                {formatCurrencyForDisplay(nodeTotal)}
-              </span>
-            </TableCell>
-            <TableCell className="erp-table-cell-currency px-2 py-1 text-muted-foreground">
-              <span className="font-mono text-xs tabular-nums">
-                {formatCurrency(calculateNodeActualTotal(node))}
-              </span>
-            </TableCell>
-            <TableCell className="px-2 py-1">
+          {!hideActions && (
+            <TableCell className="px-2 py-1 min-w-[160px] shrink-0">
               {canEdit && (
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 flex-nowrap overflow-visible">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -514,9 +418,25 @@ export function BudgetLinesCompactTable({
                         node.wbsNode.name
                       )
                     }
-                    className="h-6 w-6 p-0"
+                    className="h-6 w-6 shrink-0 p-0"
+                    title={t('addPhase')}
                   >
                     <Plus className="h-3 w-3 text-primary" />
+                  </Button>
+                  <Button
+                    variant={hasAPU ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setEditingAPU(line.id)}
+                    className="h-6 shrink-0 text-[10px]"
+                    title="APU - Análisis de precios unitarios"
+                  >
+                    <Calculator className="mr-1 h-3 w-3" />
+                    APU
+                    {hasAPU && (
+                      <span className="ml-1 rounded bg-primary/20 px-1 text-[10px]">
+                        {line.resources.length}
+                      </span>
+                    )}
                   </Button>
                   <Button
                     variant="ghost"
@@ -535,11 +455,63 @@ export function BudgetLinesCompactTable({
                 </div>
               )}
             </TableCell>
+          )}
+        </>
+      )
+      if (canDrag) {
+        return (
+          <SortableBudgetRow key={node.wbsNode.id} id={node.wbsNode.id} canDrag displayLabel={displayLabel ?? node.wbsNode.code} className={`${bgColor} h-8 hover:bg-muted/50`}>
+            {itemAndRest}
           </SortableBudgetRow>
-        ) : (
-        <TableRow className={`${bgColor} h-8 hover:bg-muted/50`}>
-<TableCell className="w-12 min-w-[2.5rem] px-2 py-1 text-center font-mono text-xs text-muted-foreground tabular-nums">
-            {rowIndex != null ? rowIndex : '—'}
+        )
+      }
+      const code = (displayLabel ?? node.wbsNode.code) || ''
+      return (
+        <TableRow key={node.wbsNode.id} className={`${bgColor} h-8 hover:bg-muted/50`}>
+          <TableCell className="min-w-[5rem] w-[5rem] px-2 py-1 font-mono text-xs text-muted-foreground tabular-nums">
+            <div className="flex items-center gap-1.5">
+              <span className="w-6 shrink-0" aria-hidden />
+              <span className="min-w-[2rem] flex-1 text-right">{code || '—'}</span>
+            </div>
+          </TableCell>
+          {itemAndRest}
+        </TableRow>
+      )
+    }
+
+    const firstLineForApu = getFirstLineInNode(node)
+    // APU only on leaf nodes (roll-up: parents get total from children, no partida on parent)
+    const showApuOnPhase = canEdit && node.children.length === 0
+    async function handlePhaseApuClick() {
+      if (node.children.length > 0) return // no partida on parents
+      if (firstLineForApu) {
+        setEditingAPU(firstLineForApu.id)
+        return
+      }
+      const result = await createBudgetLine(versionId, {
+        wbsNodeId: node.wbsNode.id,
+        description: node.wbsNode.name || node.wbsNode.code,
+        unit: 'un',
+        quantity: 1,
+        unitCost: 0,
+      })
+      if (result && 'lineId' in result) {
+        setEditingAPU(result.lineId)
+        router.refresh()
+      } else if (result && 'error' in result) {
+        toast.error(t('error'), { description: typeof result.error === 'object' ? Object.values(result.error).flat().join(', ') : String(result.error) })
+      }
+    }
+
+    const nonDragRow = (() => {
+      const code = (displayLabel ?? node.wbsNode.code) || ''
+      return (
+        <TableRow key={node.wbsNode.id} className={`${bgColor} h-8 hover:bg-muted/50`}>
+          <TableCell className="min-w-[5rem] w-[5rem] px-2 py-1 font-mono text-xs text-muted-foreground tabular-nums">
+            <div className="flex items-center gap-1.5">
+              <span className="w-6 shrink-0" aria-hidden />
+              <span className="min-w-[2rem] flex-1 text-right">{code || '—'}</span>
+            </div>
           </TableCell>
           <TableCell
             style={{ paddingLeft: `${level * 16 + 8}px` }}
@@ -592,50 +564,185 @@ export function BudgetLinesCompactTable({
               {formatCurrency(calculateNodeActualTotal(node))}
             </span>
           </TableCell>
-          <TableCell className="px-2 py-1">
-            {canEdit && (
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() =>
-                    handleAddClick(
-                      node.wbsNode.id,
-                      node.wbsNode.code,
-                      node.wbsNode.name
-                    )
-                  }
-                  className="h-6 w-6 p-0"
-                >
-                  <Plus className="h-3 w-3 text-primary" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() =>
-                    handleDeleteClick(
-                      node.wbsNode.id,
-                      node.wbsNode.code,
-                      node.wbsNode.name
-                    )
-                  }
-                  className="h-6 w-6 p-0"
-                >
-                  <Trash2 className="h-3 w-3 text-destructive" />
-                </Button>
-              </div>
-            )}
-          </TableCell>
+          {!hideActions && (
+            <TableCell className="px-2 py-1 min-w-[160px] shrink-0">
+              {canEdit && (
+                <div className="flex items-center gap-1 flex-nowrap overflow-visible">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      handleAddClick(
+                        node.wbsNode.id,
+                        node.wbsNode.code,
+                        node.wbsNode.name
+                      )
+                    }
+                    className="h-6 w-6 shrink-0 p-0"
+                    title={t('addPhase')}
+                  >
+                    <Plus className="h-3 w-3 text-primary" />
+                  </Button>
+                  {showApuOnPhase && (
+                    <Button
+                      variant={firstLineForApu?.resources.length ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => handlePhaseApuClick()}
+                      className="h-6 shrink-0 text-[10px]"
+                      title="APU - Análisis de precios unitarios"
+                    >
+                      <Calculator className="mr-1 h-3 w-3" />
+                      APU
+                      {firstLineForApu?.resources.length ? (
+                        <span className="ml-1 rounded bg-primary/20 px-1 text-[10px]">
+                          {firstLineForApu.resources.length}
+                        </span>
+                      ) : null}
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      handleDeleteClick(
+                        node.wbsNode.id,
+                        node.wbsNode.code,
+                        node.wbsNode.name
+                      )
+                    }
+                    className="h-6 w-6 shrink-0 p-0"
+                  >
+                    <Trash2 className="h-3 w-3 text-destructive" />
+                  </Button>
+                </div>
+              )}
+            </TableCell>
+          )}
         </TableRow>
-        )}
+      )
+    })()
 
-        {isExpanded &&
+    return React.createElement(
+      Fragment,
+      { key: node.wbsNode.id },
+      canDrag ? (
+          <SortableBudgetRow id={node.wbsNode.id} canDrag displayLabel={displayLabel ?? node.wbsNode.code} className={`${bgColor} h-8 hover:bg-muted/50`}>
+            <TableCell
+              style={{ paddingLeft: `${level * 16 + 8}px` }}
+              className="px-2 py-1"
+            >
+              <div className="flex items-center gap-1">
+                {showChevron && (
+                  <button
+                    type="button"
+                    onClick={() => toggleNode(node.wbsNode.id)}
+                    className="rounded p-0.5 hover:bg-muted"
+                  >
+                    {isExpanded ? (
+                      <ChevronDown className="h-3 w-3" />
+                    ) : (
+                      <ChevronRight className="h-3 w-3" />
+                    )}
+                  </button>
+                )}
+                <span className="text-xs font-medium text-foreground">
+                  {node.wbsNode.name}
+                </span>
+              </div>
+            </TableCell>
+            <TableCell className="px-2 py-1" />
+            <TableCell className="px-2 py-1" />
+            {showBreakdown && (() => {
+              const sums = nodeResourceSums(node)
+              return (
+                <>
+                  <TableCell className="px-2 py-1 text-right font-mono text-xs tabular-nums">
+                    {formatCurrency(sums.material)}
+                  </TableCell>
+                  <TableCell className="px-2 py-1 text-right font-mono text-xs tabular-nums">
+                    {formatCurrency(sums.labor)}
+                  </TableCell>
+                  <TableCell className="px-2 py-1 text-right font-mono text-xs tabular-nums">
+                    {formatCurrency(sums.equipment)}
+                  </TableCell>
+                </>
+              )
+            })()}
+            <TableCell className="erp-table-cell-currency px-2 py-1">
+              <span className="font-mono text-xs font-semibold">
+                {formatCurrencyForDisplay(nodeTotal)}
+              </span>
+            </TableCell>
+            <TableCell className="erp-table-cell-currency px-2 py-1 text-muted-foreground">
+              <span className="font-mono text-xs tabular-nums">
+                {formatCurrency(calculateNodeActualTotal(node))}
+              </span>
+            </TableCell>
+            {!hideActions && (
+              <TableCell className="px-2 py-1 min-w-[160px] shrink-0">
+                {canEdit && (
+                  <div className="flex items-center gap-1 flex-nowrap overflow-visible">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        handleAddClick(
+                          node.wbsNode.id,
+                          node.wbsNode.code,
+                          node.wbsNode.name
+                        )
+                      }
+                      className="h-6 w-6 shrink-0 p-0"
+                      title={t('addPhase')}
+                    >
+                      <Plus className="h-3 w-3 text-primary" />
+                    </Button>
+                    {showApuOnPhase && (
+                      <Button
+                        variant={firstLineForApu?.resources.length ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => handlePhaseApuClick()}
+                        className="h-6 shrink-0 text-[10px]"
+                        title="APU - Análisis de precios unitarios"
+                      >
+                        <Calculator className="mr-1 h-3 w-3" />
+                        APU
+                        {firstLineForApu?.resources.length ? (
+                          <span className="ml-1 rounded bg-primary/20 px-1 text-[10px]">
+                            {firstLineForApu.resources.length}
+                          </span>
+                        ) : null}
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        handleDeleteClick(
+                          node.wbsNode.id,
+                          node.wbsNode.code,
+                          node.wbsNode.name
+                        )
+                      }
+                      className="h-6 w-6 p-0"
+                    >
+                      <Trash2 className="h-3 w-3 text-destructive" />
+                    </Button>
+                  </div>
+                )}
+              </TableCell>
+            )}
+          </SortableBudgetRow>
+        ) : nonDragRow,
+        // Roll-up: do not show partida rows on parents; only phase row + children
+        isExpanded &&
+          node.children.length === 0 &&
           node.lines.map((line) => {
             const hasAPU = line.resources.length > 0
             const sums = lineResourceSums(line)
             return (
               <TableRow key={line.id} className="h-8 hover:bg-muted/50">
-                <TableCell className="w-12 min-w-[2.5rem] px-2 py-1 text-center text-muted-foreground">—</TableCell>
+                <TableCell className="min-w-[5rem] w-[5rem] px-2 py-1 text-center text-muted-foreground">—</TableCell>
                 <TableCell
                   style={{ paddingLeft: `${(level + 1) * 16 + 8}px` }}
                   className="px-2 py-1"
@@ -675,37 +782,40 @@ export function BudgetLinesCompactTable({
                     {formatCurrency(Number(line.actualCostTotal ?? 0))}
                   </span>
                 </TableCell>
-                <TableCell className="px-2 py-1">
-                  {canEdit && (
-                    <Button
-                      variant={hasAPU ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setEditingAPU(line.id)}
-                      className="h-6 text-[10px]"
-                    >
-                      <Calculator className="mr-1 h-3 w-3" />
-                      APU
-                      {hasAPU && (
-                        <span className="ml-1 rounded bg-primary/20 px-1 text-[10px]">
-                          {line.resources.length}
-                        </span>
-                      )}
-                    </Button>
-                  )}
-                </TableCell>
+                {!hideActions && (
+                  <TableCell className="px-2 py-1 min-w-[160px] shrink-0">
+                    {canEdit && (
+                      <div className="flex items-center gap-1 flex-nowrap overflow-visible">
+                        <Button
+                          variant={hasAPU ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setEditingAPU(line.id)}
+                          className="h-6 shrink-0 text-[10px]"
+                          title="APU - Análisis de precios unitarios"
+                        >
+                          <Calculator className="mr-1 h-3 w-3" />
+                          APU
+                          {hasAPU && (
+                            <span className="ml-1 rounded bg-primary/20 px-1 text-[10px]">
+                              {line.resources.length}
+                            </span>
+                          )}
+                        </Button>
+                      </div>
+                    )}
+                  </TableCell>
+                )}
               </TableRow>
             )
-          })}
-
-        {isExpanded && node.children.length > 0 && (
+          }),
+        isExpanded && node.children.length > 0 && (
           <SortableContext
             items={node.children.map((c) => c.wbsNode.id)}
             strategy={verticalListSortingStrategy}
           >
-            {node.children.map((child, i) => renderNode(child, level + 1, i + 1))}
+            {node.children.map((child) => renderNode(child, level + 1, child.wbsNode.code))}
           </SortableContext>
-        )}
-      </React.Fragment>
+        )
     )
   }
 
@@ -714,11 +824,12 @@ export function BudgetLinesCompactTable({
 
   return (
     <>
-      <div className="overflow-x-auto rounded-lg border border-border bg-card">
-        <Table>
-          <TableHeader className="sticky top-0 z-10 bg-muted">
+      <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+        <div className="overflow-x-auto rounded-lg border border-border bg-card">
+          <Table>
+            <TableHeader className="sticky top-0 z-10 bg-muted">
             <TableRow className="h-8">
-              <TableHead className="w-12 min-w-[2.5rem] px-2 py-1 text-center text-xs text-foreground">
+              <TableHead className="min-w-[5rem] w-[5rem] px-2 py-1 text-left text-xs text-foreground">
                 {t('rowNumber')}
               </TableHead>
               <TableHead className="px-2 py-1 text-xs text-foreground">
@@ -749,38 +860,43 @@ export function BudgetLinesCompactTable({
               <TableHead className="w-[120px] px-2 py-1 text-right text-xs text-foreground text-muted-foreground">
                 {t('actualCost')}
               </TableHead>
-              <TableHead className="w-[100px] px-2 py-1 text-xs text-foreground">
-                <div className="flex items-center justify-end gap-1">
-                  <span>{tCommon('actions')}</span>
-                  {canEdit && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleAddClick(null)}
-                      className="h-6 w-6 shrink-0 p-0"
-                      title={t('addPhase')}
-                    >
-                      <Plus className="h-3.5 w-3.5 text-primary" />
-                    </Button>
-                  )}
-                </div>
-              </TableHead>
+              {!hideActions && (
+                <TableHead className="min-w-[160px] w-[160px] shrink-0 px-2 py-1 text-xs text-foreground">
+                  <div className="flex items-center justify-end gap-1 flex-nowrap">
+                    <span>{tCommon('actions')}</span>
+                    {canEdit && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleAddClick(null)}
+                        className="h-6 w-6 shrink-0 p-0"
+                        title={t('addPhase')}
+                      >
+                        <Plus className="h-3.5 w-3.5 text-primary" />
+                      </Button>
+                    )}
+                  </div>
+                </TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredData.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={showBreakdown ? 10 : 7} className="py-8 text-center text-muted-foreground">
+                <TableCell colSpan={showBreakdown ? (hideActions ? 9 : 10) : (hideActions ? 6 : 7)} className="py-8 text-center text-muted-foreground">
                   {searchQuery.trim() ? t('noResultsFound') : t('noBudgetLinesYet')}
                 </TableCell>
               </TableRow>
             ) : (
-              <>
+              <SortableContext
+                items={filteredData.map((n) => n.wbsNode.id)}
+                strategy={verticalListSortingStrategy}
+              >
                 {filteredData.map((node, i) => (
-                  <React.Fragment key={node.wbsNode.id}>
-                    {renderNode(node, 0, i + 1)}
-                  </React.Fragment>
+                  <Fragment key={node.wbsNode.id}>
+                    {renderNode(node, 0, node.wbsNode.code)}
+                  </Fragment>
                 ))}
                 <TableRow className="h-8 border-t-2 border-border bg-muted font-bold">
                   <TableCell colSpan={4} className="px-2 py-1 text-right text-xs">
@@ -799,13 +915,14 @@ export function BudgetLinesCompactTable({
                   <TableCell className="erp-table-cell-currency px-2 py-1 text-sm text-muted-foreground">
                     {formatCurrencyForDisplay(grandActualTotal)}
                   </TableCell>
-                  <TableCell className="px-2 py-1" />
+                  {!hideActions && <TableCell className="px-2 py-1" />}
                 </TableRow>
-            </>
+              </SortableContext>
             )}
           </TableBody>
         </Table>
       </div>
+      </DndContext>
 
       {editingAPU && (
         <APUEditorDialog

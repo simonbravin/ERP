@@ -1,5 +1,12 @@
 'use client'
 
+/**
+ * Legacy: not used by the version page. The version page uses BudgetVersionTabsWithSearch
+ * (Desglose / Totales / Planilla Final with BudgetLinesCompactTable). This component
+ * used BudgetLinesClient + BudgetVersionView (BudgetTreeTable). Kept for reference;
+ * remove if no alternate view is needed.
+ */
+
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'

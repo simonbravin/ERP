@@ -26,8 +26,8 @@ export default async function BudgetApprovedRedirectPage({ params }: PageProps) 
   }
 
   return (
-    <div className="erp-stack max-w-lg">
-      <p className="text-muted-foreground">
+    <div className="erp-stack w-full max-w-4xl">
+      <p className="text-muted-foreground max-w-full text-base leading-relaxed">
         No hay presupuesto aprobado aún. Creá o aprobá una versión desde Versiones.
       </p>
       <Button asChild variant="default">

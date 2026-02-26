@@ -1,6 +1,7 @@
 'use client'
 
 import { useForm, Controller } from 'react-hook-form'
+import { useTranslations } from 'next-intl'
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
   createProjectSchema,
@@ -11,6 +12,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import Link from 'next/link'
 import { useRouter } from '@/i18n/navigation'
 import { updateProject } from '@/app/actions/projects'
@@ -34,6 +36,7 @@ export function ProjectForm({
   onSubmit: onSubmitProp,
   onCancelHref,
 }: ProjectFormProps) {
+  const t = useTranslations('projects')
   const router = useRouter()
   const isCreate = mode === 'create'
   const schema = isCreate ? createProjectSchema : updateProjectSchema
@@ -53,6 +56,7 @@ export function ProjectForm({
       location: '',
       m2: undefined,
       startDate: undefined,
+      plannedEndDate: undefined,
     },
   })
 
@@ -116,18 +120,19 @@ export function ProjectForm({
   return (
     <form
       onSubmit={handleSubmit(handleFormSubmit)}
-      className="erp-form-page space-y-6 rounded-lg border border-border bg-card p-6"
+      className="space-y-6"
     >
-      <div className="space-y-4">
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         <div className="space-y-2">
           <Label htmlFor="name">Nombre del proyecto *</Label>
           <Input
             id="name"
             {...register('name')}
             placeholder="ej. Torre Oficinas A"
+            className="mt-1"
           />
           {errors.name && (
-            <p className="text-sm text-destructive">
+            <p className="mt-1 text-sm text-destructive">
               {errors.name.message}
             </p>
           )}
@@ -138,9 +143,10 @@ export function ProjectForm({
             id="clientName"
             {...register('clientName')}
             placeholder="Nombre del cliente o empresa"
+            className="mt-1"
           />
           {errors.clientName && (
-            <p className="text-sm text-destructive">
+            <p className="mt-1 text-sm text-destructive">
               {errors.clientName.message}
             </p>
           )}
@@ -151,106 +157,123 @@ export function ProjectForm({
             id="location"
             {...register('location')}
             placeholder="Dirección o ubicación del proyecto"
+            className="mt-1"
           />
           {errors.location && (
-            <p className="text-sm text-destructive">
+            <p className="mt-1 text-sm text-destructive">
               {errors.location.message}
             </p>
           )}
         </div>
         <div className="space-y-2">
-          <Label htmlFor="description">Descripción</Label>
-          <textarea
-            id="description"
-            {...register('description')}
-            rows={3}
-            className="flex w-full rounded-md border border-input bg-card dark:bg-background px-3 py-2 text-sm text-foreground"
-            placeholder="Brief description"
+          <Label htmlFor="m2">Superficie (m²)</Label>
+          <Input
+            id="m2"
+            type="number"
+            step="0.01"
+            min="0"
+            {...register('m2')}
+            placeholder="0"
+            className="mt-1"
           />
-          {errors.description && (
-            <p className="text-sm text-destructive">
-              {errors.description.message}
+          {errors.m2 && (
+            <p className="mt-1 text-sm text-destructive">
+              {errors.m2.message}
             </p>
           )}
         </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="m2">Superficie (m²)</Label>
+        <div className="space-y-2 sm:col-span-2 lg:col-span-1">
+          <Label htmlFor="startDate">{t('startDate')}</Label>
+          <Input
+            id="startDate"
+            type="date"
+            {...register('startDate')}
+            className="mt-1"
+          />
+          {errors.startDate && (
+            <p className="mt-1 text-sm text-destructive">
+              {errors.startDate.message}
+            </p>
+          )}
+        </div>
+        {!isCreate && (
+          <div className="space-y-2 sm:col-span-2 lg:col-span-1">
+            <Label htmlFor="plannedEndDate">{t('plannedEndDate')}</Label>
             <Input
-              id="m2"
-              type="number"
-              step="0.01"
-              min="0"
-              {...register('m2')}
-              placeholder="0"
+              id="plannedEndDate"
+              type="date"
+              {...register('plannedEndDate')}
+              className="mt-1"
             />
-            {errors.m2 && (
-              <p className="text-sm text-destructive">
-                {errors.m2.message}
+            {errors.plannedEndDate && (
+              <p className="mt-1 text-sm text-destructive">
+                {errors.plannedEndDate.message}
               </p>
             )}
           </div>
+        )}
+      </div>
+      {!isCreate && defaultValues && 'status' in defaultValues && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="startDate">Fecha de inicio</Label>
-            <Input
-              id="startDate"
-              type="date"
-              {...register('startDate')}
+            <Label htmlFor="phase">Fase del proyecto</Label>
+            <Controller
+              name="phase"
+              control={control}
+              render={({ field }) => (
+                <select
+                  id="phase"
+                  value={field.value ?? ''}
+                  onChange={(e) => field.onChange(e.target.value)}
+                  onBlur={field.onBlur}
+                  ref={field.ref}
+                  className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                  <option value="PRE_CONSTRUCTION">Pre-construcción</option>
+                  <option value="CONSTRUCTION">En construcción</option>
+                  <option value="CLOSEOUT">Cierre</option>
+                  <option value="COMPLETE">Completado</option>
+                </select>
+              )}
             />
-            {errors.startDate && (
-              <p className="text-sm text-destructive">
-                {errors.startDate.message}
-              </p>
-            )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="status">Estado</Label>
+            <Controller
+              name="status"
+              control={control}
+              render={({ field }) => (
+                <select
+                  id="status"
+                  value={field.value ?? ''}
+                  onChange={(e) => field.onChange(e.target.value)}
+                  onBlur={field.onBlur}
+                  ref={field.ref}
+                  className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                  <option value="DRAFT">Borrador</option>
+                  <option value="ACTIVE">Activo</option>
+                  <option value="ON_HOLD">En pausa</option>
+                  <option value="COMPLETE">Completado</option>
+                </select>
+              )}
+            />
           </div>
         </div>
-        {!isCreate && defaultValues && 'status' in defaultValues && (
-          <>
-            <div className="space-y-2">
-              <Label htmlFor="phase">Fase del proyecto</Label>
-              <Controller
-                name="phase"
-                control={control}
-                render={({ field }) => (
-                  <select
-                    id="phase"
-                    value={field.value ?? ''}
-                    onChange={(e) => field.onChange(e.target.value)}
-                    onBlur={field.onBlur}
-                    ref={field.ref}
-                    className="h-10 w-full rounded-md border border-input bg-card dark:bg-background px-3 py-2 text-sm text-foreground"
-                  >
-                    <option value="PRE_CONSTRUCTION">Pre-construcción</option>
-                    <option value="CONSTRUCTION">En construcción</option>
-                    <option value="CLOSEOUT">Cierre</option>
-                    <option value="COMPLETE">Completado</option>
-                  </select>
-                )}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="status">Estado</Label>
-              <Controller
-                name="status"
-                control={control}
-                render={({ field }) => (
-                  <select
-                    id="status"
-                    value={field.value ?? ''}
-                    onChange={(e) => field.onChange(e.target.value)}
-                    onBlur={field.onBlur}
-                    ref={field.ref}
-                    className="h-10 w-full rounded-md border border-input bg-card dark:bg-background px-3 py-2 text-sm text-foreground"
-                  >
-                    <option value="DRAFT">Borrador</option>
-                    <option value="ACTIVE">Activo</option>
-                    <option value="ON_HOLD">En pausa</option>
-                    <option value="COMPLETE">Completado</option>
-                  </select>
-                )}
-              />
-            </div>
-          </>
+      )}
+      <div className="space-y-2">
+        <Label htmlFor="description">Descripción</Label>
+        <Textarea
+          id="description"
+          {...register('description')}
+          rows={3}
+          placeholder="Breve descripción del proyecto"
+          className="mt-1"
+        />
+        {errors.description && (
+          <p className="mt-1 text-sm text-destructive">
+            {errors.description.message}
+          </p>
         )}
       </div>
       {errors.root && (
@@ -258,7 +281,7 @@ export function ProjectForm({
           {errors.root.message}
         </p>
       )}
-      <div className="flex gap-3">
+      <div className="flex flex-wrap gap-3 pt-2">
         <Button type="submit" disabled={isSubmitting}>
           {isSubmitting
             ? isCreate
@@ -268,12 +291,9 @@ export function ProjectForm({
               ? 'Crear proyecto'
               : 'Guardar cambios'}
         </Button>
-        <Link
-          href={onCancelHref}
-          className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-transparent px-4 py-2 text-sm font-medium hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800"
-        >
-          Cancelar
-        </Link>
+        <Button type="button" variant="outline" asChild>
+          <Link href={onCancelHref}>Cancelar</Link>
+        </Button>
       </div>
     </form>
   )

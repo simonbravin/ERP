@@ -74,7 +74,9 @@ export function BudgetSummaryTabClient({
         </div>
       )}
 
-      {canSeeAdmin && viewMode === 'admin' ? (
+      {summaryData.length === 0 ? (
+        <p className="text-muted-foreground text-sm">{t('noSummaryLinesInVersion')}</p>
+      ) : canSeeAdmin && viewMode === 'admin' ? (
         <BudgetSummarySheet
           data={summaryData}
           projectTotal={projectTotalSale}

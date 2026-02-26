@@ -366,6 +366,19 @@ export async function updateProject(projectId: string, data: UpdateProjectInput)
   if (parsed.data.plannedEndDate !== undefined) updatePayload.plannedEndDate = parsed.data.plannedEndDate
   if (parsed.data.active !== undefined) updatePayload.active = parsed.data.active
 
+  // Al pasar a ACTIVE: fijar baseline de fecha de finalización (solo la primera vez)
+  const newStatus = parsed.data.status ?? existing.status
+  const effectivePlannedEnd = parsed.data.plannedEndDate ?? existing.plannedEndDate
+  if (
+    newStatus === 'ACTIVE' &&
+    existing.status !== 'ACTIVE' &&
+    existing.baselinePlannedEndDate == null &&
+    effectivePlannedEnd != null
+  ) {
+    updatePayload.baselinePlannedEndDate =
+      effectivePlannedEnd instanceof Date ? effectivePlannedEnd : new Date(effectivePlannedEnd)
+  }
+
   const updatedFields = Object.keys(updatePayload) as (keyof typeof existing)[]
   const beforeSnapshot: Record<string, unknown> = {}
   for (const key of updatedFields) {

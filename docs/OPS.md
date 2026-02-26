@@ -11,7 +11,24 @@
 
 - **API PDF (descarga):**  
   Con sesión (cookies) en el mismo origen:  
-  `GET http://localhost:3333/api/pdf?doc=computo&id=<versionId>&locale=es`
+  `GET http://localhost:3333/api/pdf?template=computo&id=<versionId>&locale=es`
+
+### Smoke test pre-release (10 exportaciones PDF)
+
+Comprobar que cada documento carga en print y que el API devuelve PDF. Sustituir `<versionId>`, `<projectId>`, `<scheduleId>`, `<partyId>` y fechas por valores válidos con sesión activa.
+
+| # | Documento | Print URL | API PDF (`GET /api/pdf?template=...`) |
+|---|-----------|-----------|--------------------------------------|
+| 1 | Cómputo | `/<locale>/print/computo/<versionId>` | `template=computo&id=<versionId>&locale=es` |
+| 2 | Certificaciones | `/<locale>/print/certification/<projectId>` | `template=certification&id=<projectId>&locale=es` |
+| 3 | Transacciones | `/<locale>/print/transactions?dateFrom=&dateTo=` | `template=transactions&locale=es&dateFrom=&dateTo=` |
+| 4 | Presupuesto | `/<locale>/print/budget/<versionId>` | `template=budget&id=<versionId>&locale=es` |
+| 5 | Materiales | `/<locale>/print/materials/<versionId>` | `template=materials&id=<versionId>&locale=es` |
+| 6 | Cronograma | `/<locale>/print/schedule/<scheduleId>` | `template=schedule&id=<scheduleId>&locale=es` |
+| 7 | Cashflow | `/<locale>/print/cashflow?from=&to=` | `template=cashflow&locale=es&from=&to=` |
+| 8 | Dashboard finanzas | `/<locale>/print/finance-dashboard` | `template=finance-dashboard&locale=es` |
+| 9 | Dashboard proyecto | `/<locale>/print/project-dashboard/<projectId>` | `template=project-dashboard&id=<projectId>&locale=es` |
+| 10 | Compras por proveedor | `/<locale>/print/purchases-by-supplier?partyId=` | `template=purchases-by-supplier&locale=es&partyId=` |
 
 ### Variables de entorno
 

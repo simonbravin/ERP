@@ -137,7 +137,7 @@ export function GlobalSidebar({ orgName = 'Bloqer', orgLogoUrl, user, restricted
 
   const widthClass = collapsed ? 'w-16' : 'w-64'
   const asideContent = (
-    <aside className={`flex h-full shrink-0 flex-col border-r border-sidebar-border bg-sidebar transition-[width] duration-200 ${widthClass}`}>
+    <aside className={`flex h-full shrink-0 flex-col rounded-r-xl border-r border-sidebar-border bg-sidebar transition-[width] duration-200 ${widthClass}`}>
       {/* Logo or org name (or Home when collapsed) + collapse (desktop) / close (mobile) */}
       <div className={cn('flex h-14 items-center justify-between border-b border-sidebar-border py-0.5', collapsed ? 'px-1.5 gap-1' : 'px-2 gap-2')}>
         {collapsed ? (

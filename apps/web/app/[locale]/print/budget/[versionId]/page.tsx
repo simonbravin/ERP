@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation'
-import { getBudgetVersionWithLines } from '@/app/actions/budget'
+import { getBudgetExportData } from '@/app/actions/budget'
 import { getProject } from '@/app/actions/projects'
 import { PrintDocumentShell } from '@/components/print/print-document-shell'
 import { PrintTable } from '@/components/print/print-table'
@@ -21,29 +21,12 @@ type BudgetRow = {
 export default async function PrintBudgetPage({ params }: PageProps) {
   const { versionId } = await params
 
-  const data = await getBudgetVersionWithLines(versionId)
+  const data = await getBudgetExportData(versionId)
   if (!data) return notFound()
-  const { version, lines } = data
+  const { version, rows, grandTotal } = data
 
   const project = await getProject(version.projectId)
   if (!project) return notFound()
-
-  const rows: BudgetRow[] = (lines ?? []).map((line: { wbsNode?: { code: string; name: string } | null; quantity: number; unit: string | null; description: string | null; directCostTotal?: unknown }) => {
-    const qty = typeof line.quantity === 'number' ? line.quantity : Number(line.quantity) || 1
-    const total = Number((line as { directCostTotal?: number }).directCostTotal ?? 0)
-    const unitPrice = qty > 0 ? total / qty : 0
-    const wbs = line.wbsNode
-    return {
-      code: wbs?.code ?? '—',
-      description: line.description ?? wbs?.name ?? '—',
-      unit: line.unit ?? '—',
-      quantity: qty,
-      unitPrice,
-      totalCost: total,
-    }
-  })
-
-  const grandTotal = rows.reduce((sum, r) => sum + r.totalCost, 0)
 
   const columns = [
     { key: 'code' as const, label: 'Código', align: 'left' as const },
@@ -77,7 +60,7 @@ export default async function PrintBudgetPage({ params }: PageProps) {
         </h2>
         <PrintTable<BudgetRow>
           columns={columns}
-          rows={rows}
+          rows={rows as BudgetRow[]}
           totals={{ totalCost: formatCurrency(grandTotal) }}
           totalsLabel="Total presupuesto"
         />

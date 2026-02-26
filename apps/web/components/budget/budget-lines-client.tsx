@@ -1,5 +1,9 @@
 'use client'
 
+/**
+ * Legacy: only used by BudgetVersionTabs, which is not used by any route.
+ * The version page uses BudgetVersionTabsWithSearch + BudgetLinesCompactTable instead.
+ */
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { useTranslations } from 'next-intl'

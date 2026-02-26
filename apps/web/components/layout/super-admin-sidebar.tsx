@@ -47,7 +47,7 @@ export function SuperAdminSidebar({ userName }: SuperAdminSidebarProps) {
   }
 
   return (
-    <aside className="flex w-64 shrink-0 flex-col border-r border-amber-900/50 bg-slate-950">
+    <aside className="flex w-64 shrink-0 flex-col rounded-r-xl border-r border-amber-900/50 bg-slate-950">
       <div className="flex h-14 items-center gap-2 border-b border-amber-900/50 px-4">
         <Shield className="h-6 w-6 text-amber-500" aria-hidden />
         <span className="font-semibold text-amber-100">Super Admin</span>

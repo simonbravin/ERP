@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation'
+import { notFound, unstable_rethrow } from 'next/navigation'
 import { getTranslations } from 'next-intl/server'
 import { getSession } from '@/lib/session'
 import { getOrgContext } from '@/lib/org-context'
@@ -12,6 +12,7 @@ import {
   ProjectStatusBadge,
 } from '@/components/projects/project-overview-badges'
 import { formatCurrency } from '@/lib/format-utils'
+import { differenceInDays } from 'date-fns'
 import {
   Calendar,
   MapPin,
@@ -41,19 +42,20 @@ function formatDateOnly(d: Date): string {
 export const dynamic = 'force-dynamic'
 
 export default async function ProjectDetailPage({ params }: PageProps) {
-  const session = await getSession()
-  if (!session?.user?.id) return notFound()
-  const org = await getOrgContext(session.user.id)
-  if (!org) return notFound()
-  const t = await getTranslations('projects')
+  try {
+    const session = await getSession()
+    if (!session?.user?.id) return notFound()
+    const org = await getOrgContext(session.user.id)
+    if (!org) return notFound()
+    const t = await getTranslations('projects')
 
-  const { id } = await params
-  const [project, approvedBudgetTotal, recentActivity] = await Promise.all([
-    getProject(id),
-    getApprovedOrBaselineBudgetTotal(id),
-    getRecentActivityByProject(org.orgId, id),
-  ])
-  if (!project) notFound()
+    const { id } = await params
+    const [project, approvedBudgetTotal, recentActivity] = await Promise.all([
+      getProject(id),
+      getApprovedOrBaselineBudgetTotal(id),
+      getRecentActivityByProject(org.orgId, id),
+    ])
+    if (!project) return notFound()
 
   // Presupuesto: mostrar total de versión aprobada/baseline si existe; si no, el campo del proyecto
   const totalBudget =
@@ -130,6 +132,38 @@ export default async function ProjectDetailPage({ params }: PageProps) {
             </div>
           </div>
         </div>
+
+        {/* Time elapsed (when start + planned end exist) */}
+        {project.startDate && project.plannedEndDate && (() => {
+          const start = new Date(project.startDate)
+          const end = new Date(project.plannedEndDate)
+          const today = new Date()
+          const totalDays = Math.max(1, differenceInDays(end, start))
+          const elapsedDays = differenceInDays(today, start)
+          const notStarted = elapsedDays < 0
+          const pct = notStarted ? 0 : Math.round((elapsedDays / totalDays) * 100)
+          const exceeded = elapsedDays > totalDays && project.status !== 'COMPLETE'
+          const displayText = notStarted
+            ? t('timeElapsedNotStarted')
+            : exceeded
+              ? t('timeElapsedExceeded')
+              : t('timeElapsedPct', { pct: Math.min(100, pct) })
+          return (
+            <div className="erp-card-elevated p-5">
+              <div className="flex items-center gap-3">
+                <div className="rounded-lg bg-sky-100 p-2">
+                  <Clock className="h-5 w-5 text-sky-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">{t('timeElapsed')}</p>
+                  <p className={`text-lg font-medium ${exceeded ? 'text-amber-600 dark:text-amber-400' : 'text-foreground'}`}>
+                    {displayText}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )
+        })()}
       </div>
 
       {/* Project Details */}
@@ -153,7 +187,7 @@ export default async function ProjectDetailPage({ params }: PageProps) {
             <div className="flex items-start gap-3">
               <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
               <div>
-                <dt className="text-sm text-muted-foreground">Ubicación</dt>
+                <dt className="text-sm text-muted-foreground">{t('location')}</dt>
                 <dd className="text-sm font-medium text-foreground">
                   {project.location}
                 </dd>
@@ -164,7 +198,7 @@ export default async function ProjectDetailPage({ params }: PageProps) {
             <div className="flex items-start gap-3">
               <FileText className="h-5 w-5 text-muted-foreground mt-0.5" />
               <div>
-                <dt className="text-sm text-muted-foreground">Superficie</dt>
+                <dt className="text-sm text-muted-foreground">{t('surface')}</dt>
                 <dd className="text-sm font-medium text-foreground">
                   {project.m2.toString()} m²
                 </dd>
@@ -182,11 +216,39 @@ export default async function ProjectDetailPage({ params }: PageProps) {
               </div>
             </div>
           )}
+          {'baselinePlannedEndDate' in project && project.baselinePlannedEndDate && (
+            <div className="flex items-start gap-3">
+              <Calendar className="h-5 w-5 text-muted-foreground mt-0.5" />
+              <div>
+                <dt className="text-sm text-muted-foreground">{t('baselinePlannedEndDate')}</dt>
+                <dd className="text-sm font-medium text-foreground">
+                  {formatDateOnly(new Date(project.baselinePlannedEndDate))}
+                </dd>
+              </div>
+            </div>
+          )}
+          {'baselinePlannedEndDate' in project && project.baselinePlannedEndDate && (() => {
+            const baseline = new Date(project.baselinePlannedEndDate)
+            const reference = project.actualEndDate ? new Date(project.actualEndDate) : new Date()
+            const days = differenceInDays(reference, baseline)
+            if (days === 0) return null
+            return (
+              <div className="flex items-start gap-3">
+                <Clock className="h-5 w-5 text-muted-foreground mt-0.5" />
+                <div>
+                  <dt className="text-sm text-muted-foreground">{t('endDateDeviation')}</dt>
+                  <dd className={`text-sm font-medium ${days > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                    {days > 0 ? t('endDateDeviationBehind', { count: days }) : t('endDateDeviationAhead', { count: -days })}
+                  </dd>
+                </div>
+              </div>
+            )
+          })()}
           {project.description && (
             <div className="sm:col-span-2 lg:col-span-3 flex items-start gap-3">
               <FileText className="h-5 w-5 text-muted-foreground mt-0.5" />
               <div>
-                <dt className="text-sm text-muted-foreground">Descripción</dt>
+                <dt className="text-sm text-muted-foreground">{t('description')}</dt>
                 <dd className="text-sm text-card-foreground">
                   {project.description}
                 </dd>
@@ -263,4 +325,8 @@ export default async function ProjectDetailPage({ params }: PageProps) {
       <RecentActivityFeed activities={recentActivity} hideProjectName />
     </div>
   )
+  } catch (err) {
+    unstable_rethrow(err)
+    return notFound()
+  }
 }

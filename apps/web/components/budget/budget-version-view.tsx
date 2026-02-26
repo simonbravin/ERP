@@ -1,5 +1,9 @@
 'use client'
 
+/**
+ * Legacy: only used by BudgetVersionTabs, which is not used by any route.
+ * The version page uses BudgetVersionTabsWithSearch + BudgetLinesCompactTable instead.
+ */
 import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { BudgetTreeTableAdmin } from './budget-tree-table-admin'

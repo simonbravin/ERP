@@ -91,22 +91,20 @@ export default async function BudgetVersionPage({ params }: PageProps) {
   type VersionWithRelations = typeof versionRaw
   const version = serializeForClient(versionRaw) as unknown as VersionWithRelations
 
-  const wbsNodes =
-    version.budgetLines.length === 0
-      ? await prisma.wbsNode.findMany({
-          where: { projectId, orgId, active: true },
-          select: {
-            id: true,
-            code: true,
-            name: true,
-            parentId: true,
-            category: true,
-            sortOrder: true,
-          },
-          orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }],
-        })
-      : []
+  const wbsNodes = await prisma.wbsNode.findMany({
+    where: { projectId, orgId, active: true },
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      parentId: true,
+      category: true,
+      sortOrder: true,
+    },
+    orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }],
+  })
 
+  // Same criterion for Desglose, Totales, and Planilla Final: only lines whose WBS node is active.
   const wbsGroups = new Map<
     string,
     Array<(typeof version.budgetLines)[number]>
@@ -123,61 +121,6 @@ export default async function BudgetVersionPage({ params }: PageProps) {
   const globalFinancial = Number(version.globalFinancialPct ?? 0)
   const globalProfit = Number(version.globalProfitPct ?? 0)
   const globalTax = Number(version.globalTaxPct ?? 0)
-
-  function buildTree(
-    parentId: string | null
-  ): BudgetTreeNode[] {
-    const entries: Array<{ wbsId: string; lines: (typeof version.budgetLines)[number][] }> = []
-    wbsGroups.forEach((lines, wbsId) => {
-      const firstLine = lines[0]
-      if (firstLine.wbsNode.parentId !== parentId) return
-      entries.push({ wbsId, lines })
-    })
-    const sortOrder = (x: (typeof version.budgetLines)[number][0]['wbsNode']) =>
-      (x as { sortOrder?: number }).sortOrder ?? 0
-    entries.sort((a, b) => {
-      const soA = sortOrder(a.lines[0].wbsNode)
-      const soB = sortOrder(b.lines[0].wbsNode)
-      if (soA !== soB) return soA - soB
-      return a.lines[0].wbsNode.code.localeCompare(b.lines[0].wbsNode.code)
-    })
-    return entries.map(({ wbsId, lines }) => {
-      const firstLine = lines[0]
-      const treeLines = lines.map((line) => ({
-        id: line.id,
-        description: line.description,
-        unit: line.unit,
-        quantity: Number(line.quantity),
-        directCostTotal: Number(line.directCostTotal),
-        actualCostTotal: Number(
-          'actualCostTotal' in line && line.actualCostTotal != null
-            ? Number(line.actualCostTotal)
-            : 0
-        ),
-        overheadPct: Number(line.overheadPct ?? globalOverhead),
-        financialPct: Number(line.financialPct ?? globalFinancial),
-        profitPct: Number(line.profitPct ?? globalProfit),
-        taxPct: Number(line.taxPct ?? globalTax),
-        resources: (line.resources ?? []).map((r: { id: string; resourceType: string; quantity: unknown; unitCost: unknown; sortOrder: number }) => ({
-          id: r.id,
-          resourceType: r.resourceType,
-          quantity: Number(r.quantity),
-          unitCost: Number(r.unitCost),
-        })),
-      }))
-      return {
-        wbsNode: {
-          id: firstLine.wbsNode.id,
-          code: firstLine.wbsNode.code,
-          name: firstLine.wbsNode.name,
-          category: firstLine.wbsNode.category ?? 'ITEM',
-        },
-        parentId,
-        lines: treeLines,
-        children: buildTree(wbsId),
-      }
-    })
-  }
 
   function buildTreeFromWbs(parentId: string | null): BudgetTreeNode[] {
     const list = wbsNodes as Array<{ id: string; code: string; name: string; parentId: string | null; category: string | null; sortOrder: number }>
@@ -197,8 +140,47 @@ export default async function BudgetVersionPage({ params }: PageProps) {
       }))
   }
 
-  const treeData =
-    version.budgetLines.length > 0 ? buildTree(null) : buildTreeFromWbs(null)
+  function lineToTreeLine(line: (typeof version.budgetLines)[number]) {
+    return {
+      id: line.id,
+      description: line.description,
+      unit: line.unit,
+      quantity: Number(line.quantity),
+      directCostTotal: Number(line.directCostTotal),
+      actualCostTotal: Number(
+        'actualCostTotal' in line && line.actualCostTotal != null
+          ? Number(line.actualCostTotal)
+          : 0
+      ),
+      overheadPct: Number(line.overheadPct ?? globalOverhead),
+      financialPct: Number(line.financialPct ?? globalFinancial),
+      profitPct: Number(line.profitPct ?? globalProfit),
+      taxPct: Number(line.taxPct ?? globalTax),
+      resources: (line.resources ?? []).map((r: { id: string; resourceType: string; quantity: unknown; unitCost: unknown; sortOrder: number }) => ({
+        id: r.id,
+        resourceType: r.resourceType,
+        quantity: Number(r.quantity),
+        unitCost: Number(r.unitCost),
+      })),
+    }
+  }
+
+  function enrichTreeWithLines(
+    nodes: BudgetTreeNode[],
+    groups: Map<string, Array<(typeof version.budgetLines)[number]>>
+  ): BudgetTreeNode[] {
+    return nodes.map((node) => {
+      const lines = (groups.get(node.wbsNode.id) ?? []).map(lineToTreeLine)
+      return {
+        ...node,
+        lines,
+        children: enrichTreeWithLines(node.children, groups),
+      }
+    })
+  }
+
+  // Always show full WBS tree; attach budget lines per node so all phases appear.
+  const treeData = enrichTreeWithLines(buildTreeFromWbs(null), wbsGroups)
 
   const visibleLineIds = new Set<string>()
   wbsGroups.forEach((lines) => {
@@ -212,39 +194,43 @@ export default async function BudgetVersionPage({ params }: PageProps) {
     0
   )
 
-  function lineSaleTotal(line: (typeof version.budgetLines)[number]): number {
-    const directUnit = Number(line.directCostTotal) / Number(line.quantity) || 0
-    const oh = Number(line.overheadPct ?? globalOverhead)
-    const fin = Number(line.financialPct ?? globalFinancial)
-    const prof = Number(line.profitPct ?? globalProfit)
-    const tax = Number(line.taxPct ?? globalTax)
-    let price = directUnit
-    price += price * (oh / 100)
-    price += price * (fin / 100)
-    price += price * (prof / 100)
-    price += price * (tax / 100)
-    return price * Number(line.quantity)
+  /** Flatten tree (depth-first) for Planilla Final admin view and sale total. */
+  function flattenTreeToSummaryLines(nodes: BudgetTreeNode[]): Array<{ code: string; description: string; unit: string; quantity: number; unitPrice: number; total: number; overheadPct: number; financialPct: number; profitPct: number; taxPct: number }> {
+    const out: Array<{ code: string; description: string; unit: string; quantity: number; unitPrice: number; total: number; overheadPct: number; financialPct: number; profitPct: number; taxPct: number }> = []
+    for (const node of nodes) {
+      for (const line of node.lines) {
+        const qty = Number(line.quantity)
+        const total = Number(line.directCostTotal)
+        out.push({
+          code: node.wbsNode.code,
+          description: line.description ?? '',
+          unit: line.unit ?? '',
+          quantity: qty,
+          unitPrice: qty ? total / qty : 0,
+          total,
+          overheadPct: Number(line.overheadPct ?? globalOverhead),
+          financialPct: Number(line.financialPct ?? globalFinancial),
+          profitPct: Number(line.profitPct ?? globalProfit),
+          taxPct: Number(line.taxPct ?? globalTax),
+        })
+      }
+      out.push(...flattenTreeToSummaryLines(node.children))
+    }
+    return out
   }
-
-  const projectTotalSale = visibleLines.reduce(
-    (sum: number, line: (typeof version.budgetLines)[number]) => sum + lineSaleTotal(line),
+  const summaryData = flattenTreeToSummaryLines(treeData)
+  function lineSaleTotalFromSummary(row: (typeof summaryData)[number]): number {
+    let price = row.unitPrice
+    price += price * (row.overheadPct / 100)
+    price += price * (row.financialPct / 100)
+    price += price * (row.profitPct / 100)
+    price += price * (row.taxPct / 100)
+    return price * row.quantity
+  }
+  const projectTotalSale = summaryData.reduce(
+    (sum, row) => sum + lineSaleTotalFromSummary(row),
     0
   )
-
-  const summaryData = visibleLines.map((line: (typeof version.budgetLines)[number]) => ({
-    code: line.wbsNode.code,
-    description: line.description,
-    unit: line.unit,
-    quantity: Number(line.quantity),
-    unitPrice: Number(line.quantity)
-      ? Number(line.directCostTotal) / Number(line.quantity)
-      : 0,
-    total: Number(line.directCostTotal),
-    overheadPct: Number(line.overheadPct ?? globalOverhead),
-    financialPct: Number(line.financialPct ?? globalFinancial),
-    profitPct: Number(line.profitPct ?? globalProfit),
-    taxPct: Number(line.taxPct ?? globalTax),
-  }))
 
   const canEdit =
     ['EDITOR', 'ADMIN', 'OWNER'].includes(role) && version.status === 'DRAFT'

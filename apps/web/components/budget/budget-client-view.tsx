@@ -64,6 +64,7 @@ export function BudgetClientView({ data, projectTotal }: BudgetClientViewProps) 
     return sub2 * (1 + Number(line.taxPct) / 100)
   }
 
+  /** Roll-up: parents show only sum of children; leaves show lines total. */
   function calculateNodeTotal(node: BudgetTreeNode): number {
     const linesTotal = node.lines.reduce((sum, line) => {
       const salePrice = calculateSalePrice(line)
@@ -75,7 +76,8 @@ export function BudgetClientView({ data, projectTotal }: BudgetClientViewProps) 
       0
     )
 
-    return linesTotal + childrenTotal
+    if (node.children.length > 0) return childrenTotal
+    return linesTotal
   }
 
   function renderNode(node: BudgetTreeNode, level: number = 0) {
@@ -139,8 +141,9 @@ export function BudgetClientView({ data, projectTotal }: BudgetClientViewProps) 
           </TableCell>
         </TableRow>
 
-        {/* Budget Lines */}
+        {/* Budget Lines: only on leaf nodes (roll-up, no partida rows under parents) */}
         {isExpanded &&
+          node.children.length === 0 &&
           node.lines.map((line) => {
             const salePrice = calculateSalePrice(line)
             const totalSale = salePrice * Number(line.quantity)
@@ -193,7 +196,11 @@ export function BudgetClientView({ data, projectTotal }: BudgetClientViewProps) 
 
         {/* Children */}
         {isExpanded &&
-          node.children.map((child) => renderNode(child, level + 1))}
+          node.children.map((child) => (
+            <Fragment key={child.wbsNode.id}>
+              {renderNode(child, level + 1)}
+            </Fragment>
+          ))}
       </>
     )
   }

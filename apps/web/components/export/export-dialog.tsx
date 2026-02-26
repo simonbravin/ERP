@@ -24,17 +24,24 @@ interface ExportColumn {
   defaultVisible?: boolean
 }
 
+export type ExportPdfOptions = {
+  showEmitidoPor: boolean
+  showFullCompanyData: boolean
+}
+
 interface ExportDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   title: string
   columns: ExportColumn[]
-  onExport: (format: 'excel' | 'pdf', selectedColumns: string[]) => Promise<{
+  onExport: (format: 'excel' | 'pdf', selectedColumns: string[], pdfOptions?: ExportPdfOptions) => Promise<{
     success: boolean
     data?: string
     filename?: string
     error?: string
   }>
+  /** When true, show PDF-specific checkboxes (Emitido por, Datos empresa) when PDF tab is selected */
+  showPdfOptions?: boolean
 }
 
 export function ExportDialog({
@@ -43,6 +50,7 @@ export function ExportDialog({
   title,
   columns,
   onExport,
+  showPdfOptions = false,
 }: ExportDialogProps) {
   const t = useTranslations('export')
   const [isPending, startTransition] = useTransition()
@@ -51,6 +59,8 @@ export function ExportDialog({
     () => new Set(columns.filter((col) => col.defaultVisible !== false).map((col) => col.field))
   )
   const [exportFormat, setExportFormat] = useState<'excel' | 'pdf'>('excel')
+  const [pdfShowEmitidoPor, setPdfShowEmitidoPor] = useState(true)
+  const [pdfShowFullCompanyData, setPdfShowFullCompanyData] = useState(true)
 
   function toggleColumn(field: string) {
     const newSelected = new Set(selectedColumns)
@@ -78,7 +88,11 @@ export function ExportDialog({
 
     startTransition(async () => {
       try {
-        const result = await onExport(exportFormat, Array.from(selectedColumns))
+        const pdfOptions =
+          exportFormat === 'pdf' && showPdfOptions
+            ? { showEmitidoPor: pdfShowEmitidoPor, showFullCompanyData: pdfShowFullCompanyData }
+            : undefined
+        const result = await onExport(exportFormat, Array.from(selectedColumns), pdfOptions)
 
         if (result.success && result.data && result.filename) {
           downloadFile(result.data, result.filename, exportFormat)
@@ -156,6 +170,33 @@ export function ExportDialog({
                 El PDF incluirá logo y datos de la empresa con formato profesional.
               </p>
             </div>
+            {showPdfOptions && (
+              <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/30 p-3">
+                <p className="text-sm font-medium text-foreground">{t('pdfOptions', { defaultValue: 'Opciones del PDF' })}</p>
+                <div className="flex flex-wrap gap-6">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="pdf-show-emitido"
+                      checked={pdfShowEmitidoPor}
+                      onCheckedChange={(v) => setPdfShowEmitidoPor(v === true)}
+                    />
+                    <Label htmlFor="pdf-show-emitido" className="cursor-pointer text-sm font-normal">
+                      {t('pdfShowEmitidoPor', { defaultValue: "Incluir 'Emitido por'" })}
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="pdf-full-company"
+                      checked={pdfShowFullCompanyData}
+                      onCheckedChange={(v) => setPdfShowFullCompanyData(v === true)}
+                    />
+                    <Label htmlFor="pdf-full-company" className="cursor-pointer text-sm font-normal">
+                      {t('pdfFullCompanyData', { defaultValue: 'Datos completos de la empresa (solo nombre si se desmarca)' })}
+                    </Label>
+                  </div>
+                </div>
+              </div>
+            )}
           </TabsContent>
         </Tabs>
 

@@ -33,6 +33,7 @@ export default async function PrintLayout({
       select: {
         legalName: true,
         taxId: true,
+        country: true,
         address: true,
         email: true,
         phone: true,

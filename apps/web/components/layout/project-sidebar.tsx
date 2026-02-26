@@ -187,7 +187,7 @@ export function ProjectSidebar({ projectId, orgName = 'Bloqer', orgLogoUrl, user
   const widthClass = collapsed ? 'w-16' : 'w-64'
 
   const asideContent = (
-    <aside className={`flex h-full shrink-0 flex-col border-r border-sidebar-border bg-sidebar transition-[width] duration-200 ${widthClass}`}>
+    <aside className={`flex h-full shrink-0 flex-col rounded-r-xl border-r border-sidebar-border bg-sidebar transition-[width] duration-200 ${widthClass}`}>
       {/* Logo/org name (or Home when collapsed) + back to projects + collapse/close */}
       <div className={cn('flex h-14 items-center justify-between border-b border-sidebar-border py-0.5', collapsed ? 'px-1.5 gap-1' : 'px-2 gap-2')}>
         {collapsed ? (

@@ -152,6 +152,118 @@ export async function getBudgetVersionWithLines(versionId: string) {
   }
 }
 
+/** Flattened row for PDF: one per WBS node (same as UI Planilla Final tree). */
+export type BudgetExportRow = {
+  code: string
+  description: string
+  unit: string
+  quantity: number
+  unitPrice: number
+  totalCost: number
+  /** Inc % (overhead) from first line of node, for optional export column */
+  incidenciaPct?: number
+}
+
+/**
+ * Same dataset as Budget version page Planilla Final: full WBS tree with lines attached.
+ * Returns one row per WBS node (depth-first), so the PDF shows all nodes (1, 1.1, 1.1.1, 2, …) like the UI.
+ */
+export async function getBudgetExportData(versionId: string): Promise<{
+  version: Awaited<ReturnType<typeof getBudgetVersionWithLines>>['version']
+  rows: BudgetExportRow[]
+  grandTotal: number
+} | null> {
+  const { org } = await getAuthContext()
+  const versionRaw = await prisma.budgetVersion.findFirst({
+    where: { id: versionId, orgId: org.orgId },
+    include: {
+      project: { select: { id: true, name: true, projectNumber: true } },
+      budgetLines: {
+        include: {
+          wbsNode: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+              parentId: true,
+              sortOrder: true,
+              active: true,
+            },
+          },
+        },
+      },
+    },
+  })
+  if (!versionRaw) return null
+  const version = serializeForClient(versionRaw) as (typeof versionRaw) & { budgetLines: typeof versionRaw.budgetLines }
+  const projectId = version.projectId as string
+  const wbsNodes = await prisma.wbsNode.findMany({
+    where: { projectId, orgId: org.orgId, active: true },
+    select: { id: true, code: true, name: true, parentId: true, sortOrder: true },
+    orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }],
+  })
+  const wbsGroups = new Map<string, typeof version.budgetLines>()
+  for (const line of version.budgetLines) {
+    const wbs = line.wbsNode as { active?: boolean }
+    if (wbs?.active === false) continue
+    const wbsId = line.wbsNode.id
+    if (!wbsGroups.has(wbsId)) wbsGroups.set(wbsId, [])
+    wbsGroups.get(wbsId)!.push(line)
+  }
+  type Node = {
+    wbsNode: { id: string; code: string; name: string }
+    children: Node[]
+    lines: Array<{ description: string | null; unit: string | null; quantity: unknown; directCostTotal: unknown; overheadPct?: unknown }>
+  }
+  function buildTree(parentId: string | null): Node[] {
+    const list = wbsNodes.filter((n) => n.parentId === parentId)
+    return list
+      .sort((a, b) => a.sortOrder - b.sortOrder || a.code.localeCompare(b.code))
+      .map((n) => ({
+        wbsNode: { id: n.id, code: n.code, name: n.name },
+        children: buildTree(n.id),
+        lines: (wbsGroups.get(n.id) ?? []).map((l) => ({
+          description: l.description,
+          unit: l.unit,
+          quantity: l.quantity,
+          directCostTotal: l.directCostTotal,
+          overheadPct: (l as { overheadPct?: unknown }).overheadPct,
+        })),
+      }))
+  }
+  function flattenToRows(nodes: Node[]): BudgetExportRow[] {
+    const out: BudgetExportRow[] = []
+    for (const node of nodes) {
+      const first = node.lines[0]
+      const qty = first != null ? Number(first.quantity) || 0 : 0
+      const total = first != null ? Number(first.directCostTotal) || 0 : 0
+      const incidenciaPct = first != null && first.overheadPct != null ? Number(first.overheadPct) : undefined
+      out.push({
+        code: node.wbsNode.code,
+        description:
+          (first?.description != null && String(first.description).trim() !== ''
+            ? first.description
+            : node.wbsNode.name) ?? '—',
+        unit: first?.unit ?? '—',
+        quantity: qty,
+        unitPrice: qty > 0 ? total / qty : 0,
+        totalCost: total,
+        ...(incidenciaPct !== undefined && { incidenciaPct }),
+      })
+      out.push(...flattenToRows(node.children))
+    }
+    return out
+  }
+  const tree = buildTree(null)
+  const rows = flattenToRows(tree)
+  const grandTotal = rows.reduce((sum, r) => sum + r.totalCost, 0)
+  return {
+    version: serializeForClient(versionRaw) as Awaited<ReturnType<typeof getBudgetVersionWithLines>>['version'],
+    rows,
+    grandTotal,
+  }
+}
+
 export async function getVersionTotal(versionId: string): Promise<number> {
   const { org } = await getAuthContext()
   const version = await prisma.budgetVersion.findFirst({

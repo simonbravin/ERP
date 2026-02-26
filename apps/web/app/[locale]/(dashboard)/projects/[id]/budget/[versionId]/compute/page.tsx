@@ -7,8 +7,9 @@ import {
   getBudgetVersion,
   listBudgetLines,
 } from '@/app/actions/budget'
-import { getTranslations } from 'next-intl/server'
+import { getTranslations, getLocale } from 'next-intl/server'
 import { PlanillaComputeView } from '@/components/budget/planilla-compute-view'
+import { ExportPdfButton } from '@/components/print/export-pdf-button'
 
 type PageProps = {
   params: Promise<{ id: string; versionId: string }>
@@ -34,7 +35,7 @@ export default async function BudgetComputePage({ params }: PageProps) {
 
   if (!version || version.projectId !== projectId) return notFound()
 
-  const t = await getTranslations('budget')
+  const [t, locale] = await Promise.all([getTranslations('budget'), getLocale()])
 
   const computeSheetLines = (lines ?? [])
     .map((line) => {
@@ -94,12 +95,19 @@ export default async function BudgetComputePage({ params }: PageProps) {
             {version.versionCode} — {version.versionType} · {project.name}
           </p>
         </div>
-        <Link
-          href={`/projects/${projectId}/budget/${versionId}`}
-          className="text-sm font-medium text-slate-600 hover:text-slate-900"
-        >
-          ← {t('version', { defaultValue: 'Volver a versión' })}
-        </Link>
+        <div className="flex items-center gap-3">
+          <ExportPdfButton
+            versionId={versionId}
+            locale={locale}
+            label={t('exportPDF', { defaultValue: 'Exportar PDF' })}
+          />
+          <Link
+            href={`/projects/${projectId}/budget/${versionId}`}
+            className="text-sm font-medium text-slate-600 hover:text-slate-900"
+          >
+            ← {t('version', { defaultValue: 'Volver a versión' })}
+          </Link>
+        </div>
       </div>
 
       {/* Compute sheet table */}

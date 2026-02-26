@@ -19,6 +19,7 @@ const exportColumns = [
   { field: 'quantity', label: 'Cantidad', defaultVisible: true },
   { field: 'unitPrice', label: 'Precio Unitario', defaultVisible: true },
   { field: 'totalCost', label: 'Costo Total', defaultVisible: true },
+  { field: 'incidenciaPct', label: 'Incidencia (Inc %)', defaultVisible: false },
   { field: 'overheadPct', label: 'GG %', defaultVisible: false },
   { field: 'profitPct', label: 'Beneficio %', defaultVisible: false },
   { field: 'taxPct', label: 'IVA %', defaultVisible: false },
@@ -28,16 +29,25 @@ export function BudgetVersionExport({ versionId, versionCode }: BudgetVersionExp
   const t = useTranslations('export')
   const [showExportDialog, setShowExportDialog] = useState(false)
 
-  async function handleExport(format: 'excel' | 'pdf', selectedColumns: string[]) {
+  async function handleExport(format: 'excel' | 'pdf', selectedColumns: string[], pdfOptions?: { showEmitidoPor: boolean; showFullCompanyData: boolean }) {
     if (format === 'excel') {
       return await exportBudgetToExcel(versionId, selectedColumns)
     }
     const locale = typeof window !== 'undefined' ? document.documentElement.lang || 'es' : 'es'
-    const url = `/api/pdf?template=budget&id=${encodeURIComponent(versionId)}&locale=${encodeURIComponent(locale)}`
+    const params = new URLSearchParams({
+      template: 'budget',
+      id: versionId,
+      locale,
+      showEmitidoPor: pdfOptions?.showEmitidoPor !== false ? '1' : '0',
+      showFullCompanyData: pdfOptions?.showFullCompanyData !== false ? '1' : '0',
+    })
+    if (selectedColumns.length) params.set('columns', selectedColumns.join(','))
+    const url = `/api/pdf?${params.toString()}`
     const res = await fetch(url, { credentials: 'include' })
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
-      return { success: false, error: data?.error ?? 'No se pudo generar el PDF' }
+      const message = data?.detail ?? data?.error ?? 'No se pudo generar el PDF'
+      return { success: false, error: message }
     }
     const blob = await res.blob()
     const disposition = res.headers.get('Content-Disposition')
@@ -63,6 +73,7 @@ export function BudgetVersionExport({ versionId, versionCode }: BudgetVersionExp
         title={`Presupuesto ${versionCode}`}
         columns={exportColumns}
         onExport={handleExport}
+        showPdfOptions
       />
     </>
   )

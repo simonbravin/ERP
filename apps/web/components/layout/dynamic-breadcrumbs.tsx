@@ -14,6 +14,8 @@ const SEGMENT_LABELS: Record<string, string> = {
   settings: 'nav.settings',
   wbs: 'wbs.title',
   budget: 'nav.budget',
+  approved: 'nav.budgetApproved',
+  materials: 'nav.budgetMaterials',
   'change-orders': 'changeOrders.title',
   certifications: 'nav.certifications',
   documents: 'nav.documents',

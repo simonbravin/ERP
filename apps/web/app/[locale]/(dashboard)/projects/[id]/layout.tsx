@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation'
+import { notFound, unstable_rethrow } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { getOrgContext } from '@/lib/org-context'
 import { hasMinimumRole } from '@/lib/rbac'
@@ -21,25 +21,30 @@ export default async function ProjectLayout({
   children,
   params,
 }: ProjectLayoutProps) {
-  const session = await getSession()
-  if (!session?.user?.id) return notFound()
+  try {
+    const session = await getSession()
+    if (!session?.user?.id) return notFound()
 
-  const org = await getOrgContext(session.user.id)
-  if (!org) return notFound()
+    const org = await getOrgContext(session.user.id)
+    if (!org) return notFound()
 
-  const { id } = await params
+    const { id } = await params
 
-  const project = await getProject(id)
-  if (!project) return notFound()
+    const project = await getProject(id)
+    if (!project) return notFound()
 
-  const canEdit = hasMinimumRole(org.role, 'EDITOR')
-  const projectPlain = serializeForClient(project)
+    const canEdit = hasMinimumRole(org.role, 'EDITOR')
+    const projectPlain = serializeForClient(project)
 
-  return (
-    <div className="erp-view-container space-y-6 py-6">
-      <ProjectLayoutInner project={projectPlain} canEdit={canEdit}>
-        {children}
-      </ProjectLayoutInner>
-    </div>
-  )
+    return (
+      <div className="erp-view-container space-y-6 py-6">
+        <ProjectLayoutInner project={projectPlain} canEdit={canEdit}>
+          {children}
+        </ProjectLayoutInner>
+      </div>
+    )
+  } catch (err) {
+    unstable_rethrow(err)
+    return notFound()
+  }
 }

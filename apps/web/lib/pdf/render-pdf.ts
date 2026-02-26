@@ -10,6 +10,8 @@ export type RenderPdfOptions = {
   format?: 'A4' | 'Letter'
   margin?: { top?: string; right?: string; bottom?: string; left?: string }
   printBackground?: boolean
+  /** If set, used as Puppeteer headerTemplate (e.g. project name on every page). Empty div by default. */
+  headerTemplate?: string
 }
 
 export type CookieInput = {
@@ -83,6 +85,7 @@ export async function renderHtmlToPdf(
       format: options.format ?? 'A4',
       printBackground: options.printBackground ?? true,
       displayHeaderFooter: true,
+      headerTemplate: options.headerTemplate ?? '<div></div>',
       footerTemplate: FOOTER_TEMPLATE,
       margin,
     })
