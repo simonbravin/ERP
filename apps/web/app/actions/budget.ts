@@ -110,6 +110,48 @@ export async function getBudgetVersion(versionId: string) {
   return version
 }
 
+/**
+ * Same data source as the Budget version page (version + lines with active WBS).
+ * Use this for PDF/print so the export shows the exact same rows as the UI.
+ */
+export async function getBudgetVersionWithLines(versionId: string) {
+  const { org } = await getAuthContext()
+  const version = await prisma.budgetVersion.findFirst({
+    where: { id: versionId, orgId: org.orgId },
+    include: {
+      project: { select: { id: true, name: true, projectNumber: true } },
+      budgetLines: {
+        include: {
+          wbsNode: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+              parentId: true,
+              sortOrder: true,
+              active: true,
+            },
+          },
+        },
+        orderBy: [
+          { wbsNode: { sortOrder: 'asc' } },
+          { wbsNode: { code: 'asc' } },
+          { sortOrder: 'asc' },
+        ],
+      },
+    },
+  })
+  if (!version) return null
+  const lines = version.budgetLines.filter((line) => {
+    const active = (line.wbsNode as { active?: boolean }).active
+    return active !== false
+  })
+  return {
+    version: serializeForClient(version),
+    lines: lines.map((line) => serializeForClient(line)),
+  }
+}
+
 export async function getVersionTotal(versionId: string): Promise<number> {
   const { org } = await getAuthContext()
   const version = await prisma.budgetVersion.findFirst({
@@ -694,9 +736,13 @@ export async function createBudgetLine(versionId: string, data: CreateBudgetLine
 
   const wbsNode = await prisma.wbsNode.findFirst({
     where: { id: parsed.data.wbsNodeId, projectId: version.projectId, orgId: org.orgId, active: true },
-    select: { id: true },
+    select: { id: true, children: { select: { id: true } } },
   })
   if (!wbsNode) return { error: { wbsNodeId: ['WBS item must belong to this project.'] } }
+  // Roll-up: partidas only on leaf nodes (no children)
+  if (wbsNode.children.length > 0) {
+    return { error: { wbsNodeId: ['Solo se pueden cargar partidas (APU) en partidas finales, no en fases con subpartidas.'] } }
+  }
 
   if (parsed.data.resourceId) {
     const resource = await prisma.resource.findFirst({
@@ -722,6 +768,7 @@ export async function createBudgetLine(versionId: string, data: CreateBudgetLine
     _max: { sortOrder: true },
   })
 
+  let createdLineId: string
   await prisma.$transaction(async (tx) => {
     const line = await tx.budgetLine.create({
       data: {
@@ -741,6 +788,7 @@ export async function createBudgetLine(versionId: string, data: CreateBudgetLine
         sortOrder: (maxSort._max.sortOrder ?? -1) + 1,
       },
     })
+    createdLineId = line.id
     await publishOutboxEvent(tx, {
       orgId: org.orgId,
       eventType: 'BUDGET_LINE.CREATED',
@@ -751,7 +799,7 @@ export async function createBudgetLine(versionId: string, data: CreateBudgetLine
   })
 
   revalidatePath(`/projects/${version.projectId}/budget/${versionId}`)
-  return { success: true }
+  return { success: true, lineId: createdLineId }
 }
 
 export async function updateBudgetLine(lineId: string, data: UpdateBudgetLineInput) {
@@ -949,7 +997,7 @@ export async function listBudgetLines(versionId: string) {
     },
     orderBy: { sortOrder: 'asc' },
     include: {
-      wbsNode: { select: { id: true, code: true, name: true } },
+      wbsNode: { select: { id: true, code: true, name: true, parentId: true } },
       resources: {
         orderBy: { sortOrder: 'asc' },
         select: {
@@ -966,7 +1014,9 @@ export async function listBudgetLines(versionId: string) {
     },
   })
   lines.sort((a, b) => {
-    const c = a.wbsNode.code.localeCompare(b.wbsNode.code)
+    const codeA = a.wbsNode?.code ?? ''
+    const codeB = b.wbsNode?.code ?? ''
+    const c = codeA.localeCompare(codeB)
     return c !== 0 ? c : a.sortOrder - b.sortOrder
   })
   return lines.map((line) => serializeForClient(line))

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 import { prisma } from '@repo/database'
 import { getOrgContext } from '@/lib/org-context'
-import { getBudgetVersion, listBudgetLines } from '@/app/actions/budget'
+import { getBudgetVersionWithLines, listBudgetLines } from '@/app/actions/budget'
 import { getProject } from '@/app/actions/projects'
 import { getDownloadUrl } from '@/lib/r2-client'
 import { buildBudgetPrintHtml } from '@/lib/pdf/build-budget-print-html'
@@ -109,6 +109,8 @@ export async function GET(request: NextRequest) {
     let pdfBuffer: Buffer
 
     if (template.id === 'budget' && id) {
+      // Use same data source as Budget version page: getBudgetVersionWithLines loads version + budgetLines
+      // (with wbsNode) and filters to active WBS only. Do not use listBudgetLines alone for PDF.
       const org = await getOrgContext(token.sub)
       if (!org) {
         return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
@@ -137,15 +139,25 @@ export async function GET(request: NextRequest) {
       } catch {
         // optional
       }
-      const version = await getBudgetVersion(id)
-      if (!version) {
+      const data = await getBudgetVersionWithLines(id)
+      if (!data) {
         return NextResponse.json({ error: 'Versión no encontrada' }, { status: 404 })
+      }
+      const { version, lines } = data
+      console.log('[PDF budget] lines count:', lines.length)
+      const listCount = (await listBudgetLines(id))?.length ?? 0
+      if (listCount !== lines.length) {
+        throw new Error(
+          `[PDF budget] data source mismatch: getBudgetVersionWithLines=${lines.length} listBudgetLines=${listCount}. PDF uses version-page source.`
+        )
+      }
+      if (lines.length === 0 && version) {
+        console.warn('[PDF budget] no lines for version', id, '- export may be empty')
       }
       const project = await getProject(version.projectId)
       if (!project) {
         return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 })
       }
-      const lines = await listBudgetLines(id) ?? []
       const rows = lines.map((line: { wbsNode?: { code: string; name: string } | null; quantity: number; unit: string | null; description: string | null; directCostTotal?: unknown }) => {
         const qty = typeof line.quantity === 'number' ? line.quantity : Number(line.quantity) || 1
         const total = Number((line as { directCostTotal?: number }).directCostTotal ?? 0)

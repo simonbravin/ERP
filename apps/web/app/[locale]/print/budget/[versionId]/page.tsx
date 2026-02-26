@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation'
-import { getBudgetVersion, listBudgetLines } from '@/app/actions/budget'
+import { getBudgetVersionWithLines } from '@/app/actions/budget'
 import { getProject } from '@/app/actions/projects'
 import { PrintDocumentShell } from '@/components/print/print-document-shell'
 import { PrintTable } from '@/components/print/print-table'
@@ -21,22 +21,21 @@ type BudgetRow = {
 export default async function PrintBudgetPage({ params }: PageProps) {
   const { versionId } = await params
 
-  const [version, lines] = await Promise.all([
-    getBudgetVersion(versionId),
-    listBudgetLines(versionId),
-  ])
+  const data = await getBudgetVersionWithLines(versionId)
+  if (!data) return notFound()
+  const { version, lines } = data
 
-  if (!version) return notFound()
   const project = await getProject(version.projectId)
   if (!project) return notFound()
 
-  const rows: BudgetRow[] = (lines ?? []).map((line: { wbsNode: { code: string; name: string }; quantity: number; unit: string | null; description: string | null; directCostTotal?: unknown }) => {
+  const rows: BudgetRow[] = (lines ?? []).map((line: { wbsNode?: { code: string; name: string } | null; quantity: number; unit: string | null; description: string | null; directCostTotal?: unknown }) => {
     const qty = typeof line.quantity === 'number' ? line.quantity : Number(line.quantity) || 1
     const total = Number((line as { directCostTotal?: number }).directCostTotal ?? 0)
     const unitPrice = qty > 0 ? total / qty : 0
+    const wbs = line.wbsNode
     return {
-      code: line.wbsNode.code,
-      description: line.description ?? line.wbsNode.name ?? '—',
+      code: wbs?.code ?? '—',
+      description: line.description ?? wbs?.name ?? '—',
       unit: line.unit ?? '—',
       quantity: qty,
       unitPrice,
