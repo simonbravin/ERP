@@ -54,7 +54,7 @@ export function FinanceExecutiveDashboardClient({ data, alerts = [] }: Props) {
     setIsExporting(true)
     try {
       const locale = typeof document !== 'undefined' ? document.documentElement.lang || 'es' : 'es'
-      const url = `/api/pdf?template=finance-dashboard&locale=${encodeURIComponent(locale)}`
+      const url = `/api/pdf?template=finance-dashboard&locale=${encodeURIComponent(locale)}&showEmitidoPor=1&showFullCompanyData=1`
       const res = await fetch(url, { credentials: 'include' })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))

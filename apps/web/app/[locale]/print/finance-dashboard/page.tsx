@@ -5,7 +5,12 @@ import { formatCurrency } from '@/lib/format-utils'
 
 type Row = { month: string; income: number; expense: number; balance: number }
 
-export default async function PrintFinanceDashboardPage() {
+type PageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>
+}
+
+export default async function PrintFinanceDashboardPage({ searchParams }: PageProps) {
+  const sp = searchParams ? await searchParams : {}
   const data = await getFinanceExecutiveDashboard()
 
   const summary = data.summary
@@ -50,7 +55,7 @@ export default async function PrintFinanceDashboardPage() {
   ]
 
   return (
-    <PrintDocumentShell templateId="finance-dashboard">
+    <PrintDocumentShell templateId="finance-dashboard" query={sp}>
       <div className="space-y-6">
         <h2 className="text-lg font-semibold">Dashboard Finanzas — Resumen</h2>
       <div className="grid gap-4 text-sm">

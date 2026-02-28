@@ -83,7 +83,11 @@ export function BudgetSummaryTabClient({
           markups={markups}
         />
       ) : (
-        <BudgetClientView data={treeData} projectTotal={projectTotalSale} />
+        <BudgetClientView
+          data={treeData}
+          projectTotal={projectTotalSale}
+          globalMarkups={markups}
+        />
       )}
     </div>
   )

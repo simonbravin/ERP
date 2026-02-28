@@ -30,10 +30,21 @@ import {
 import { Checkbox } from '@/components/ui/checkbox'
 import { getMaterialsForPurchaseOrder, createPurchaseOrderCommitment } from '@/app/actions/materials'
 import { getPartiesForProject } from '@/app/actions/finance'
+import { exportPurchaseOrderToExcel } from '@/app/actions/export'
+import { ExportDialog } from '@/components/export/export-dialog'
 import { formatCurrency } from '@/lib/format-utils'
 import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
 import type { MaterialLineForPO } from '@/lib/types/materials'
+
+const purchaseOrderExportColumns = [
+  { field: 'description', label: 'Descripción', defaultVisible: true },
+  { field: 'wbsCode', label: 'Código WBS', defaultVisible: false },
+  { field: 'unit', label: 'Unidad', defaultVisible: true },
+  { field: 'quantity', label: 'Cantidad', defaultVisible: true },
+  { field: 'unitPrice', label: 'P. Unit', defaultVisible: true },
+  { field: 'totalCost', label: 'Total', defaultVisible: true },
+]
 
 interface CreatePurchaseOrderDialogProps {
   open: boolean
@@ -59,6 +70,9 @@ export function CreatePurchaseOrderDialog({
     new Date().toISOString().slice(0, 10)
   )
   const [selected, setSelected] = useState<Record<string, number>>({})
+  const [createdCommitmentId, setCreatedCommitmentId] = useState<string | null>(null)
+  const [createdCommitmentNumber, setCreatedCommitmentNumber] = useState<string | null>(null)
+  const [showExportDialog, setShowExportDialog] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -139,13 +153,62 @@ export function CreatePurchaseOrderDialog({
     setSubmitting(false)
     if (result.success) {
       toast.success(`Orden de compra ${result.commitmentNumber} creada`)
+      setCreatedCommitmentId(result.commitmentId)
+      setCreatedCommitmentNumber(result.commitmentNumber)
       onOpenChange(false)
+      setShowExportDialog(true)
     } else {
       toast.error(result.error)
     }
   }
 
+  async function handleExportPO(
+    format: 'excel' | 'pdf',
+    selectedColumns: string[],
+    pdfOptions?: { showEmitidoPor: boolean; showFullCompanyData: boolean }
+  ) {
+    if (!createdCommitmentId) return { success: false as const, error: 'No hay orden de compra' }
+    if (format === 'excel') {
+      return await exportPurchaseOrderToExcel(createdCommitmentId, selectedColumns)
+    }
+    const locale = typeof window !== 'undefined' ? document.documentElement.lang || 'es' : 'es'
+    const params = new URLSearchParams({
+      template: 'purchase-order',
+      id: createdCommitmentId,
+      locale,
+      showEmitidoPor: pdfOptions?.showEmitidoPor !== false ? '1' : '0',
+      showFullCompanyData: pdfOptions?.showFullCompanyData !== false ? '1' : '0',
+    })
+    if (selectedColumns.length) params.set('columns', selectedColumns.join(','))
+    const url = `/api/pdf?${params.toString()}`
+    const res = await fetch(url, { credentials: 'include' })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      const message = data?.detail ?? data?.error ?? 'No se pudo generar el PDF'
+      return { success: false as const, error: message }
+    }
+    const blob = await res.blob()
+    const disposition = res.headers.get('Content-Disposition')
+    const match = disposition?.match(/filename="?([^";]+)"?/)
+    const filename = match?.[1] ?? `orden-compra-${createdCommitmentId}.pdf`
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = filename
+    link.click()
+    URL.revokeObjectURL(link.href)
+    return { success: true as const, filename }
+  }
+
+  function handleExportDialogClose(open: boolean) {
+    if (!open) {
+      setShowExportDialog(false)
+      setCreatedCommitmentId(null)
+      setCreatedCommitmentNumber(null)
+    }
+  }
+
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
         <DialogHeader>
@@ -277,5 +340,15 @@ export function CreatePurchaseOrderDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <ExportDialog
+      open={showExportDialog}
+      onOpenChange={handleExportDialogClose}
+      title={createdCommitmentNumber ? `Orden de compra ${createdCommitmentNumber}` : 'Orden de compra'}
+      columns={purchaseOrderExportColumns}
+      onExport={handleExportPO}
+      showPdfOptions
+    />
+  </>
   )
 }

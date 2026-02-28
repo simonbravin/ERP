@@ -50,6 +50,8 @@ interface BudgetLinesCompactTableProps {
   searchQuery?: string
   /** 'totals' = una columna Total; 'breakdown' = Materiales, MO, Equipos, Total */
   columnView?: 'totals' | 'breakdown'
+  /** When set with columnView="totals", show Inc % instead of Costo real */
+  projectTotalSale?: number
   /** When set, enables drag-and-drop reorder; called with (parentId, orderedWbsNodeIds) */
   onReorder?: (parentId: string | null, orderedWbsNodeIds: string[]) => Promise<void>
   /** Hide Actions column (e.g. Planilla Final read-only) */
@@ -154,11 +156,33 @@ export function BudgetLinesCompactTable({
   wbsTemplates = [],
   searchQuery = '',
   columnView = 'totals',
+  projectTotalSale,
   onReorder,
   hideActions = false,
 }: BudgetLinesCompactTableProps) {
   const showBreakdown = columnView === 'breakdown'
+  const showIncidence =
+    (columnView === 'totals' || columnView === 'breakdown') &&
+    projectTotalSale != null &&
+    projectTotalSale > 0
   const canDrag = Boolean(canEdit && onReorder && !hideActions)
+
+  /** Sale price per unit: same formula as BudgetClientView (Sub1, Sub2, then IVA). */
+  function calculateLineSaleTotal(line: BudgetTreeNode['lines'][number]): number {
+    const qty = Number(line.quantity) || 1
+    const directUnit = Number(line.directCostTotal) / qty
+    const sub1 = directUnit * (1 + Number(line.overheadPct ?? 0) / 100)
+    const sub2 = sub1 * (1 + Number(line.financialPct ?? 0) / 100 + Number(line.profitPct ?? 0) / 100)
+    return sub2 * (1 + Number(line.taxPct ?? 0) / 100) * qty
+  }
+
+  /** Roll-up: node sale total (for incidence). */
+  function calculateNodeSaleTotal(node: BudgetTreeNode): number {
+    const linesTotal = node.lines.reduce((sum, line) => sum + calculateLineSaleTotal(line), 0)
+    const childrenTotal = node.children.reduce((sum, child) => sum + calculateNodeSaleTotal(child), 0)
+    if (node.children.length > 0) return childrenTotal
+    return linesTotal
+  }
 
   function lineResourceSums(line: { resources: Array<{ resourceType: string; quantity: number; unitCost: number }> }) {
     let material = 0, labor = 0, equipment = 0
@@ -400,14 +424,22 @@ export function BudgetLinesCompactTable({
             </span>
           </TableCell>
           <TableCell className="erp-table-cell-currency px-2 py-1 text-muted-foreground">
-            <span className="font-mono text-xs tabular-nums">
-              {formatCurrency(Number(line.actualCostTotal ?? 0))}
-            </span>
+            {showIncidence ? (
+              <span className="font-mono text-xs tabular-nums">
+                {projectTotalSale! > 0
+                  ? ((calculateLineSaleTotal(line) / projectTotalSale!) * 100).toFixed(2)
+                  : '0.00'}%
+              </span>
+            ) : (
+              <span className="font-mono text-xs tabular-nums">
+                {formatCurrency(Number(line.actualCostTotal ?? 0))}
+              </span>
+            )}
           </TableCell>
           {!hideActions && (
-            <TableCell className="px-2 py-1 min-w-[160px] shrink-0">
+            <TableCell className="px-2 py-1 min-w-[100px] w-[100px] shrink-0">
               {canEdit && (
-                <div className="flex items-center gap-1 flex-nowrap overflow-visible">
+                <div className="flex items-center justify-end gap-1 flex-nowrap overflow-visible">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -561,13 +593,15 @@ export function BudgetLinesCompactTable({
           </TableCell>
           <TableCell className="erp-table-cell-currency px-2 py-1 text-muted-foreground">
             <span className="font-mono text-xs tabular-nums">
-              {formatCurrency(calculateNodeActualTotal(node))}
+              {showIncidence && projectTotalSale
+                ? ((calculateNodeSaleTotal(node) / projectTotalSale) * 100).toFixed(2) + '%'
+                : formatCurrency(calculateNodeActualTotal(node))}
             </span>
           </TableCell>
           {!hideActions && (
-            <TableCell className="px-2 py-1 min-w-[160px] shrink-0">
+            <TableCell className="px-2 py-1 min-w-[100px] w-[100px] shrink-0">
               {canEdit && (
-                <div className="flex items-center gap-1 flex-nowrap overflow-visible">
+                <div className="flex items-center justify-end gap-1 flex-nowrap overflow-visible">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -675,13 +709,15 @@ export function BudgetLinesCompactTable({
             </TableCell>
             <TableCell className="erp-table-cell-currency px-2 py-1 text-muted-foreground">
               <span className="font-mono text-xs tabular-nums">
-                {formatCurrency(calculateNodeActualTotal(node))}
+                {showIncidence && projectTotalSale
+                  ? ((calculateNodeSaleTotal(node) / projectTotalSale) * 100).toFixed(2) + '%'
+                  : formatCurrency(calculateNodeActualTotal(node))}
               </span>
             </TableCell>
             {!hideActions && (
-              <TableCell className="px-2 py-1 min-w-[160px] shrink-0">
+              <TableCell className="px-2 py-1 min-w-[100px] w-[100px] shrink-0">
                 {canEdit && (
-                  <div className="flex items-center gap-1 flex-nowrap overflow-visible">
+                  <div className="flex items-center justify-end gap-1 flex-nowrap overflow-visible">
                     <Button
                       variant="ghost"
                       size="sm"
@@ -779,13 +815,15 @@ export function BudgetLinesCompactTable({
                 </TableCell>
                 <TableCell className="px-2 py-1 text-right text-muted-foreground">
                   <span className="font-mono text-xs tabular-nums">
-                    {formatCurrency(Number(line.actualCostTotal ?? 0))}
+                    {showIncidence && projectTotalSale
+                      ? ((calculateLineSaleTotal(line) / projectTotalSale) * 100).toFixed(2) + '%'
+                      : formatCurrency(Number(line.actualCostTotal ?? 0))}
                   </span>
                 </TableCell>
                 {!hideActions && (
-                  <TableCell className="px-2 py-1 min-w-[160px] shrink-0">
+                  <TableCell className="px-2 py-1 min-w-[100px] w-[100px] shrink-0">
                     {canEdit && (
-                      <div className="flex items-center gap-1 flex-nowrap overflow-visible">
+                      <div className="flex items-center justify-end gap-1 flex-nowrap overflow-visible">
                         <Button
                           variant={hasAPU ? 'default' : 'outline'}
                           size="sm"
@@ -858,10 +896,10 @@ export function BudgetLinesCompactTable({
                 {t('total')}
               </TableHead>
               <TableHead className="w-[120px] px-2 py-1 text-right text-xs text-foreground text-muted-foreground">
-                {t('actualCost')}
+                {showIncidence ? t('incidence', { defaultValue: 'Inc %' }) : t('actualCost')}
               </TableHead>
               {!hideActions && (
-                <TableHead className="min-w-[160px] w-[160px] shrink-0 px-2 py-1 text-xs text-foreground">
+                <TableHead className="min-w-[100px] w-[100px] shrink-0 px-2 py-1 text-xs text-foreground">
                   <div className="flex items-center justify-end gap-1 flex-nowrap">
                     <span>{tCommon('actions')}</span>
                     {canEdit && (
@@ -913,7 +951,7 @@ export function BudgetLinesCompactTable({
                     {formatCurrencyForDisplay(grandTotal)}
                   </TableCell>
                   <TableCell className="erp-table-cell-currency px-2 py-1 text-sm text-muted-foreground">
-                    {formatCurrencyForDisplay(grandActualTotal)}
+                    {showIncidence ? '100.00%' : formatCurrencyForDisplay(grandActualTotal)}
                   </TableCell>
                   {!hideActions && <TableCell className="px-2 py-1" />}
                 </TableRow>
@@ -928,6 +966,7 @@ export function BudgetLinesCompactTable({
         <APUEditorDialog
           budgetLineId={editingAPU}
           versionId={versionId}
+          projectId={projectId}
           onClose={() => {
             setEditingAPU(null)
             router.refresh()

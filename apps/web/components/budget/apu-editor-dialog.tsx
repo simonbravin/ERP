@@ -39,6 +39,8 @@ import {
   getBudgetLineWithResources,
   updateBudgetLine,
 } from '@/app/actions/budget'
+import { getPartiesForProject, createPartyForTransaction } from '@/app/actions/finance-transactions'
+import { SupplierNameCombobox } from './supplier-name-combobox'
 import { toast } from 'sonner'
 import { formatCurrency, formatCurrencyForDisplay, formatNumber } from '@/lib/format-utils'
 import { RESOURCE_TYPES } from '@/lib/constants/budget'
@@ -77,12 +79,14 @@ interface BudgetLineData {
 interface APUEditorDialogProps {
   budgetLineId: string
   versionId: string
+  projectId?: string
   onClose: () => void
 }
 
 export function APUEditorDialog({
   budgetLineId,
   versionId,
+  projectId,
   onClose,
 }: APUEditorDialogProps) {
   const t = useTranslations('budget')
@@ -108,6 +112,13 @@ export function APUEditorDialog({
     unitCost: '0',
     supplierName: '',
   })
+  const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([])
+
+  useEffect(() => {
+    if (projectId) {
+      getPartiesForProject(projectId, 'SUPPLIER').then(setSuppliers)
+    }
+  }, [projectId])
 
   useEffect(() => {
     getBudgetLineWithResources(budgetLineId)
@@ -354,6 +365,17 @@ export function APUEditorDialog({
               onDelete={handleDeleteResource}
               isPending={isPending}
               t={t}
+              suppliers={suppliers}
+              onCreateSupplier={async (name) => {
+                const result = await createPartyForTransaction('SUPPLIER', name)
+                if (result && 'name' in result) {
+                  setSuppliers((prev) => (prev.some((s) => s.name === result.name) ? prev : [...prev, { id: (result as { partyId: string }).partyId, name: result.name }]))
+                  return { name: result.name }
+                }
+                const err = result && 'error' in result ? result.error : t('error')
+                toast.error(err)
+                return { name: name.trim() }
+              }}
             />
             <AddResourceForm
               type="MATERIAL"
@@ -362,6 +384,17 @@ export function APUEditorDialog({
               onAdd={handleAddResource}
               isPending={isPending}
               t={t}
+              suppliers={suppliers}
+              onCreateSupplier={async (name) => {
+                const result = await createPartyForTransaction('SUPPLIER', name)
+                if (result && 'name' in result) {
+                  setSuppliers((prev) => (prev.some((s) => s.name === result.name) ? prev : [...prev, { id: (result as { partyId: string }).partyId, name: result.name }]))
+                  return { name: result.name }
+                }
+                const err = result && 'error' in result ? result.error : t('error')
+                toast.error(err)
+                return { name: name.trim() }
+              }}
             />
           </TabsContent>
 
@@ -509,6 +542,8 @@ function ResourceTable({
   onDelete,
   isPending,
   t,
+  suppliers = [],
+  onCreateSupplier,
 }: {
   resources: BudgetResourceRow[]
   type: string
@@ -516,6 +551,8 @@ function ResourceTable({
   onDelete: (id: string) => void
   isPending: boolean
   t: (key: string, opts?: { defaultValue?: string }) => string
+  suppliers?: { id: string; name: string }[]
+  onCreateSupplier?: (name: string) => Promise<{ name: string } | { error: string }>
 }) {
   if (resources.length === 0) {
     return (
@@ -594,13 +631,25 @@ function ResourceTable({
               </TableCell>
               {type === RESOURCE_TYPES.MATERIAL && (
                 <TableCell>
-                  <Input
-                    value={resource.supplierName ?? ''}
-                    onChange={(e) => onUpdate(resource.id, 'supplierName', e.target.value)}
-                    className="h-8"
-                    placeholder={t('supplier', { defaultValue: 'Proveedor' })}
-                    disabled={isPending}
-                  />
+                  {suppliers.length > 0 && onCreateSupplier ? (
+                    <SupplierNameCombobox
+                      value={resource.supplierName ?? ''}
+                      onChange={(name) => onUpdate(resource.id, 'supplierName', name)}
+                      suppliers={suppliers}
+                      onCreateSupplier={onCreateSupplier}
+                      placeholder={t('supplier', { defaultValue: 'Proveedor' })}
+                      disabled={isPending}
+                      compact
+                    />
+                  ) : (
+                    <Input
+                      value={resource.supplierName ?? ''}
+                      onChange={(e) => onUpdate(resource.id, 'supplierName', e.target.value)}
+                      className="h-8"
+                      placeholder={t('supplier', { defaultValue: 'Proveedor' })}
+                      disabled={isPending}
+                    />
+                  )}
                 </TableCell>
               )}
               <TableCell>
@@ -629,6 +678,8 @@ function AddResourceForm({
   onAdd,
   isPending,
   t,
+  suppliers = [],
+  onCreateSupplier,
 }: {
   type: string
   resource: { type: string; name: string; description: string; unit: string; quantity: string; unitCost: string; supplierName: string }
@@ -636,6 +687,8 @@ function AddResourceForm({
   onAdd: () => void
   isPending: boolean
   t: (key: string, opts?: { defaultValue?: string }) => string
+  suppliers?: { id: string; name: string }[]
+  onCreateSupplier?: (name: string) => Promise<{ name: string } | { error: string }>
 }) {
   const unitOptions =
     type === 'MATERIAL'
@@ -710,12 +763,23 @@ function AddResourceForm({
         </div>
         {type === RESOURCE_TYPES.MATERIAL && (
           <div className="col-span-2">
-            <Input
-              placeholder={t('supplier', { defaultValue: 'Proveedor' })}
-              value={resource.supplierName}
-              onChange={(e) => onChange({ ...resource, supplierName: e.target.value })}
-              disabled={isPending}
-            />
+            {suppliers.length > 0 && onCreateSupplier ? (
+              <SupplierNameCombobox
+                value={resource.supplierName}
+                onChange={(name) => onChange({ ...resource, supplierName: name })}
+                suppliers={suppliers}
+                onCreateSupplier={onCreateSupplier}
+                placeholder={t('supplier', { defaultValue: 'Proveedor' })}
+                disabled={isPending}
+              />
+            ) : (
+              <Input
+                placeholder={t('supplier', { defaultValue: 'Proveedor' })}
+                value={resource.supplierName}
+                onChange={(e) => onChange({ ...resource, supplierName: e.target.value })}
+                disabled={isPending}
+              />
+            )}
           </div>
         )}
         <div className={type === RESOURCE_TYPES.MATERIAL ? 'col-span-1' : 'col-span-3'}>

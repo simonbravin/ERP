@@ -350,7 +350,8 @@ export async function updateUserModules(
     }
     const customPermissions: Record<string, string[]> = {}
     enabledModules.forEach((module) => {
-      customPermissions[module] = ['view', 'create', 'edit']
+      const key = module.toLowerCase()
+      customPermissions[key] = ['view', 'create', 'edit']
     })
     await prisma.orgMember.update({
       where: { id: orgMember.id },

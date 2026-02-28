@@ -5,6 +5,7 @@ import { PrintTable } from '@/components/print/print-table'
 
 type PageProps = {
   params: Promise<{ scheduleId: string }>
+  searchParams?: Promise<Record<string, string | string[] | undefined>>
 }
 
 type TaskRow = {
@@ -58,6 +59,7 @@ export default async function PrintSchedulePage({ params }: PageProps) {
     <PrintDocumentShell
       templateId="schedule"
       id={scheduleId}
+      query={sp}
       project={
         project?.name != null
           ? { name: project.name, projectNumber: project.projectNumber }

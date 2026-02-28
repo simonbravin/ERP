@@ -11,11 +11,11 @@ import { SignOutConfirmButton } from '@/components/auth/sign-out-confirm-button'
 function DashboardError({ message }: { message: string }) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="max-w-md rounded-lg border border-red-200 bg-red-50 p-6 dark:border-red-800 dark:bg-red-950/30">
+      <div className="w-full max-w-2xl rounded-lg border border-red-200 bg-red-50 p-6 dark:border-red-800 dark:bg-red-950/30">
         <h1 className="text-lg font-semibold text-red-800 dark:text-red-200">
           Error al cargar el panel
         </h1>
-        <p className="mt-2 text-sm text-red-700 dark:text-red-300 font-mono break-all">
+        <p className="mt-2 text-sm text-red-700 dark:text-red-300 font-mono break-words">
           {message}
         </p>
         <p className="mt-4 text-xs text-red-600 dark:text-red-400">

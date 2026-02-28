@@ -59,6 +59,7 @@ const MODULE_LABELS: Record<Module, string> = {
   quality: 'Calidad',
   documents: 'Documentos',
   reports: 'Reportes',
+  suppliers: 'Proveedores y clientes',
   team: 'Equipo',
   settings: 'Configuración',
 }

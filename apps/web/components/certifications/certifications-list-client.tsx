@@ -189,10 +189,11 @@ export function CertificationsListClient({
         onOpenChange={setShowExportDialog}
         title="Exportar certificaciones del proyecto"
         columns={EXPORT_COLUMNS}
-        onExport={async (format, selectedColumns) => {
+        showPdfOptions
+        onExport={async (format, selectedColumns, pdfOptions) => {
           if (format === 'excel') return exportCertificationsToExcel(projectId, selectedColumns)
           const locale = typeof window !== 'undefined' ? document.documentElement.lang || 'es' : 'es'
-          const url = `/api/pdf?template=certification&id=${encodeURIComponent(projectId)}&locale=${encodeURIComponent(locale)}`
+          const url = `/api/pdf?template=certification&id=${encodeURIComponent(projectId)}&locale=${encodeURIComponent(locale)}&showEmitidoPor=${pdfOptions?.showEmitidoPor !== false ? '1' : '0'}&showFullCompanyData=${pdfOptions?.showFullCompanyData !== false ? '1' : '0'}`
           const res = await fetch(url, { credentials: 'include' })
           if (!res.ok) {
             const data = await res.json().catch(() => ({}))

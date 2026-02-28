@@ -885,6 +885,7 @@ model Party {
   orgId       String   @map("org_id")
   partyType   String   @map("party_type") // SUPPLIER|CLIENT|SUBCONTRACTOR
   name        String
+  category    String?  // e.g. MATERIAL|LABOR|EQUIPMENT|SUBCONTRACT|OTHER or custom
   taxId       String?  @map("tax_id")
   email       String?
   phone       String?
@@ -908,6 +909,7 @@ model Party {
 
   @@index([orgId, partyType])
   @@index([orgId, name])
+  @@index([orgId, category])
   @@map("parties")
   @@schema("public")
 }
@@ -1441,7 +1443,7 @@ model Commitment {
   approvedBy   OrgMember?         @relation("CommitmentApprovedBy", fields: [approvedByOrgMemberId], references: [id])
   lines        CommitmentLine[]
 
-  @@unique([orgId, commitmentNumber])
+  @@unique([orgId, projectId, commitmentNumber])
   @@index([projectId, status])
   @@map("commitments")
   @@schema("public")

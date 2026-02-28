@@ -65,6 +65,8 @@ export function GanttTimelineDynamic({
     taskId: string
     dragType: 'move' | 'resize-start' | 'resize-end'
     startX: number
+    initialStartDate: Date
+    initialEndDate: Date
     originalStartDate: Date
     originalEndDate: Date
   } | null>(null)
@@ -276,11 +278,42 @@ export function GanttTimelineDynamic({
   function drawTasks(ctx: CanvasRenderingContext2D) {
     tasks.forEach((task, idx) => {
       const y = GANTT_HEADER_HEIGHT + idx * GANTT_ROW_HEIGHT
+      const isDragging = dragState?.taskId === task.id
+
+      if (isDragging && dragState) {
+        const ghostStartDay = days.findIndex((d) =>
+          isSameDay(d, dragState.initialStartDate)
+        )
+        const ghostEndDay = days.findIndex((d) =>
+          isSameDay(d, dragState.initialEndDate)
+        )
+        if (
+          ghostStartDay !== -1 &&
+          ghostEndDay !== -1 &&
+          dragState.initialStartDate.getTime() !==
+            dragState.initialEndDate.getTime()
+        ) {
+          const ghostX = ghostStartDay * DAY_WIDTH
+          const ghostW = Math.max(
+            (ghostEndDay - ghostStartDay + 1) * DAY_WIDTH,
+            DAY_WIDTH * 0.5
+          )
+          const barY = y + 8
+          const barHeight = task.taskType === 'SUMMARY' ? 24 : 20
+          ctx.fillStyle = 'rgba(148, 163, 184, 0.35)'
+          ctx.strokeStyle = '#94a3b8'
+          ctx.setLineDash([4, 4])
+          ctx.lineWidth = 1.5
+          ctx.strokeRect(ghostX, barY, ghostW, barHeight)
+          ctx.fillRect(ghostX, barY, ghostW, barHeight)
+          ctx.setLineDash([])
+        }
+      }
 
       let startDate = task.startDate
       let endDate = task.endDate
 
-      if (dragState && dragState.taskId === task.id) {
+      if (isDragging && dragState) {
         startDate = dragState.originalStartDate
         endDate = dragState.originalEndDate
       }
@@ -501,6 +534,8 @@ export function GanttTimelineDynamic({
       taskId: task.id,
       dragType,
       startX: x,
+      initialStartDate: new Date(task.startDate),
+      initialEndDate: new Date(task.endDate),
       originalStartDate: new Date(task.startDate),
       originalEndDate: new Date(task.endDate),
     })

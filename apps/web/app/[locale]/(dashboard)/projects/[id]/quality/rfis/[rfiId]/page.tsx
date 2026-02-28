@@ -1,11 +1,13 @@
 import { notFound } from 'next/navigation'
-import Link from 'next/link'
+import { getTranslations } from 'next-intl/server'
 import { getSession } from '@/lib/session'
 import { getOrgContext } from '@/lib/org-context'
 import { hasMinimumRole } from '@/lib/rbac'
 import { prisma } from '@repo/database'
 import { RfiDetail } from '@/components/quality/rfi-detail'
 import { RfiCommentForm } from '@/components/quality/rfi-comment-form'
+import { Button } from '@/components/ui/button'
+import { Link } from '@/i18n/navigation'
 
 type PageProps = {
   params: Promise<{ id: string; rfiId: string }>
@@ -50,25 +52,26 @@ export default async function RfiDetailPage({ params }: PageProps) {
   if (!rfi) notFound()
 
   const canAnswer = hasMinimumRole(org.role, 'EDITOR')
+  const t = await getTranslations('quality')
 
   return (
-    <div className="p-6">
-      <div className="mb-6 flex items-center gap-4">
-        <Link
-          href={`/projects/${projectId}/quality/rfis`}
-          className="text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-        >
-          ← RFIs
-        </Link>
-        <span className="text-gray-400">|</span>
-        <Link
-          href={`/projects/${projectId}/quality`}
-          className="text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-        >
-          Quality
-        </Link>
+    <div className="erp-view-container space-y-6 bg-background">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="erp-section-header">
+          <h1 className="erp-page-title">RFI #{rfi.number}</h1>
+          <p className="erp-section-desc">{rfi.subject}</p>
+        </div>
+        <div className="flex shrink-0 gap-2">
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/projects/${projectId}/quality/rfis`}>← {t('rfis')}</Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/projects/${projectId}/quality`}>{t('title')}</Link>
+          </Button>
+        </div>
       </div>
 
+      <div className="rounded-xl border border-border/60 bg-card p-4 shadow-sm md:p-6">
       <RfiDetail
         rfi={{
           id: rfi.id,
@@ -89,9 +92,9 @@ export default async function RfiDetailPage({ params }: PageProps) {
         canAnswer={canAnswer}
       />
 
-      <div className="mt-6 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
-        <h3 className="mb-4 text-lg font-medium text-gray-900 dark:text-white">
-          Discussion
+      <div className="mt-6 border-t border-border pt-6">
+        <h3 className="mb-4 text-lg font-medium">
+          {t('comments')}
         </h3>
         <RfiCommentForm rfiId={rfiId} projectId={projectId} />
 
@@ -99,22 +102,23 @@ export default async function RfiDetailPage({ params }: PageProps) {
           {rfi.comments.map((comment) => (
             <div
               key={comment.id}
-              className="rounded-lg border border-gray-200 p-4 dark:border-gray-700"
+              className="rounded-lg border border-border p-4"
             >
               <div className="flex items-center justify-between">
-                <span className="font-medium text-gray-900 dark:text-white">
+                <span className="font-medium">
                   {comment.author.user.fullName}
                 </span>
-                <span className="text-sm text-gray-500">
+                <span className="text-sm text-muted-foreground">
                   {new Date(comment.createdAt).toLocaleString()}
                 </span>
               </div>
-              <p className="mt-2 text-gray-700 dark:text-gray-300">
+              <p className="mt-2 text-muted-foreground">
                 {comment.comment}
               </p>
             </div>
           ))}
         </div>
+      </div>
       </div>
     </div>
   )

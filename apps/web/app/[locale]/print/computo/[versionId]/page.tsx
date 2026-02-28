@@ -7,6 +7,7 @@ import { formatCurrency } from '@/lib/format-utils'
 
 type PageProps = {
   params: Promise<{ versionId: string }>
+  searchParams?: Promise<Record<string, string | string[] | undefined>>
 }
 
 type ComputeRow = {
@@ -18,8 +19,9 @@ type ComputeRow = {
   total: number
 }
 
-export default async function PrintComputoPage({ params }: PageProps) {
+export default async function PrintComputoPage({ params, searchParams }: PageProps) {
   const { versionId } = await params
+  const sp = searchParams ? await searchParams : {}
 
   const [version, lines] = await Promise.all([
     getBudgetVersion(versionId),
@@ -77,6 +79,7 @@ export default async function PrintComputoPage({ params }: PageProps) {
     <PrintDocumentShell
       templateId="computo"
       id={versionId}
+      query={sp}
       project={{ name: project.name, projectNumber: project.projectNumber }}
     >
       <div className="mb-6">

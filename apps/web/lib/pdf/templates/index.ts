@@ -9,6 +9,7 @@ import { cashflowTemplate } from './cashflow.template'
 import { financeDashboardTemplate } from './finance-dashboard.template'
 import { projectDashboardTemplate } from './project-dashboard.template'
 import { purchasesBySupplierTemplate } from './purchases-by-supplier.template'
+import { purchaseOrderTemplate } from './purchase-order.template'
 
 export const documentTemplates = {
   computo: computoTemplate,
@@ -21,6 +22,7 @@ export const documentTemplates = {
   'finance-dashboard': financeDashboardTemplate,
   'project-dashboard': projectDashboardTemplate,
   'purchases-by-supplier': purchasesBySupplierTemplate,
+  'purchase-order': purchaseOrderTemplate,
 } as const
 
 export type DocumentTemplateId = keyof typeof documentTemplates

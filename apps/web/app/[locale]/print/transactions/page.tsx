@@ -76,7 +76,7 @@ export default async function PrintTransactionsPage({ searchParams }: PageProps)
   if (dateTo) query.dateTo = dateTo
 
   return (
-    <PrintDocumentShell templateId="transactions" query={query}>
+    <PrintDocumentShell templateId="transactions" query={sp}>
       <div className="space-y-4">
         <h2 className="text-lg font-semibold">Transacciones de Empresa</h2>
         <PrintTable<Row>

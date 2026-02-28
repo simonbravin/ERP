@@ -33,10 +33,14 @@ export function CashflowExportToolbar({ dateFrom, dateTo }: Props) {
     dateTo: dateTo.toISOString().split('T')[0],
   }
 
-  async function handleExport(format: 'excel' | 'pdf', selectedColumns: string[]) {
+  async function handleExport(
+    format: 'excel' | 'pdf',
+    selectedColumns: string[],
+    pdfOptions?: { showEmitidoPor: boolean; showFullCompanyData: boolean }
+  ) {
     if (format === 'excel') return exportCompanyCashflowToExcel(params, selectedColumns)
     const locale = typeof window !== 'undefined' ? document.documentElement.lang || 'es' : 'es'
-    const url = `/api/pdf?template=cashflow&locale=${encodeURIComponent(locale)}&from=${encodeURIComponent(params.dateFrom)}&to=${encodeURIComponent(params.dateTo)}`
+    const url = `/api/pdf?template=cashflow&locale=${encodeURIComponent(locale)}&from=${encodeURIComponent(params.dateFrom)}&to=${encodeURIComponent(params.dateTo)}&showEmitidoPor=${pdfOptions?.showEmitidoPor !== false ? '1' : '0'}&showFullCompanyData=${pdfOptions?.showFullCompanyData !== false ? '1' : '0'}`
     const res = await fetch(url, { credentials: 'include' })
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
@@ -71,6 +75,7 @@ export function CashflowExportToolbar({ dateFrom, dateTo }: Props) {
         title={t('exportCashflowTitle', { defaultValue: 'Exportar flujo de caja (según período actual)' })}
         columns={CASHFLOW_EXPORT_COLUMNS}
         onExport={handleExport}
+        showPdfOptions
       />
     </>
   )

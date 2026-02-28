@@ -78,6 +78,8 @@ export function getHeaderMeta(
       return partyId
         ? { folioLabel: 'Proveedor', folioValue: partyId }
         : {}
+    case 'purchase-order':
+      return id ? { folioLabel: 'OC', folioValue: id } : {}
     default:
       return {}
   }

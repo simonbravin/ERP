@@ -1,9 +1,11 @@
 import { redirectToLogin, redirectTo } from '@/lib/i18n-redirect'
-import Link from 'next/link'
+import { getTranslations } from 'next-intl/server'
 import { getSession } from '@/lib/session'
 import { getOrgContext } from '@/lib/org-context'
 import { prisma } from '@repo/database'
 import { RfiForm } from '@/components/quality/rfi-form'
+import { Button } from '@/components/ui/button'
+import { Link } from '@/i18n/navigation'
 
 type PageProps = {
   params: Promise<{ id: string }>
@@ -38,24 +40,26 @@ export default async function NewRfiPage({ params }: PageProps) {
     }),
   ])
 
+  const t = await getTranslations('quality')
   return (
-    <div className="p-6">
-      <div className="mb-6 flex items-center gap-4">
-        <Link
-          href={`/projects/${projectId}/quality/rfis`}
-          className="text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-        >
-          ← RFIs
-        </Link>
+    <div className="erp-view-container space-y-6 bg-background">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="erp-section-header">
+          <h1 className="erp-page-title">{t('newRfi')}</h1>
+          <p className="erp-section-desc">{project.name}</p>
+        </div>
+        <Button asChild variant="outline" size="sm">
+          <Link href={`/projects/${projectId}/quality/rfis`}>← {t('rfis')}</Link>
+        </Button>
       </div>
-      <h1 className="mb-6 text-2xl font-semibold text-gray-900 dark:text-white">
-        New RFI
-      </h1>
-      <RfiForm
-        projectId={projectId}
-        wbsNodes={wbsNodes}
-        orgMembers={orgMembers}
-      />
+
+      <div className="rounded-xl border border-border/60 bg-card p-4 shadow-sm md:p-6">
+        <RfiForm
+          projectId={projectId}
+          wbsNodes={wbsNodes}
+          orgMembers={orgMembers}
+        />
+      </div>
     </div>
   )
 }

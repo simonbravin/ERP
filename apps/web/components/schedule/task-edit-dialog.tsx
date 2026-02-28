@@ -39,6 +39,13 @@ interface TaskEditDialogProps {
   }
   workingDaysPerWeek: number
   canEdit: boolean
+  dependencies?: Array<{
+    id: string
+    predecessorName: string
+    successorName: string
+    type: string
+  }>
+  onOpenDependencies?: () => void
 }
 
 export function TaskEditDialog({

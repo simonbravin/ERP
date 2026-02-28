@@ -68,7 +68,7 @@ export default async function PrintCashflowPage({ searchParams }: PageProps) {
     },
   ]
 
-  const query: Record<string, string | undefined> = {}
+  const query: Record<string, string | string[] | undefined> = { ...sp }
   if (fromStr) query.from = fromStr
   if (toStr) query.to = toStr
 

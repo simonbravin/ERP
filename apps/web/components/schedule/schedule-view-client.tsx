@@ -14,9 +14,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { toast } from 'sonner'
 import {
   setScheduleAsBaseline,
+  approveSchedule,
   updateTaskDates,
 } from '@/app/actions/schedule'
 import type { getScheduleForView } from '@/app/actions/schedule'
@@ -26,6 +28,7 @@ import {
   CheckCircle2,
   Download,
   Loader2,
+  AlertTriangle,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -55,6 +58,7 @@ export function ScheduleViewClient({
   useMessageBus('PROJECT.UPDATED', () => router.refresh())
 
   const [exporting, setExporting] = useState(false)
+  const [approving, setApproving] = useState(false)
 
   const [zoom, setZoom] = useState<'day' | 'week' | 'month'>('week')
   const [showCriticalPath, setShowCriticalPath] = useState(true)
@@ -207,11 +211,22 @@ export function ScheduleViewClient({
       (1000 * 60 * 60 * 24)
   )
 
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const delayedTasks = schedule.tasks.filter(
+    (t: (typeof schedule.tasks)[0]) => {
+      if (t.taskType !== 'TASK' || Number(t.progressPercent) >= 100) return false
+      const planEnd = new Date(t.plannedEndDate)
+      planEnd.setHours(0, 0, 0, 0)
+      return planEnd.getTime() < today.getTime()
+    }
+  )
+
   async function handleExportPDF() {
     setExporting(true)
     try {
       const locale = typeof document !== 'undefined' ? document.documentElement.lang || 'es' : 'es'
-      const url = `/api/pdf?template=schedule&id=${encodeURIComponent(schedule.id)}&locale=${encodeURIComponent(locale)}`
+      const url = `/api/pdf?template=schedule&id=${encodeURIComponent(schedule.id)}&locale=${encodeURIComponent(locale)}&showEmitidoPor=1&showFullCompanyData=1`
       const res = await fetch(url, { credentials: 'include' })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
@@ -246,6 +261,23 @@ export function ScheduleViewClient({
       }
     } catch {
       toast.error(t('baselineSetError'))
+    }
+  }
+
+  async function handleApproveSchedule() {
+    setApproving(true)
+    try {
+      const result = await approveSchedule(schedule.id)
+      if (result.success) {
+        toast.success(t('approveScheduleSuccess'))
+        router.refresh()
+      } else {
+        toast.error(result.error ?? t('approveScheduleError'))
+      }
+    } catch {
+      toast.error(t('approveScheduleError'))
+    } finally {
+      setApproving(false)
     }
   }
 
@@ -473,6 +505,11 @@ export function ScheduleViewClient({
             >
               {schedule.status}
             </Badge>
+            {!canEdit && schedule.status !== 'DRAFT' && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {t('editOnlyInDraft')}
+              </p>
+            )}
           </div>
           {schedule.isBaseline && (
             <div className="rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-800">
@@ -503,6 +540,21 @@ export function ScheduleViewClient({
                 {t('setAsBaseline')}
               </Button>
             )}
+          {canSetBaseline &&
+            (schedule.status === 'DRAFT' || schedule.status === 'BASELINE') && (
+              <Button
+                onClick={handleApproveSchedule}
+                disabled={approving}
+                variant="default"
+              >
+                {approving ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                )}
+                {t('approveSchedule')}
+              </Button>
+            )}
           <Button
             onClick={handleExportPDF}
             disabled={exporting}
@@ -522,6 +574,16 @@ export function ScheduleViewClient({
           </Button>
         </div>
       </div>
+
+      {delayedTasks.length > 0 && (
+        <Alert variant="destructive" className="border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>{t('delayedTasksAlert')}</AlertTitle>
+          <AlertDescription>
+            {t('delayedTasksAlertDesc', { count: delayedTasks.length })}
+          </AlertDescription>
+        </Alert>
+      )}
 
       <GanttControlPanel
         showCriticalPath={showCriticalPath}
@@ -557,10 +619,11 @@ export function ScheduleViewClient({
           />
         </div>
 
-        <div className="flex h-[520px] overflow-hidden rounded-lg border border-border">
-          <div className="flex min-h-0 flex-1 overflow-auto">
-            <div className="min-w-[420px] shrink-0 border-r border-border">
-              <GanttDataTable
+        <div className="overflow-hidden rounded-lg border border-border">
+          <div className="flex h-[520px] min-h-0">
+            <div className="flex min-h-0 flex-1 overflow-auto">
+              <div className="min-w-[420px] shrink-0 border-r border-border">
+                <GanttDataTable
                 tasks={visibleTableTasks}
                 allTasks={tableTasks}
                 expandedNodes={expandedNodes}
@@ -591,7 +654,49 @@ export function ScheduleViewClient({
             highlightedTask={highlightedTask}
             onTaskHover={setHighlightedTask}
           />
+              </div>
             </div>
+          </div>
+          <div
+            className="flex flex-wrap items-center gap-4 border-t border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground"
+            role="img"
+            aria-label={t('legendCriticalPath')}
+          >
+          <span className="flex items-center gap-1.5">
+            <span
+              className="h-3 w-6 rounded-sm border border-red-800 bg-red-500"
+              aria-hidden
+            />
+            {t('legendCriticalPath')}
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span
+              className="h-0.5 w-4 border-t-2 border-dashed border-red-600"
+              aria-hidden
+            />
+            {t('legendToday')}
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span
+              className="h-3 w-6 rounded-sm border border-blue-800 bg-blue-500"
+              aria-hidden
+            />
+            {t('legendTask')}
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span
+              className="h-3 w-5 rounded-sm border border-cyan-800 bg-cyan-500"
+              aria-hidden
+            />
+            {t('legendSummary')}
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span
+              className="inline-block h-3 w-3 rotate-45 border border-amber-700 bg-amber-500"
+              aria-hidden
+            />
+            {t('legendMilestone')}
+          </span>
           </div>
         </div>
       </div>

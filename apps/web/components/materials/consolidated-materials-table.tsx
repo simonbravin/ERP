@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, Fragment } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations, useLocale } from 'next-intl'
 import { formatCurrency, formatCurrencyForDisplay, formatNumber } from '@/lib/format-utils'
 import {
   Table,
@@ -46,6 +46,8 @@ export function ConsolidatedMaterialsTable({
   onExport,
 }: ConsolidatedMaterialsTableProps) {
   const t = useTranslations('materials')
+  const locale = useLocale()
+  const searchPlaceholder = locale === 'es' ? 'Buscar materiales o proveedor...' : 'Search materials or supplier...'
   const [showExportDialog, setShowExportDialog] = useState(false)
 
   const exportColumns = [
@@ -57,12 +59,16 @@ export function ConsolidatedMaterialsTable({
     { field: 'totalCost', label: t('totalCost'), defaultVisible: true },
   ]
 
-  async function handleExport(format: 'excel' | 'pdf', selectedColumns: string[]) {
+  async function handleExport(
+    format: 'excel' | 'pdf',
+    selectedColumns: string[],
+    pdfOptions?: { showEmitidoPor: boolean; showFullCompanyData: boolean }
+  ) {
     if (format === 'excel') {
       return await exportMaterialsToExcel(budgetVersionId, selectedColumns)
     }
     const locale = typeof window !== 'undefined' ? document.documentElement.lang || 'es' : 'es'
-    const url = `/api/pdf?template=materials&id=${encodeURIComponent(budgetVersionId)}&locale=${encodeURIComponent(locale)}`
+    const url = `/api/pdf?template=materials&id=${encodeURIComponent(budgetVersionId)}&locale=${encodeURIComponent(locale)}&showEmitidoPor=${pdfOptions?.showEmitidoPor !== false ? '1' : '0'}&showFullCompanyData=${pdfOptions?.showFullCompanyData !== false ? '1' : '0'}`
     const res = await fetch(url, { credentials: 'include' })
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
@@ -90,11 +96,12 @@ export function ConsolidatedMaterialsTable({
   const filteredMaterials = useMemo(() => {
     let filtered = materials
     if (searchQuery) {
-      const query = searchQuery.toLowerCase()
+      const query = searchQuery.toLowerCase().trim()
       filtered = filtered.filter(
         (m) =>
           m.name.toLowerCase().includes(query) ||
-          (m.description?.toLowerCase() ?? '').includes(query)
+          (m.description?.toLowerCase() ?? '').includes(query) ||
+          (m.suppliers?.some((s) => s.name?.toLowerCase().includes(query)) ?? false)
       )
     }
     filtered = [...filtered].sort((a, b) => {
@@ -168,7 +175,7 @@ export function ConsolidatedMaterialsTable({
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder={t('searchMaterials')}
+            placeholder={searchPlaceholder}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
@@ -501,6 +508,7 @@ export function ConsolidatedMaterialsTable({
         title={t('title')}
         columns={exportColumns}
         onExport={handleExport}
+        showPdfOptions
       />
     </div>
   )

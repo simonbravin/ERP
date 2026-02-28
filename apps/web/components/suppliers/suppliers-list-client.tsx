@@ -16,9 +16,10 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Card, CardContent } from '@/components/ui/card'
-import { Search, List, Grid3x3, Building2 } from 'lucide-react'
+import { Search, List, Grid3x3, Building2, Pencil, ArrowUpDown } from 'lucide-react'
 import { SupplierSearch } from './supplier-search'
 import { GlobalSupplierCard } from './global-supplier-card'
+import { PartyDetailDialog } from './party-detail-dialog'
 
 type LinkedSupplier = {
   id: string
@@ -39,6 +40,7 @@ type LocalSupplier = {
   email: string | null
   phone: string | null
   city: string | null
+  category?: string | null
 }
 
 type GlobalParty = {
@@ -61,6 +63,7 @@ type SuppliersListClientProps = {
   localClients: LocalSupplier[]
   globalSearchResults: GlobalParty[]
   canAddLocal: boolean
+  canEditLocal: boolean
 }
 
 export function SuppliersListClient({
@@ -69,6 +72,7 @@ export function SuppliersListClient({
   localSuppliers,
   localClients,
   globalSearchResults,
+  canEditLocal,
 }: SuppliersListClientProps) {
   const t = useTranslations('suppliers')
   const router = useRouter()
@@ -80,11 +84,16 @@ export function SuppliersListClient({
   const [localPartyTypeFilter, setLocalPartyTypeFilter] = useState<'all' | 'suppliers' | 'clients'>(
     filterParam === 'suppliers' || filterParam === 'clients' ? filterParam : 'all'
   )
+  const currentTab = (searchParams.get('tab') as 'linked' | 'local' | 'directory') || defaultTab
+  const [detailPartyId, setDetailPartyId] = useState<string | null>(null)
+  const [localSortBy, setLocalSortBy] = useState<'name' | 'category' | null>(null)
 
   const categories = Array.from(
     new Set([
       ...linkedSuppliers.map((l) => l.globalParty.category),
       ...globalSearchResults.map((g) => g.category),
+      ...localSuppliers.map((s) => s.category).filter(Boolean),
+      ...localClients.map((s) => s.category).filter(Boolean),
     ])
   ).filter(Boolean).sort()
 
@@ -113,16 +122,26 @@ export function SuppliersListClient({
       )
     : localClients
   type LocalPartyItem = LocalSupplier & { partyType: 'SUPPLIER' | 'CLIENT' }
-  const filteredLocalByType: LocalPartyItem[] =
+  const localSuppliersWithType = localSuppliersFilteredBySearch.map((s) => ({ ...s, partyType: 'SUPPLIER' as const }))
+  const localClientsWithType = localClientsFilteredBySearch.map((s) => ({ ...s, partyType: 'CLIENT' as const }))
+  const mergedLocal: LocalPartyItem[] =
     localPartyTypeFilter === 'suppliers'
-      ? localSuppliersFilteredBySearch.map((s) => ({ ...s, partyType: 'SUPPLIER' as const }))
+      ? localSuppliersWithType
       : localPartyTypeFilter === 'clients'
-        ? localClientsFilteredBySearch.map((s) => ({ ...s, partyType: 'CLIENT' as const }))
-        : [
-            ...localSuppliersFilteredBySearch.map((s) => ({ ...s, partyType: 'SUPPLIER' as const })),
-            ...localClientsFilteredBySearch.map((s) => ({ ...s, partyType: 'CLIENT' as const })),
-          ].sort((a, b) => a.name.localeCompare(b.name))
+        ? localClientsWithType
+        : [...localSuppliersWithType, ...localClientsWithType].sort((a, b) => a.name.localeCompare(b.name))
+  const filteredLocalByType = selectedCategory
+    ? mergedLocal.filter((s) => (s.category ?? '') === selectedCategory)
+    : mergedLocal
   const filteredLocal = filteredLocalByType
+  const sortedLocal =
+    localSortBy === 'name'
+      ? [...filteredLocal].sort((a, b) => a.name.localeCompare(b.name))
+      : localSortBy === 'category'
+        ? [...filteredLocal].sort((a, b) =>
+            (a.category ?? '').localeCompare(b.category ?? '')
+          )
+        : filteredLocal
 
   function handleSearch() {
     const params = new URLSearchParams(searchParams.toString())
@@ -154,80 +173,67 @@ export function SuppliersListClient({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4 md:flex-row md:items-end">
-        <div className="flex-1">
-          <label className="mb-2 block text-sm font-medium">{t('search')}</label>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder={t('searchPlaceholder')}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              className="pl-9"
-            />
-          </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder={t('searchPlaceholder')}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+            className="pl-9"
+          />
         </div>
+        <Button onClick={handleSearch}>{t('filter')}</Button>
+        <Button variant="outline" onClick={handleClearFilters}>
+          {t('clearFilters')}
+        </Button>
         {categories.length > 0 && (
-          <div className="w-full md:w-48">
-            <label className="mb-2 block text-sm font-medium">{t('category')}</label>
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="flex h-10 w-full rounded-md border border-input bg-card dark:bg-background px-3 py-2 text-sm"
-            >
-              <option value="">{t('debtFilterAll')}</option>
-              {categories.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat.replace(/_/g, ' ')}
-                </option>
-              ))}
-            </select>
-          </div>
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            className="flex h-10 rounded-md border border-input bg-card dark:bg-background px-3 py-2 text-sm"
+          >
+            <option value="">{t('debtFilterAll')}</option>
+            {categories.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat.replace(/_/g, ' ')}
+              </option>
+            ))}
+          </select>
         )}
-        <div className="flex gap-2">
-          <Button onClick={handleSearch}>{t('filter')}</Button>
-          <Button variant="outline" onClick={handleClearFilters}>
-            {t('clearFilters')}
-          </Button>
-        </div>
       </div>
 
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          {(defaultTab === 'linked' ? filteredLinked.length : defaultTab === 'local' ? filteredLocal.length : globalSearchResults.length)}{' '}
-          {(defaultTab === 'linked' ? filteredLinked.length : defaultTab === 'local' ? filteredLocal.length : globalSearchResults.length) === 1 ? t('oneSupplier') : t('manySuppliers')}
-        </p>
-        <div className="flex gap-2">
-          <Button
-            variant={viewMode === 'table' ? 'secondary' : 'ghost'}
-            size="sm"
-            onClick={() => setViewMode('table')}
-          >
-            <List className="mr-2 h-4 w-4" />
-            {t('table')}
-          </Button>
-          <Button
-            variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
-            size="sm"
-            onClick={() => setViewMode('grid')}
-          >
-            <Grid3x3 className="mr-2 h-4 w-4" />
-            {t('cards')}
-          </Button>
+      <Tabs value={currentTab} onValueChange={handleTabChange}>
+        <div className="flex flex-wrap items-center gap-4">
+          <TabsList>
+            <TabsTrigger value="linked">
+              {t('linked')} ({linkedSuppliers.length})
+            </TabsTrigger>
+            <TabsTrigger value="local">
+              {t('myDirectory', { defaultValue: 'Mi directorio' })} ({localSuppliers.length + localClients.length})
+            </TabsTrigger>
+            <TabsTrigger value="directory">{t('global')}</TabsTrigger>
+          </TabsList>
+          <div className="flex gap-2 ml-auto">
+            <Button
+              variant={viewMode === 'table' ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('table')}
+            >
+              <List className="mr-2 h-4 w-4" />
+              {t('table')}
+            </Button>
+            <Button
+              variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('grid')}
+            >
+              <Grid3x3 className="mr-2 h-4 w-4" />
+              {t('cards')}
+            </Button>
+          </div>
         </div>
-      </div>
-
-      <Tabs value={defaultTab} onValueChange={handleTabChange}>
-        <TabsList>
-          <TabsTrigger value="linked">
-            {t('linked')} ({linkedSuppliers.length})
-          </TabsTrigger>
-          <TabsTrigger value="local">
-            {t('local')} ({localSuppliers.length + localClients.length})
-          </TabsTrigger>
-          <TabsTrigger value="directory">{t('global')}</TabsTrigger>
-        </TabsList>
 
         <TabsContent value="linked" className="mt-4">
           {filteredLinked.length === 0 ? (
@@ -248,7 +254,7 @@ export function SuppliersListClient({
                     <TableHead className="w-[100px]">{t('verified')}</TableHead>
                     <TableHead className="w-[100px]">{t('preferred')}</TableHead>
                     <TableHead>{t('contact')}</TableHead>
-                    <TableHead className="w-[120px]">{t('viewDetails')}</TableHead>
+                    <TableHead className="w-[120px]">{t('view')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -289,7 +295,7 @@ export function SuppliersListClient({
                           href={`/suppliers/global/${link.globalParty.id}`}
                           className="text-sm text-primary hover:underline"
                         >
-                          {t('viewDetails')} →
+                          {t('view')} →
                         </Link>
                       </TableCell>
                     </TableRow>
@@ -334,7 +340,7 @@ export function SuppliersListClient({
                       href={`/suppliers/global/${link.globalParty.id}`}
                       className="mt-3 inline-block text-sm text-primary hover:underline"
                     >
-                      {t('viewDetails')} →
+                      {t('view')} →
                     </Link>
                   </CardContent>
                 </Card>
@@ -378,57 +384,105 @@ export function SuppliersListClient({
                 <Link href="/suppliers/local/new">{t('addLocalSupplier')}</Link>
               </Button>
             </div>
-          ) : viewMode === 'table' ? (
+          ) : (
+            <>
+              {viewMode === 'table' ? (
             <div className="rounded-lg border border-border bg-card overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[220px]">{t('name')}</TableHead>
+                    <TableHead className="w-[220px]">
+                      <button
+                        type="button"
+                        onClick={() => setLocalSortBy((prev) => (prev === 'name' ? null : 'name'))}
+                        className="inline-flex items-center gap-1.5 font-medium hover:text-foreground"
+                      >
+                        {t('name')}
+                        {localSortBy === 'name' && <ArrowUpDown className="h-3.5 w-3.5" />}
+                      </button>
+                    </TableHead>
+                    <TableHead className="w-[140px]">
+                      <button
+                        type="button"
+                        onClick={() => setLocalSortBy((prev) => (prev === 'category' ? null : 'category'))}
+                        className="inline-flex items-center gap-1.5 font-medium hover:text-foreground"
+                      >
+                        {t('category')}
+                        {localSortBy === 'category' && <ArrowUpDown className="h-3.5 w-3.5" />}
+                      </button>
+                    </TableHead>
                     <TableHead>{t('email')}</TableHead>
                     <TableHead>{t('phone')}</TableHead>
                     <TableHead>{t('city')}</TableHead>
+                    {canEditLocal && (
+                      <TableHead className="w-[100px] text-right">{t('edit')}</TableHead>
+                    )}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredLocal.map((s) => (
+                  {sortedLocal.map((s) => (
                     <TableRow key={`${s.partyType}-${s.id}`}>
                       <TableCell className="font-medium">
-                        {s.partyType === 'SUPPLIER' ? (
-                          <Link
-                            href={`/suppliers/local/${s.id}`}
-                            className="hover:underline text-foreground"
-                          >
-                            {s.name}
-                          </Link>
-                        ) : (
-                          s.name
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => setDetailPartyId(s.id)}
+                          className="hover:underline text-foreground text-left font-medium"
+                        >
+                          {s.name}
+                        </button>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {s.category ? s.category.replace(/_/g, ' ') : '—'}
                       </TableCell>
                       <TableCell className="text-muted-foreground">{s.email ?? '—'}</TableCell>
                       <TableCell className="text-muted-foreground">{s.phone ?? '—'}</TableCell>
                       <TableCell className="text-muted-foreground">{s.city ?? '—'}</TableCell>
+                      {canEditLocal && (
+                        <TableCell className="text-right">
+                          <Link
+                            href={`/suppliers/local/${s.id}/edit`}
+                            className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                          >
+                            <Pencil className="h-4 w-4" />
+                            {t('edit')}
+                          </Link>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             </div>
-          ) : (
+              ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {filteredLocal.map((s) => (
+              {sortedLocal.map((s) => (
                 <Card key={`${s.partyType}-${s.id}`} className="transition-colors hover:bg-muted/50">
                   <CardContent className="p-4">
-                    <h3 className="font-medium">
-                      {s.partyType === 'SUPPLIER' ? (
-                        <Link
-                          href={`/suppliers/local/${s.id}`}
-                          className="hover:underline text-foreground"
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="font-medium">
+                        <button
+                          type="button"
+                          onClick={() => setDetailPartyId(s.id)}
+                          className="hover:underline text-foreground text-left"
                         >
                           {s.name}
+                        </button>
+                      </h3>
+                      {canEditLocal && (
+                        <Link
+                          href={`/suppliers/local/${s.id}/edit`}
+                          className="inline-flex items-center gap-1 text-sm text-primary hover:underline shrink-0"
+                        >
+                          <Pencil className="h-4 w-4" />
+                          {t('edit')}
                         </Link>
-                      ) : (
-                        s.name
                       )}
-                    </h3>
+                    </div>
+                    {s.category && (
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {t('category')}: {s.category.replace(/_/g, ' ')}
+                      </p>
+                    )}
                     <p className="mt-1 text-sm text-muted-foreground">{t('email')}: {s.email ?? '—'}</p>
                     <p className="text-sm text-muted-foreground">{t('phone')}: {s.phone ?? '—'}</p>
                     <p className="text-sm text-muted-foreground">{t('city')}: {s.city ?? '—'}</p>
@@ -436,8 +490,17 @@ export function SuppliersListClient({
                 </Card>
               ))}
             </div>
+              )}
+            </>
           )}
         </TabsContent>
+
+        <PartyDetailDialog
+          open={!!detailPartyId}
+          onOpenChange={(open) => !open && setDetailPartyId(null)}
+          partyId={detailPartyId}
+          canEdit={canEditLocal}
+        />
 
         <TabsContent value="directory" className="mt-4">
           <SupplierSearch

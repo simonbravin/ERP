@@ -37,9 +37,15 @@ interface BudgetTreeNode {
 interface BudgetClientViewProps {
   data: BudgetTreeNode[]
   projectTotal: number
+  globalMarkups?: {
+    overheadPct: number
+    financialPct: number
+    profitPct: number
+    taxPct: number
+  }
 }
 
-export function BudgetClientView({ data, projectTotal }: BudgetClientViewProps) {
+export function BudgetClientView({ data, projectTotal, globalMarkups }: BudgetClientViewProps) {
   const t = useTranslations('budget')
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())
 
@@ -54,14 +60,26 @@ export function BudgetClientView({ data, projectTotal }: BudgetClientViewProps) 
   }
 
   /**
-   * Precio de venta: GG sobre costo directo → Subtotal 1; GF y Beneficio sobre Subtotal 1 → Subtotal 2; IVA sobre Subtotal 2 → Total
+   * Precio de venta: GG sobre costo directo → Subtotal 1; GF y Beneficio sobre Subtotal 1 → Subtotal 2; IVA sobre Subtotal 2 → Total.
+   * Usa márgenes de la línea si existen; si no (o son 0), márgenes globales.
    */
+  function pct(lineVal: number | null | undefined, globalVal: number | undefined): number {
+    if (lineVal != null && lineVal !== undefined && Number(lineVal) !== 0) {
+      return Number(lineVal)
+    }
+    return globalVal ?? 0
+  }
+
   function calculateSalePrice(line: (BudgetTreeNode['lines'][0])): number {
     const directUnitCost =
       Number(line.directCostTotal) / Number(line.quantity)
-    const sub1 = directUnitCost * (1 + Number(line.overheadPct) / 100)
-    const sub2 = sub1 * (1 + Number(line.financialPct) / 100 + Number(line.profitPct) / 100)
-    return sub2 * (1 + Number(line.taxPct) / 100)
+    const overheadPct = pct(line.overheadPct, globalMarkups?.overheadPct)
+    const financialPct = pct(line.financialPct, globalMarkups?.financialPct)
+    const profitPct = pct(line.profitPct, globalMarkups?.profitPct)
+    const taxPct = pct(line.taxPct, globalMarkups?.taxPct)
+    const sub1 = directUnitCost * (1 + overheadPct / 100)
+    const sub2 = sub1 * (1 + financialPct / 100 + profitPct / 100)
+    return sub2 * (1 + taxPct / 100)
   }
 
   /** Roll-up: parents show only sum of children; leaves show lines total. */
@@ -129,7 +147,7 @@ export function BudgetClientView({ data, projectTotal }: BudgetClientViewProps) 
           <TableCell className="py-1 px-2" />
           <TableCell className="py-1 px-2" />
           <TableCell className="py-1 px-2" />
-          <TableCell className="py-1 px-2 text-right">
+          <TableCell className="py-1 px-2 text-right whitespace-nowrap">
             <span className="font-mono text-xs font-semibold tabular-nums text-blue-700">
               {formatCurrency(nodeTotal)}
             </span>
@@ -173,13 +191,13 @@ export function BudgetClientView({ data, projectTotal }: BudgetClientViewProps) 
                   </span>
                 </TableCell>
 
-                <TableCell className="py-1 px-2 text-right">
+                <TableCell className="py-1 px-2 text-right whitespace-nowrap">
                   <span className="font-mono text-xs tabular-nums text-slate-700">
                     {formatCurrency(salePrice)}
                   </span>
                 </TableCell>
 
-                <TableCell className="py-1 px-2 text-right">
+                <TableCell className="py-1 px-2 text-right whitespace-nowrap">
                   <span className="font-mono text-xs font-semibold tabular-nums text-blue-700">
                     {formatCurrency(totalSale)}
                   </span>
@@ -224,10 +242,10 @@ export function BudgetClientView({ data, projectTotal }: BudgetClientViewProps) 
             <TableHead className="text-foreground text-xs py-1 px-2 text-right w-[80px]">
               {t('quantity')}
             </TableHead>
-            <TableHead className="text-foreground text-xs py-1 px-2 text-right w-[100px]">
+            <TableHead className="text-foreground text-xs py-1 px-2 text-right min-w-[130px] w-[130px]">
               {t('unitPrice')}
             </TableHead>
-            <TableHead className="text-foreground text-xs py-1 px-2 text-right w-[120px]">
+            <TableHead className="text-foreground text-xs py-1 px-2 text-right min-w-[140px] w-[140px]">
               {t('total')}
             </TableHead>
             <TableHead className="text-foreground text-xs py-1 px-2 text-right w-[70px]">
@@ -242,14 +260,14 @@ export function BudgetClientView({ data, projectTotal }: BudgetClientViewProps) 
             </Fragment>
           ))}
 
-          {/* Grand Total */}
+          {/* Grand Total: use projectTotal (server) so it matches Desglose/Totales */}
           <TableRow className="h-9 border-t-2 border-border bg-muted font-bold">
             <TableCell colSpan={4} className="text-right text-sm py-1 px-2 text-foreground">
               {t('totalSale')}:
             </TableCell>
-            <TableCell className="text-right text-base py-1 px-2">
+            <TableCell className="text-right text-base py-1 px-2 min-w-[140px] whitespace-nowrap">
               <span className="font-mono tabular-nums text-primary">
-                {formatCurrency(grandTotal)}
+                {formatCurrency(projectTotal > 0 ? projectTotal : grandTotal)}
               </span>
             </TableCell>
             <TableCell className="text-right text-xs py-1 px-2">

@@ -24,6 +24,10 @@ type DocumentHeaderProps = {
   folioValue?: string | null
   /** User name or email who issued the document */
   issuedBy?: string | null
+  /** Show "Emitido por" line (default true). Aligns with budget PDF options. */
+  showEmitidoPor?: boolean
+  /** Show full company data block: legal ID, address, email, phone (default true). If false, only org name. */
+  showFullCompanyData?: boolean
 }
 
 export function DocumentHeader({
@@ -42,6 +46,8 @@ export function DocumentHeader({
   folioLabel,
   folioValue,
   issuedBy,
+  showEmitidoPor = true,
+  showFullCompanyData = true,
 }: DocumentHeaderProps) {
   const displayName = (orgLegalName || orgName).trim() || '—'
   const dateStr = date.toLocaleDateString('es-AR', {
@@ -57,7 +63,7 @@ export function DocumentHeader({
         ? `ID Fiscal: ${String(taxId).trim()}`
         : null
 
-  const hasLegal = [legalLine, address, email, phone].some((v) => v != null && String(v).trim() !== '')
+  const hasLegal = showFullCompanyData && [legalLine, address, email, phone].some((v) => v != null && String(v).trim() !== '')
   const showFolioBlock =
     (folioLabel != null && folioValue != null && folioLabel !== '' && folioValue !== '') ||
     (folio != null && folio !== '')
@@ -103,7 +109,7 @@ export function DocumentHeader({
           {showFolioBlock && folioDisplay && (
             <span className="print-document-header__folio">{folioDisplay}</span>
           )}
-          {issuedBy != null && issuedBy !== '' && (
+          {showEmitidoPor && issuedBy != null && issuedBy !== '' && (
             <span className="print-document-header__issued-by">Emitido por: {issuedBy}</span>
           )}
         </div>

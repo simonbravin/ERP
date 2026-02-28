@@ -319,7 +319,7 @@ export async function createPurchaseOrderCommitment(
   }
 
   const existing = await prisma.commitment.findMany({
-    where: { orgId: org.orgId, commitmentType: 'PO', deleted: false },
+    where: { orgId: org.orgId, projectId, commitmentType: 'PO', deleted: false },
     orderBy: { commitmentNumber: 'desc' },
     take: 1,
     select: { commitmentNumber: true },

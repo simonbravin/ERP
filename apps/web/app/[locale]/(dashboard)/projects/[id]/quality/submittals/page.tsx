@@ -1,10 +1,12 @@
 import { redirectToLogin, redirectTo } from '@/lib/i18n-redirect'
-import Link from 'next/link'
+import { getTranslations } from 'next-intl/server'
 import { getSession } from '@/lib/session'
 import { getOrgContext } from '@/lib/org-context'
 import { prisma } from '@repo/database'
 import { SubmittalList } from '@/components/quality/submittal-list'
 import type { SubmittalRow } from '@/components/quality/submittal-list'
+import { Button } from '@/components/ui/button'
+import { Link } from '@/i18n/navigation'
 
 type PageProps = {
   params: Promise<{ id: string }>
@@ -29,6 +31,7 @@ export default async function SubmittalsPage({
   })
   if (!project) return redirectTo('/projects')
 
+  const t = await getTranslations('quality')
   const submittals = await prisma.submittal.findMany({
     where: {
       projectId,
@@ -48,28 +51,25 @@ export default async function SubmittalsPage({
   })
 
   return (
-    <div className="p-6">
-      <div className="mb-6 flex items-center gap-4">
-        <Link
-          href={`/projects/${projectId}/quality`}
-          className="text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-        >
-          ← Quality
-        </Link>
-      </div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
-          Submittals
-        </h1>
-        <Link
-          href={`/projects/${projectId}/quality/submittals/new`}
-          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
-        >
-          New Submittal
-        </Link>
+    <div className="erp-view-container space-y-6 bg-background">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="erp-section-header">
+          <h1 className="erp-page-title">{t('submittals')}</h1>
+          <p className="erp-section-desc">{project.name}</p>
+        </div>
+        <div className="flex shrink-0 gap-2">
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/projects/${projectId}/quality`}>← {t('title')}</Link>
+          </Button>
+          <Button asChild variant="default" size="sm">
+            <Link href={`/projects/${projectId}/quality/submittals/new`}>{t('newSubmittal')}</Link>
+          </Button>
+        </div>
       </div>
 
-      <SubmittalList submittals={submittals as SubmittalRow[]} projectId={projectId} />
+      <div className="rounded-xl border border-border/60 bg-card p-4 shadow-sm md:p-6">
+        <SubmittalList submittals={submittals as SubmittalRow[]} projectId={projectId} />
+      </div>
     </div>
   )
 }

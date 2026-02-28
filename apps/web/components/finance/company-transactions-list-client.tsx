@@ -139,13 +139,19 @@ export function CompanyTransactionsListClient({
     return f
   }
 
-  async function handleExport(format: 'excel' | 'pdf', selectedColumns: string[]) {
+  async function handleExport(
+    format: 'excel' | 'pdf',
+    selectedColumns: string[],
+    pdfOptions?: { showEmitidoPor: boolean; showFullCompanyData: boolean }
+  ) {
     const filters = buildExportFilters()
     if (format === 'excel') return exportCompanyTransactionsToExcel(filters, selectedColumns)
     const locale = typeof window !== 'undefined' ? document.documentElement.lang || 'es' : 'es'
     const params = new URLSearchParams({
       template: 'transactions',
       locale,
+      showEmitidoPor: pdfOptions?.showEmitidoPor !== false ? '1' : '0',
+      showFullCompanyData: pdfOptions?.showFullCompanyData !== false ? '1' : '0',
     })
     if (filters.projectId != null) params.set('projectId', String(filters.projectId))
     if (filters.type) params.set('type', filters.type)
@@ -422,6 +428,7 @@ export function CompanyTransactionsListClient({
         title="Exportar transacciones de empresa (según filtros actuales)"
         columns={exportColumns}
         onExport={handleExport}
+        showPdfOptions
       />
     </div>
   )

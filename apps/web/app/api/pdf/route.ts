@@ -6,6 +6,7 @@ import { getBudgetExportData } from '@/app/actions/budget'
 import { getProject } from '@/app/actions/projects'
 import { getDownloadUrl } from '@/lib/r2-client'
 import { buildBudgetPrintHtml } from '@/lib/pdf/build-budget-print-html'
+import { buildPurchaseOrderPrintHtml } from '@/lib/pdf/build-purchase-order-print-html'
 import { renderUrlToPdf, renderHtmlToPdf } from '@/lib/pdf/render-pdf'
 import { getDocumentTemplate } from '@/lib/pdf/templates'
 
@@ -168,7 +169,7 @@ export async function GET(request: NextRequest) {
         location: (project as { location?: string | null }).location ?? null,
         startDate: formatDate((project as { startDate?: Date | null }).startDate),
         endDate: formatDate(endDate),
-        surfaceM2: (project as { m2?: number | null }).m2 != null ? String((project as { m2: number }).m2) : null,
+        surfaceM2: (project as { m2?: unknown }).m2 != null ? String(Number((project as { m2: unknown }).m2)) : null,
         description: (project as { description?: string | null }).description ?? null,
       }
       const layout = {
@@ -208,6 +209,102 @@ export async function GET(request: NextRequest) {
         headerTemplate,
       }
       pdfBuffer = await renderHtmlToPdf(html, baseUrl + '/', budgetPdfOptions)
+    } else if (template.id === 'purchase-order' && id) {
+      const org = await getOrgContext(token.sub)
+      if (!org) {
+        return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+      }
+      let orgProfile: { legalName: string | null; taxId: string | null; country: string | null; address: string | null; email: string | null; phone: string | null } | null = null
+      let logoUrl: string | null = null
+      try {
+        const profile = await prisma.orgProfile.findUnique({
+          where: { orgId: org.orgId },
+          select: { legalName: true, taxId: true, country: true, address: true, email: true, phone: true, logoStorageKey: true },
+        })
+        if (profile) {
+          orgProfile = {
+            legalName: profile.legalName ?? null,
+            taxId: profile.taxId ?? null,
+            country: profile.country ?? null,
+            address: profile.address ?? null,
+            email: profile.email ?? null,
+            phone: profile.phone ?? null,
+          }
+          if (profile.logoStorageKey) {
+            const url = await getDownloadUrl(profile.logoStorageKey)
+            if (url.startsWith('http') || url.startsWith('/')) logoUrl = url
+          }
+        }
+      } catch {
+        // optional
+      }
+      const commitment = await prisma.commitment.findFirst({
+        where: { id, orgId: org.orgId, deleted: false },
+        include: {
+          project: { select: { name: true, projectNumber: true } },
+          party: { select: { name: true } },
+          lines: {
+            orderBy: { sortOrder: 'asc' },
+            include: { wbsNode: { select: { code: true } } },
+          },
+        },
+      })
+      if (!commitment) {
+        return NextResponse.json({ error: 'Orden de compra no encontrada' }, { status: 404 })
+      }
+      const userName = (token as { name?: string }).name ?? (token as { email?: string }).email ?? ''
+      const layout = {
+        orgName: org.orgName ?? 'Organización',
+        orgLegalName: orgProfile?.legalName ?? null,
+        logoUrl,
+        taxId: orgProfile?.taxId ?? null,
+        country: orgProfile?.country ?? null,
+        address: orgProfile?.address ?? null,
+        email: orgProfile?.email ?? null,
+        phone: orgProfile?.phone ?? null,
+        userNameOrEmail: userName || null,
+      }
+      const page = {
+        commitmentNumber: commitment.commitmentNumber,
+        projectName: commitment.project.name,
+        projectNumber: commitment.project.projectNumber ?? null,
+        supplierName: commitment.party.name,
+        issueDate: commitment.issueDate,
+        rows: commitment.lines.map((line) => ({
+          description: line.description,
+          wbsCode: line.wbsNode?.code ?? '',
+          unit: line.unit ?? 'und',
+          quantity: Number(line.quantity),
+          unitPrice: Number(line.unitPrice),
+          totalCost: Number(line.lineTotal),
+        })),
+        grandTotal: Number(commitment.total),
+      }
+      const pdfShowEmitidoPor = showEmitidoParam !== '0' && showEmitidoParam !== 'false'
+      const pdfShowFullCompanyData = showFullCompanyParam !== '0' && showFullCompanyParam !== 'false'
+      const selectedColumns = columnsParam ? columnsParam.split(',').map((c) => c.trim()) : []
+      const includeWbsColumn = selectedColumns.includes('wbsCode')
+      const html = buildPurchaseOrderPrintHtml(layout, page, {
+        showEmitidoPor: pdfShowEmitidoPor,
+        showFullCompanyData: pdfShowFullCompanyData,
+        includeWbsColumn,
+      })
+      const headerTemplate = `<div style="font-size:9px;color:#666;text-align:right;padding:0 20px;">${escapePdfHeader(commitment.project.name)} · ${escapePdfHeader(commitment.commitmentNumber)}</div>`
+      const poPdfOptions = {
+        ...pdfOptions,
+        margin: { top: '60px', right: '10px', bottom: '58px', left: '10px' },
+        headerTemplate,
+      }
+      pdfBuffer = await renderHtmlToPdf(html, baseUrl + '/', poPdfOptions)
+      const safeNumber = commitment.commitmentNumber.replace(/\s+/g, '_')
+      const filename = `orden-compra-${commitment.project.projectNumber}-${safeNumber}.pdf`
+      return new NextResponse(new Uint8Array(pdfBuffer), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `inline; filename="${filename}"`,
+        },
+      })
     } else {
       pdfBuffer = await renderUrlToPdf(
         printUrl,
@@ -218,7 +315,7 @@ export async function GET(request: NextRequest) {
     }
 
     const filename = template.getFileName({ id: id ?? undefined })
-    return new NextResponse(pdfBuffer, {
+    return new NextResponse(new Uint8Array(pdfBuffer), {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',

@@ -425,6 +425,101 @@ export async function exportAllMaterialsBySupplierToExcel(
 }
 
 /**
+ * Exportar Orden de Compra (Commitment PO) a Excel.
+ * Misma estructura que exportación de presupuestos: cabecera empresa, proyecto, número OC, proveedor, líneas.
+ */
+export async function exportPurchaseOrderToExcel(
+  commitmentId: string,
+  selectedColumns: string[]
+) {
+  const session = await getSession()
+  if (!session?.user?.id) {
+    return { success: false, error: 'Unauthorized' }
+  }
+
+  const org = await getOrgContext(session.user.id)
+  if (!org?.orgId) return { success: false, error: 'Unauthorized' }
+
+  const orgData = await getOrganizationData(org.orgId)
+
+  try {
+    const commitment = await prisma.commitment.findFirst({
+      where: { id: commitmentId, orgId: org.orgId, deleted: false },
+      include: {
+        project: { select: { name: true, projectNumber: true, clientName: true } },
+        party: { select: { name: true } },
+        lines: {
+          orderBy: { sortOrder: 'asc' },
+          include: { wbsNode: { select: { code: true } } },
+        },
+      },
+    })
+    if (!commitment) {
+      return { success: false, error: 'Orden de compra no encontrada' }
+    }
+
+    const data = commitment.lines.map((line) => ({
+      description: line.description,
+      wbsCode: line.wbsNode?.code ?? '',
+      unit: line.unit ?? 'und',
+      quantity: Number(line.quantity),
+      unitPrice: Number(line.unitPrice),
+      totalCost: Number(line.lineTotal),
+    }))
+
+    const allColumns = [
+      { field: 'description', label: 'Descripción', type: 'text' as const, width: 40 },
+      { field: 'wbsCode', label: 'Código WBS', type: 'text' as const, width: 12 },
+      { field: 'unit', label: 'Unidad', type: 'text' as const, width: 10 },
+      { field: 'quantity', label: 'Cantidad', type: 'number' as const, width: 12, align: 'right' as const },
+      { field: 'unitPrice', label: 'P. Unit', type: 'currency' as const, width: 15, align: 'right' as const },
+      { field: 'totalCost', label: 'Total', type: 'currency' as const, width: 18, align: 'right' as const },
+    ]
+
+    const columns = allColumns.map((col) => ({
+      ...col,
+      visible: selectedColumns.includes(col.field),
+    }))
+
+    const project = commitment.project as { name: string; projectNumber: string; clientName: string | null }
+    const config: ExcelConfig = {
+      title: 'ORDEN DE COMPRA',
+      subtitle: `${project.name} - ${commitment.commitmentNumber}`,
+      includeCompanyHeader: true,
+      project: {
+        name: project.name,
+        number: project.projectNumber,
+        client: project.clientName ?? undefined,
+      },
+      metadata: {
+        version: commitment.commitmentNumber,
+        date: commitment.issueDate,
+        generatedBy: orgData?.legalName ?? orgData?.name ?? 'Sistema',
+        filters: [`Proveedor: ${(commitment.party as { name: string }).name}`],
+      },
+      columns,
+      data,
+      totals: { label: 'TOTAL', fields: ['totalCost'] },
+      sheetName: 'Orden de compra',
+      freezeHeader: true,
+      autoFilter: true,
+    }
+
+    const buffer = await exportToExcel(config)
+    const base64 = buffer.toString('base64')
+    const safeNumber = commitment.commitmentNumber.replace(/\s+/g, '_')
+    return {
+      success: true,
+      data: base64,
+      filename: `orden-compra-${project.projectNumber}-${safeNumber}.xlsx`,
+    }
+  } catch (error) {
+    console.error('Error exporting purchase order:', error)
+    return { success: false, error: 'Error al exportar orden de compra' }
+  }
+}
+
+/**
  * Exportar lista de proyectos
  */
 export async function exportProjectsToExcel(selectedColumns: string[]) {

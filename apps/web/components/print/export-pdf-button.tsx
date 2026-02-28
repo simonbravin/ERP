@@ -24,7 +24,7 @@ export function ExportPdfButton({
     setLoading(true)
     setError(null)
     try {
-      const url = `/api/pdf?template=computo&id=${encodeURIComponent(versionId)}&locale=${encodeURIComponent(locale)}`
+      const url = `/api/pdf?template=computo&id=${encodeURIComponent(versionId)}&locale=${encodeURIComponent(locale)}&showEmitidoPor=1&showFullCompanyData=1`
       const res = await fetch(url, { credentials: 'include' })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))

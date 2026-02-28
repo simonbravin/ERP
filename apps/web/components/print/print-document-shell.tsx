@@ -8,7 +8,8 @@ import { getHeaderMeta, type HeaderMetaParams } from '@/lib/pdf/templates/header
 type PrintDocumentShellProps = {
   templateId: string
   id?: string
-  query?: Record<string, string | undefined>
+  /** Query params from URL (e.g. searchParams). Used for header meta and PDF options (showEmitidoPor, showFullCompanyData). */
+  query?: Record<string, string | string[] | undefined>
   project?: { name: string; projectNumber?: string | null }
   children: React.ReactNode
 }
@@ -22,8 +23,15 @@ export function PrintDocumentShell({
 }: PrintDocumentShellProps) {
   const { org, orgProfile, user, logoUrl } = usePrintContext()
 
-  const params: HeaderMetaParams = { id, ...query }
+  const flatQuery = query
+    ? Object.fromEntries(
+        Object.entries(query).map(([k, v]) => [k, Array.isArray(v) ? v[0] : v])
+      )
+    : {}
+  const params: HeaderMetaParams = { id, ...flatQuery }
   const meta = getHeaderMeta(templateId, params)
+  const showEmitidoPor = flatQuery.showEmitidoPor !== '0' && flatQuery.showEmitidoPor !== 'false'
+  const showFullCompanyData = flatQuery.showFullCompanyData !== '0' && flatQuery.showFullCompanyData !== 'false'
   const legalIdDisplay = getLegalIdDisplay({
     taxId: orgProfile?.taxId ?? null,
     country: orgProfile?.country ?? null,
@@ -50,6 +58,8 @@ export function PrintDocumentShell({
         folioLabel={meta.folioLabel}
         folioValue={meta.folioValue}
         issuedBy={issuedBy}
+        showEmitidoPor={showEmitidoPor}
+        showFullCompanyData={showFullCompanyData}
       />
       {children}
     </>

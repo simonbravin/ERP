@@ -9,10 +9,11 @@ import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { updateLocalSupplier } from '@/app/actions/global-suppliers'
+import { updateLocalParty } from '@/app/actions/global-suppliers'
 
 const schema = z.object({
   name: z.string().min(1, 'Name is required').max(200),
+  category: z.string().max(100).optional().or(z.literal('')),
   taxId: z.string().max(50).optional(),
   email: z.string().email().max(255).optional().or(z.literal('')),
   phone: z.string().max(50).optional(),
@@ -62,8 +63,9 @@ export function LocalSupplierEditForm({ partyId, defaultValues }: LocalSupplierE
 
   async function onSubmit(data: FormData) {
     try {
-      await updateLocalSupplier(partyId, {
+      await updateLocalParty(partyId, {
         name: data.name,
+        category: data.category || undefined,
         taxId: data.taxId || undefined,
         email: data.email || undefined,
         phone: data.phone || undefined,
@@ -72,7 +74,7 @@ export function LocalSupplierEditForm({ partyId, defaultValues }: LocalSupplierE
         country: data.country || undefined,
         website: data.website || undefined,
       })
-      router.push(`/suppliers/local/${partyId}`)
+      router.push('/suppliers/list?tab=local')
       router.refresh()
     } catch (err) {
       setError('root', {
@@ -89,6 +91,15 @@ export function LocalSupplierEditForm({ partyId, defaultValues }: LocalSupplierE
         {errors.name && (
           <p className="mt-1 text-sm text-destructive">{errors.name.message}</p>
         )}
+      </div>
+      <div>
+        <Label htmlFor="category">{t('category')}</Label>
+        <Input
+          id="category"
+          {...register('category')}
+          className="mt-1"
+          placeholder="ej. MATERIAL, LABOR, EQUIPMENT"
+        />
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
@@ -127,9 +138,9 @@ export function LocalSupplierEditForm({ partyId, defaultValues }: LocalSupplierE
       )}
       <div className="flex gap-2">
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? '…' : t('edit')}
+          {isSubmitting ? '…' : t('saveChanges', { defaultValue: 'Guardar cambios' })}
         </Button>
-        <Link href={`/suppliers/local/${partyId}`}>
+        <Link href="/suppliers/list?tab=local">
           <Button type="button" variant="outline">
             {t('cancel')}
           </Button>

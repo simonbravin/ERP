@@ -58,10 +58,11 @@ export default async function PrintLayout({
     // R2/DB optional; header still shows org name
   }
 
-  const user = session.user
+  const sessionUser = session.user
+  const user = sessionUser
     ? {
-        fullName: (user as { name?: string }).name ?? (user as { fullName?: string }).fullName ?? user.email ?? '',
-        email: user.email ?? null,
+        fullName: (sessionUser as { name?: string }).name ?? (sessionUser as { fullName?: string }).fullName ?? sessionUser.email ?? '',
+        email: sessionUser.email ?? null,
       }
     : null
 

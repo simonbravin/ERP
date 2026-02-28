@@ -1,4 +1,5 @@
 import { prisma } from '@repo/database'
+import type { CustomPermissionsMap } from '@/lib/permissions'
 
 const ROLES_SEE_ALL_PROJECTS = ['OWNER', 'ADMIN', 'ACCOUNTANT'] as const
 
@@ -8,6 +9,7 @@ export type OrgContext = {
   role: string
   memberId: string
   restrictedToProjects: boolean
+  customPermissions: CustomPermissionsMap
 }
 
 /** True solo cuando el usuario es EDITOR o VIEWER y tiene restrictedToProjects = true. OWNER/ADMIN/ACCOUNTANT nunca están restringidos. */
@@ -35,7 +37,14 @@ export async function getVisibleProjectIds(ctx: OrgContext): Promise<string[] | 
 export async function getOrgContext(userId: string): Promise<OrgContext | null> {
   const member = await prisma.orgMember.findFirst({
     where: { userId, active: true },
-    include: { organization: true },
+    select: {
+      orgId: true,
+      role: true,
+      id: true,
+      restrictedToProjects: true,
+      customPermissions: true,
+      organization: { select: { name: true } },
+    },
     orderBy: { createdAt: 'asc' },
   })
   if (!member) return null
@@ -45,5 +54,6 @@ export async function getOrgContext(userId: string): Promise<OrgContext | null> 
     role: member.role,
     memberId: member.id,
     restrictedToProjects: member.restrictedToProjects ?? false,
+    customPermissions: (member.customPermissions as CustomPermissionsMap) ?? null,
   }
 }

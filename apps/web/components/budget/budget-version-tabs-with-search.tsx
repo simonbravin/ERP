@@ -150,6 +150,7 @@ export function BudgetVersionTabsWithSearch({
               wbsTemplates={wbsTemplates}
               searchQuery={searchQuery}
               columnView="totals"
+              projectTotalSale={projectTotalSale}
               onReorder={handleReorder}
               hideActions
             />
@@ -163,7 +164,16 @@ export function BudgetVersionTabsWithSearch({
             )}
           </>
         ) : (
-          <BudgetClientView data={treeData} projectTotal={projectTotalSale} />
+          <BudgetClientView
+            data={treeData}
+            projectTotal={projectTotalSale}
+            globalMarkups={{
+              overheadPct: Number(version.globalOverheadPct),
+              financialPct: Number(version.globalFinancialPct),
+              profitPct: Number(version.globalProfitPct),
+              taxPct: Number(version.globalTaxPct),
+            }}
+          />
         )}
       </TabsContent>
 
@@ -177,6 +187,7 @@ export function BudgetVersionTabsWithSearch({
           wbsTemplates={wbsTemplates}
           searchQuery={searchQuery}
           columnView="totals"
+          projectTotalSale={projectTotalSale}
           onReorder={handleReorder}
         />
         <MarkupConfiguration
@@ -203,6 +214,7 @@ export function BudgetVersionTabsWithSearch({
           wbsTemplates={wbsTemplates}
           searchQuery={searchQuery}
           columnView="breakdown"
+          projectTotalSale={projectTotalSale}
           onReorder={handleReorder}
         />
         <MarkupConfiguration

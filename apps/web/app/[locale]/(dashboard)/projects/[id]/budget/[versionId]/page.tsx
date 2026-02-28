@@ -219,21 +219,18 @@ export default async function BudgetVersionPage({ params }: PageProps) {
     return out
   }
   const summaryData = flattenTreeToSummaryLines(treeData)
-  function lineSaleTotalFromSummary(row: (typeof summaryData)[number]): number {
-    let price = row.unitPrice
-    price += price * (row.overheadPct / 100)
-    price += price * (row.financialPct / 100)
-    price += price * (row.profitPct / 100)
-    price += price * (row.taxPct / 100)
-    return price * row.quantity
-  }
-  const projectTotalSale = summaryData.reduce(
-    (sum, row) => sum + lineSaleTotalFromSummary(row),
-    0
-  )
+  /** Total de venta con la misma fórmula que MarkupConfiguration (DESGLOSE DE CÁLCULO): una sola fuente de verdad para Totales, Desglose y Planilla Final. */
+  const gg = Number(version.globalOverheadPct)
+  const gf = Number(version.globalFinancialPct)
+  const util = Number(version.globalProfitPct)
+  const tax = Number(version.globalTaxPct)
+  const subtotal1 = totalDirectCostNum * (1 + gg / 100)
+  const subtotal2 = subtotal1 * (1 + gf / 100 + util / 100)
+  const projectTotalSale = subtotal2 * (1 + tax / 100)
 
   const canEdit =
-    ['EDITOR', 'ADMIN', 'OWNER'].includes(role) && version.status === 'DRAFT'
+    ['EDITOR', 'ADMIN', 'OWNER'].includes(role) &&
+    (version.status === 'DRAFT' || version.status === 'BASELINE')
   const canChangeStatus = ['ADMIN', 'OWNER'].includes(role)
   const canSeeAdmin = ['ADMIN', 'OWNER'].includes(role)
 

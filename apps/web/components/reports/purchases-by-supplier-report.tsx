@@ -88,13 +88,17 @@ export function PurchasesBySupplierReport({ orgId }: PurchasesBySupplierReportPr
     { field: 'totalCost', label: 'Costo Total', defaultVisible: true },
   ]
 
-  async function handleExport(format: 'excel' | 'pdf', selectedColumns: string[]) {
+  async function handleExport(
+    format: 'excel' | 'pdf',
+    selectedColumns: string[],
+    pdfOptions?: { showEmitidoPor: boolean; showFullCompanyData: boolean }
+  ) {
     const { exportPurchasesBySupplierToExcel } = await import('@/app/actions/export-purchases')
     if (format === 'excel') {
       return await exportPurchasesBySupplierToExcel(orgId, selectedSupplier, selectedColumns, data)
     }
     const locale = typeof window !== 'undefined' ? document.documentElement.lang || 'es' : 'es'
-    const url = `/api/pdf?template=purchases-by-supplier&locale=${encodeURIComponent(locale)}&partyId=${encodeURIComponent(selectedSupplier)}`
+    const url = `/api/pdf?template=purchases-by-supplier&locale=${encodeURIComponent(locale)}&partyId=${encodeURIComponent(selectedSupplier)}&showEmitidoPor=${pdfOptions?.showEmitidoPor !== false ? '1' : '0'}&showFullCompanyData=${pdfOptions?.showFullCompanyData !== false ? '1' : '0'}`
     const res = await fetch(url, { credentials: 'include' })
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
@@ -216,6 +220,7 @@ export function PurchasesBySupplierReport({ orgId }: PurchasesBySupplierReportPr
         title={`${t('totalPurchases')} ${supplierName}`}
         columns={exportColumns}
         onExport={handleExport}
+        showPdfOptions
       />
     </>
   )

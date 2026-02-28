@@ -314,14 +314,14 @@ export function MarkupConfiguration({
                 {t('calculationBreakdown')}
               </h3>
               <div className="space-y-1.5 rounded border border-border bg-muted/50 p-3">
-                <div className="flex justify-between text-sm">
+                <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">{t('directCost')}:</span>
                   <span className="font-mono font-medium tabular-nums text-foreground">
                     {formatCurrency(directCostTotal)}
                   </span>
                 </div>
 
-                <div className="flex justify-between text-sm">
+                <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">
                     + {t('overhead')} ({markups.overheadPct}%):
                   </span>
@@ -330,14 +330,14 @@ export function MarkupConfiguration({
                   </span>
                 </div>
 
-                <div className="flex justify-between border-t border-border pt-1 text-sm font-medium">
+                <div className="flex justify-between border-t border-border pt-1 text-xs font-medium">
                   <span className="text-foreground">{t('subtotal')} 1:</span>
                   <span className="font-mono tabular-nums text-foreground">
                     {formatCurrency(subtotal1)}
                   </span>
                 </div>
 
-                <div className="flex justify-between text-sm">
+                <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">
                     + {t('financial')} ({markups.financialPct}%):
                   </span>
@@ -346,7 +346,7 @@ export function MarkupConfiguration({
                   </span>
                 </div>
 
-                <div className="flex justify-between text-sm">
+                <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">
                     + {t('profit')} ({markups.profitPct}%):
                   </span>
@@ -355,14 +355,14 @@ export function MarkupConfiguration({
                   </span>
                 </div>
 
-                <div className="flex justify-between border-t border-border pt-1 text-sm font-medium">
+                <div className="flex justify-between border-t border-border pt-1 text-xs font-medium">
                   <span className="text-foreground">{t('subtotal')} 2:</span>
                   <span className="font-mono tabular-nums text-foreground">
                     {formatCurrency(subtotal2)}
                   </span>
                 </div>
 
-                <div className="flex justify-between text-sm">
+                <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">
                     + {t('tax')} ({markups.taxPct}%):
                   </span>
@@ -372,10 +372,10 @@ export function MarkupConfiguration({
                 </div>
 
                 <div className="flex justify-between border-t-2 border-border pt-2">
-                  <span className="text-base font-bold text-primary">
+                  <span className="text-sm font-bold text-primary">
                     {t('totalSale')}:
                   </span>
-                  <span className="font-mono text-xl font-bold tabular-nums text-primary">
+                  <span className="font-mono text-lg font-bold tabular-nums text-primary">
                     {formatCurrency(totalSale)}
                   </span>
                 </div>

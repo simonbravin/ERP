@@ -96,7 +96,7 @@ export function SuppliersTableClient({ rows }: SuppliersTableClientProps) {
                 <TableHead className="hidden lg:table-cell">{t('city')}</TableHead>
                 <TableHead className="w-24">{t('typeFilter')}</TableHead>
                 <TableHead className="w-20 text-center">{t('globalColumn')}</TableHead>
-                <TableHead className="w-24">{t('viewDetails')}</TableHead>
+                <TableHead className="w-24">{t('view')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -125,7 +125,7 @@ export function SuppliersTableClient({ rows }: SuppliersTableClientProps) {
                   <TableCell>
                     <Link href={row.detailHref}>
                       <Button variant="outline" size="sm">
-                        {t('viewDetails')}
+                        {t('view')}
                       </Button>
                     </Link>
                   </TableCell>

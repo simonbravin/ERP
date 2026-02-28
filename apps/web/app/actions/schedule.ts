@@ -9,6 +9,7 @@ import { revalidatePath } from 'next/cache'
 import { Decimal } from '@prisma/client/runtime/library'
 import { calculateCriticalPath } from '@/lib/schedule/critical-path'
 import { addWorkingDays, countWorkingDays } from '@/lib/schedule/working-days'
+import { validateTaskDatesAgainstDependencies } from '@/lib/schedule/validate-dependencies'
 import { createAuditLog } from '@/lib/audit-log'
 import { addDays, differenceInDays } from 'date-fns'
 
@@ -300,12 +301,70 @@ export async function updateTaskDates(
       updateData.plannedDuration = data.plannedDuration
       // Si solo envían duración, recalcular fin = inicio + duración (días laborables)
       if (data.plannedEndDate == null) {
-        const start = new Date(task.plannedStartDate)
+        const start = new Date(updateData.plannedStartDate ?? task.plannedStartDate)
         updateData.plannedEndDate = addWorkingDays(
           start,
           data.plannedDuration,
           task.schedule.workingDaysPerWeek
         )
+      }
+    }
+
+    const newStart = new Date(updateData.plannedStartDate ?? task.plannedStartDate)
+    const newEnd = new Date(updateData.plannedEndDate ?? task.plannedEndDate)
+
+    const taskWithDeps = await prisma.scheduleTask.findFirst({
+      where: { id: taskId },
+      include: {
+        predecessors: {
+          include: {
+            predecessor: {
+              select: {
+                plannedStartDate: true,
+                plannedEndDate: true,
+                wbsNode: { select: { code: true } },
+              },
+            },
+          },
+        },
+        successors: {
+          include: {
+            successor: {
+              select: {
+                plannedStartDate: true,
+                plannedEndDate: true,
+                wbsNode: { select: { code: true } },
+              },
+            },
+          },
+        },
+      },
+    })
+
+    if (taskWithDeps) {
+      const predecessors = taskWithDeps.predecessors.map((d) => ({
+        plannedStartDate: d.predecessor.plannedStartDate,
+        plannedEndDate: d.predecessor.plannedEndDate,
+        dependencyType: d.dependencyType as 'FS' | 'SS' | 'FF' | 'SF',
+        lagDays: d.lagDays,
+        code: d.predecessor.wbsNode?.code,
+      }))
+      const successors = taskWithDeps.successors.map((d) => ({
+        plannedStartDate: d.successor.plannedStartDate,
+        plannedEndDate: d.successor.plannedEndDate,
+        dependencyType: d.dependencyType as 'FS' | 'SS' | 'FF' | 'SF',
+        lagDays: d.lagDays,
+        code: d.successor.wbsNode?.code,
+      }))
+      const validation = validateTaskDatesAgainstDependencies(
+        newStart,
+        newEnd,
+        predecessors,
+        successors,
+        task.schedule.workingDaysPerWeek
+      )
+      if (!validation.valid) {
+        return { success: false, error: validation.message }
       }
     }
 
@@ -775,7 +834,7 @@ export async function setScheduleAsBaseline(scheduleId: string) {
   try {
     const schedule = await prisma.schedule.findFirst({
       where: { id: scheduleId, orgId: org.orgId },
-      include: { project: { select: { id: true, name: true } } },
+      include: { project: { select: { id: true, name: true, startDate: true } } },
     })
 
     if (!schedule) {
@@ -807,6 +866,22 @@ export async function setScheduleAsBaseline(scheduleId: string) {
       },
     })
 
+    const projectUpdate: {
+      plannedEndDate: Date
+      baselinePlannedEndDate: Date
+      startDate?: Date
+    } = {
+      plannedEndDate: schedule.projectEndDate,
+      baselinePlannedEndDate: schedule.projectEndDate,
+    }
+    if (!schedule.project.startDate) {
+      projectUpdate.startDate = schedule.projectStartDate
+    }
+    await prisma.project.update({
+      where: { id: schedule.projectId },
+      data: projectUpdate,
+    })
+
     await createAuditLog({
       orgId: org.orgId,
       userId: session.user.id,
@@ -818,11 +893,77 @@ export async function setScheduleAsBaseline(scheduleId: string) {
     })
 
     revalidatePath(`/projects/${schedule.projectId}/schedule`)
+    revalidatePath(`/projects/${schedule.projectId}`)
 
     return { success: true }
   } catch (error) {
     console.error('Error setting baseline:', error)
     return { success: false, error: 'Error al establecer baseline' }
+  }
+}
+
+/**
+ * Aprobar cronograma: setea approvedBy, approvedAt y status APPROVED.
+ * Solo ADMIN/OWNER. Puede aprobar desde DRAFT o BASELINE.
+ */
+export async function approveSchedule(scheduleId: string) {
+  const session = await getSession()
+  if (!session?.user?.id) {
+    return { success: false, error: 'Unauthorized' }
+  }
+
+  const org = await getOrgContext(session.user.id)
+  if (!org) return { success: false, error: 'Unauthorized' }
+  requireRole(org.role, 'ADMIN')
+
+  try {
+    const schedule = await prisma.schedule.findFirst({
+      where: { id: scheduleId, orgId: org.orgId },
+      include: { project: { select: { id: true, name: true } } },
+    })
+
+    if (!schedule) {
+      return { success: false, error: 'Schedule not found' }
+    }
+    try {
+      const access = await assertProjectAccess(schedule.projectId, org)
+      if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.SCHEDULE)) {
+        return { success: false, error: 'No tenés permiso para aprobar el cronograma de este proyecto' }
+      }
+    } catch (e) {
+      return { success: false, error: e instanceof Error ? e.message : 'Acceso denegado' }
+    }
+
+    if (schedule.status === 'APPROVED') {
+      return { success: false, error: 'Este cronograma ya está aprobado.' }
+    }
+
+    await prisma.schedule.update({
+      where: { id: scheduleId },
+      data: {
+        status: 'APPROVED',
+        approvedByOrgMemberId: org.memberId,
+        approvedAt: new Date(),
+      },
+    })
+
+    await createAuditLog({
+      orgId: org.orgId,
+      userId: session.user.id,
+      action: 'UPDATE',
+      entity: 'Schedule',
+      entityId: scheduleId,
+      projectId: schedule.projectId,
+      description: `Cronograma aprobado en proyecto "${schedule.project.name}"`,
+    })
+
+    revalidatePath(`/projects/${schedule.projectId}/schedule`)
+    revalidatePath(`/projects/${schedule.projectId}`)
+
+    return { success: true }
+  } catch (error) {
+    console.error('Error approving schedule:', error)
+    return { success: false, error: 'Error al aprobar cronograma' }
   }
 }
 

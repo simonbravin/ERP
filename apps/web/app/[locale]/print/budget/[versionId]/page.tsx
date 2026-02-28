@@ -7,6 +7,7 @@ import { formatCurrency } from '@/lib/format-utils'
 
 type PageProps = {
   params: Promise<{ versionId: string }>
+  searchParams?: Promise<Record<string, string | string[] | undefined>>
 }
 
 type BudgetRow = {
@@ -18,8 +19,9 @@ type BudgetRow = {
   totalCost: number
 }
 
-export default async function PrintBudgetPage({ params }: PageProps) {
+export default async function PrintBudgetPage({ params, searchParams }: PageProps) {
   const { versionId } = await params
+  const sp = searchParams ? await searchParams : {}
 
   const data = await getBudgetExportData(versionId)
   if (!data) return notFound()
@@ -51,6 +53,7 @@ export default async function PrintBudgetPage({ params }: PageProps) {
     <PrintDocumentShell
       templateId="budget"
       id={versionId}
+      query={sp}
       project={{ name: project.name, projectNumber: project.projectNumber }}
     >
       <div className="space-y-4">

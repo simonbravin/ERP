@@ -2,13 +2,12 @@ import { redirectToLogin } from '@/lib/i18n-redirect'
 import { getTranslations } from 'next-intl/server'
 import { getSession } from '@/lib/session'
 import { getOrgContext } from '@/lib/org-context'
+import { hasPermission } from '@/lib/permissions'
 import { hasMinimumRole } from '@/lib/rbac'
+import type { OrgRole } from '@/lib/rbac'
 import { prisma } from '@repo/database'
-import { PageHeader } from '@/components/layout/page-header'
 import { SuppliersListClient } from '@/components/suppliers/suppliers-list-client'
-import { Button } from '@/components/ui/button'
-import { Plus } from 'lucide-react'
-import { Link } from '@/i18n/navigation'
+import { AddToLocalDirectoryDropdown } from '@/components/suppliers/add-to-local-directory-dropdown'
 
 type PageProps = {
   searchParams: Promise<{ q?: string; category?: string; tab?: string; filter?: string }>
@@ -82,26 +81,19 @@ export default async function SuppliersListPage({ searchParams }: PageProps) {
       })
 
   const canAddLocal = hasMinimumRole(org.role, 'EDITOR')
-  const totalCount = linkedSuppliers.length + localSuppliers.length + localClients.length
+  const canEditLocal = hasPermission(org.role as OrgRole, 'suppliers', 'edit', org.customPermissions ?? null)
 
   return (
-    <div className="h-full">
-      <PageHeader
-        title={t('listTitle')}
-        subtitle={`${totalCount} ${totalCount === 1 ? t('oneSupplier') : t('manySuppliers')}`}
-        actions={
-          canAddLocal ? (
-            <Button asChild variant="default">
-              <Link href="/suppliers/local/new">
-                <Plus className="mr-2 h-4 w-4" />
-                {t('addLocalSupplier')}
-              </Link>
-            </Button>
-          ) : undefined
-        }
-      />
+    <div className="erp-view-container space-y-6 bg-background">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="erp-section-header">
+          <h1 className="erp-page-title">{t('listTitle')}</h1>
+          <p className="erp-section-desc">{t('listSubtitle')}</p>
+        </div>
+        <AddToLocalDirectoryDropdown canAddLocal={canAddLocal} />
+      </div>
 
-      <div className="p-6">
+      <div className="rounded-xl border border-border/60 bg-card p-4 shadow-sm md:p-6">
         <SuppliersListClient
           defaultTab={tab || 'linked'}
           linkedSuppliers={linkedSuppliers}
@@ -109,6 +101,7 @@ export default async function SuppliersListPage({ searchParams }: PageProps) {
           localClients={localClients}
           globalSearchResults={globalSearch}
           canAddLocal={canAddLocal}
+          canEditLocal={canEditLocal}
         />
       </div>
     </div>

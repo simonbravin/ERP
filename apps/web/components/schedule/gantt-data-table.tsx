@@ -163,7 +163,7 @@ export function GanttDataTable({
 
                       {task.isCritical && (
                         <Badge
-                          variant="destructive"
+                          variant="danger"
                           className="h-4 px-1 text-[8px]"
                         >
                           {t('critical')}

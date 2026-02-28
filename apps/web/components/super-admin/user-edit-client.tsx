@@ -56,6 +56,7 @@ const AVAILABLE_MODULES = [
   { key: 'CERTIFICATIONS', label: 'Certificaciones', description: 'Certificaciones de obra' },
   { key: 'INVENTORY', label: 'Inventario', description: 'Inventario' },
   { key: 'REPORTS', label: 'Reportes', description: 'Reportes y analytics' },
+  { key: 'SUPPLIERS', label: 'Proveedores y clientes', description: 'Edición de proveedores y clientes locales' },
   { key: 'TEAM', label: 'Equipo', description: 'Gestión de equipo' },
   { key: 'SETTINGS', label: 'Configuración', description: 'Configuración' },
   { key: 'DOCUMENTS', label: 'Documentos', description: 'Documentos' },
@@ -86,9 +87,9 @@ interface UserEditClientProps {
 
 function getDefaultModulesByRole(role: string): string[] {
   const defaults: Record<string, string[]> = {
-    OWNER: ['DASHBOARD', 'PROJECTS', 'BUDGET', 'SCHEDULE', 'MATERIALS', 'FINANCE', 'CERTIFICATIONS', 'INVENTORY', 'REPORTS', 'TEAM', 'SETTINGS', 'DOCUMENTS'],
-    ADMIN: ['DASHBOARD', 'PROJECTS', 'BUDGET', 'SCHEDULE', 'MATERIALS', 'FINANCE', 'CERTIFICATIONS', 'INVENTORY', 'REPORTS', 'TEAM', 'SETTINGS', 'DOCUMENTS'],
-    EDITOR: ['DASHBOARD', 'PROJECTS', 'BUDGET', 'SCHEDULE', 'MATERIALS', 'CERTIFICATIONS', 'INVENTORY', 'REPORTS'],
+    OWNER: ['DASHBOARD', 'PROJECTS', 'BUDGET', 'SCHEDULE', 'MATERIALS', 'FINANCE', 'CERTIFICATIONS', 'INVENTORY', 'REPORTS', 'SUPPLIERS', 'TEAM', 'SETTINGS', 'DOCUMENTS'],
+    ADMIN: ['DASHBOARD', 'PROJECTS', 'BUDGET', 'SCHEDULE', 'MATERIALS', 'FINANCE', 'CERTIFICATIONS', 'INVENTORY', 'REPORTS', 'SUPPLIERS', 'TEAM', 'SETTINGS', 'DOCUMENTS'],
+    EDITOR: ['DASHBOARD', 'PROJECTS', 'BUDGET', 'SCHEDULE', 'MATERIALS', 'CERTIFICATIONS', 'INVENTORY', 'REPORTS', 'SUPPLIERS'],
     ACCOUNTANT: ['DASHBOARD', 'FINANCE', 'REPORTS'],
     VIEWER: ['DASHBOARD', 'PROJECTS', 'REPORTS'],
   }
@@ -102,11 +103,16 @@ export function UserEditClient({ user, currentUserId }: UserEditClientProps) {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
+  const moduleKeysUpper = AVAILABLE_MODULES.map((m) => m.key)
+
   const [orgModules, setOrgModules] = useState<Record<string, string[]>>(() => {
     const initial: Record<string, string[]> = {}
     user.orgMembers.forEach((member) => {
       if (member.customPermissions && typeof member.customPermissions === 'object') {
-        initial[member.organization.id] = Object.keys(member.customPermissions)
+        const storedKeys = Object.keys(member.customPermissions) as string[]
+        initial[member.organization.id] = storedKeys
+          .map((k) => moduleKeysUpper.find((mk) => mk.toLowerCase() === k.toLowerCase()))
+          .filter((key): key is string => key != null)
       } else {
         initial[member.organization.id] = getDefaultModulesByRole(member.role)
       }

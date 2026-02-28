@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useRouter } from 'next/navigation'
 import { Link } from '@/i18n/navigation'
@@ -9,6 +10,14 @@ import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { createLocalClient } from '@/app/actions/global-suppliers'
 
 const schema = z.object({
@@ -45,6 +54,9 @@ type FormData = z.infer<typeof schema>
 export function LocalClientForm() {
   const t = useTranslations('suppliers')
   const router = useRouter()
+  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false)
+  const [pendingData, setPendingData] = useState<FormData | null>(null)
+  const [forceSubmitting, setForceSubmitting] = useState(false)
   const {
     register,
     handleSubmit,
@@ -54,7 +66,7 @@ export function LocalClientForm() {
     resolver: zodResolver(schema),
   })
 
-  async function onSubmit(data: FormData) {
+  async function onSubmit(data: FormData, forceCreate = false) {
     try {
       const result = await createLocalClient({
         name: data.name,
@@ -65,15 +77,33 @@ export function LocalClientForm() {
         city: data.city || undefined,
         country: data.country || undefined,
         website: data.website || undefined,
+        forceCreate,
       })
-      if ('partyId' in result) {
+      if (result.success) {
         router.push('/suppliers/list?tab=local&filter=clients')
         router.refresh()
+        return
+      }
+      if (result.duplicateName) {
+        setPendingData(data)
+        setShowDuplicateDialog(true)
       }
     } catch (err) {
       setError('root', {
         message: err instanceof Error ? err.message : t('createClientError'),
       })
+    }
+  }
+
+  async function handleForceCreate() {
+    if (!pendingData) return
+    setForceSubmitting(true)
+    try {
+      await onSubmit(pendingData, true)
+      setShowDuplicateDialog(false)
+      setPendingData(null)
+    } finally {
+      setForceSubmitting(false)
     }
   }
 
@@ -134,6 +164,30 @@ export function LocalClientForm() {
           </Button>
         </Link>
       </div>
+
+      <Dialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
+        <DialogContent className="erp-form-modal max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t('duplicateDialogTitle')}</DialogTitle>
+            <DialogDescription>{t('duplicateNameWarningClient')}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setShowDuplicateDialog(false)
+                setPendingData(null)
+              }}
+            >
+              {t('cancel')}
+            </Button>
+            <Button type="button" onClick={handleForceCreate} disabled={forceSubmitting}>
+              {forceSubmitting ? '…' : t('forceCreateAnyway')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </form>
   )
 }

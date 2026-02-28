@@ -7,10 +7,12 @@ import { formatCurrency } from '@/lib/format-utils'
 
 type PageProps = {
   params: Promise<{ projectId: string }>
+  searchParams?: Promise<Record<string, string | string[] | undefined>>
 }
 
-export default async function PrintProjectDashboardPage({ params }: PageProps) {
+export default async function PrintProjectDashboardPage({ params, searchParams }: PageProps) {
   const { projectId } = await params
+  const sp = searchParams ? await searchParams : {}
 
   const [project, data] = await Promise.all([
     getProject(projectId),
@@ -46,6 +48,7 @@ export default async function PrintProjectDashboardPage({ params }: PageProps) {
     <PrintDocumentShell
       templateId="project-dashboard"
       id={projectId}
+      query={sp}
       project={{ name: project.name, projectNumber: project.projectNumber }}
     >
       <div className="space-y-6">

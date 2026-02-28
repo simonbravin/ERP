@@ -23,7 +23,7 @@ export default async function PrintPurchasesBySupplierPage({ searchParams }: Pag
   const partyId = typeof sp.partyId === 'string' ? sp.partyId : undefined
   if (!partyId) {
     return (
-      <PrintDocumentShell templateId="purchases-by-supplier">
+      <PrintDocumentShell templateId="purchases-by-supplier" query={sp}>
         <div className="space-y-4">
           <h2 className="text-lg font-semibold">Compras por proveedor</h2>
           <p className="text-muted-foreground">Seleccione un proveedor (partyId) en la URL.</p>
@@ -58,7 +58,7 @@ export default async function PrintPurchasesBySupplierPage({ searchParams }: Pag
   const total = rows.reduce((sum, r) => sum + r.totalCost, 0)
 
   return (
-    <PrintDocumentShell templateId="purchases-by-supplier" query={{ partyId }}>
+    <PrintDocumentShell templateId="purchases-by-supplier" query={{ ...sp, partyId }}>
       <div className="space-y-4">
         <h2 className="text-lg font-semibold">Compras por proveedor</h2>
         <PrintTable<Row>

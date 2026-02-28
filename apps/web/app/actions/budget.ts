@@ -54,7 +54,7 @@ async function getNextVersionCode(projectId: string): Promise<string> {
 }
 
 function isEditableVersion(status: string): boolean {
-  return status === 'DRAFT'
+  return status === 'DRAFT' || status === 'BASELINE'
 }
 
 export async function listBudgetVersions(projectId: string) {
@@ -628,8 +628,8 @@ export async function updateMarkupMode(
       return { success: false, error: e instanceof Error ? e.message : 'Acceso denegado' }
     }
 
-    if (version.status !== 'DRAFT') {
-      return { success: false, error: 'Solo se puede editar en modo DRAFT' }
+    if (!isEditableVersion(version.status)) {
+      return { success: false, error: 'Solo se puede editar en Borrador o Base' }
     }
 
     await prisma.budgetVersion.update({
@@ -702,8 +702,8 @@ export async function updateGlobalMarkups(
       return { success: false, error: e instanceof Error ? e.message : 'Acceso denegado' }
     }
 
-    if (version.status !== 'DRAFT') {
-      return { success: false, error: 'Solo se puede editar en modo DRAFT' }
+    if (!isEditableVersion(version.status)) {
+      return { success: false, error: 'Solo se puede editar en Borrador o Base' }
     }
 
     const oldValues = {
@@ -793,8 +793,8 @@ export async function updateLineMarkup(
       return { success: false, error: e instanceof Error ? e.message : 'Acceso denegado' }
     }
 
-    if (line.budgetVersion.status !== 'DRAFT') {
-      return { success: false, error: 'Solo editable en DRAFT' }
+    if (!isEditableVersion(line.budgetVersion.status)) {
+      return { success: false, error: 'Solo editable en Borrador o Base' }
     }
 
     if (line.budgetVersion.markupMode !== 'ADVANCED') {

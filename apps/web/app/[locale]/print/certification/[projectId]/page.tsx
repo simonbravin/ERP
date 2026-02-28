@@ -7,6 +7,7 @@ import { formatCurrency } from '@/lib/certification-utils'
 
 type PageProps = {
   params: Promise<{ projectId: string }>
+  searchParams?: Promise<Record<string, string | string[] | undefined>>
 }
 
 type CertRow = {
@@ -18,8 +19,9 @@ type CertRow = {
   status: string
 }
 
-export default async function PrintCertificationPage({ params }: PageProps) {
+export default async function PrintCertificationPage({ params, searchParams }: PageProps) {
   const { projectId } = await params
+  const sp = searchParams ? await searchParams : {}
 
   const [project, certifications] = await Promise.all([
     getProject(projectId),
@@ -59,6 +61,7 @@ export default async function PrintCertificationPage({ params }: PageProps) {
     <PrintDocumentShell
       templateId="certification"
       id={projectId}
+      query={sp}
       project={{ name: project.name, projectNumber: project.projectNumber }}
     >
       <div className="space-y-4">
