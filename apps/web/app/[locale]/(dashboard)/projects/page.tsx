@@ -33,8 +33,7 @@ export default async function ProjectsPage({ searchParams }: PageProps) {
   )
   const projectsWithBudget = projects.map((p, i) => ({
     ...p,
-    totalBudget:
-      budgetTotals[i] > 0 ? budgetTotals[i] : (p.totalBudget ? Number(p.totalBudget) : 0),
+    totalBudget: budgetTotals[i] ?? 0,
   }))
   const canEdit = hasMinimumRole(org.role, 'EDITOR')
   const restrictedNoProjects = isRestrictedToProjects(org) && projects.length === 0

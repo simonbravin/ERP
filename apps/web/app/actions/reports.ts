@@ -3,6 +3,7 @@
 import { getSession } from '@/lib/session'
 import { getOrgContext, getVisibleProjectIds } from '@/lib/org-context'
 import { requirePermission } from '@/lib/auth-helpers'
+import { getApprovedOrBaselineBudgetTotals } from '@/app/actions/budget'
 import { prisma } from '@repo/database'
 import { revalidatePath } from 'next/cache'
 import type {
@@ -259,6 +260,7 @@ export async function executeCustomQuery(config: QueryConfig): Promise<ReportRes
       return { data: [], totalRows: 0, executionTime: Date.now() - startTime }
     }
 
+    const budgetTotals = await getApprovedOrBaselineBudgetTotals(projectIds)
     const spentByProject = await prisma.financeTransaction.groupBy({
       by: ['projectId'],
       where: {
@@ -286,7 +288,7 @@ export async function executeCustomQuery(config: QueryConfig): Promise<ReportRes
     }
 
     const rows = projects.map((p) => {
-      const totalBudget = p.totalBudget != null ? Number(p.totalBudget) : 0
+      const totalBudget = budgetTotals[p.id] ?? 0
       const gastadoHastaElMomento = spentMap.get(p.id) ?? 0
       const montoAvance = certTotalByProject.get(p.id) ?? 0
       const avanceObraPct = totalBudget > 0 ? (montoAvance / totalBudget) * 100 : 0
@@ -301,7 +303,7 @@ export async function executeCustomQuery(config: QueryConfig): Promise<ReportRes
         startDate: p.startDate,
         plannedEndDate: p.plannedEndDate,
         location: p.location,
-        totalBudget: totalBudget || null,
+        totalBudget: totalBudget > 0 ? totalBudget : null,
         gastadoHastaElMomento,
         avanceObraPct: Math.round(avanceObraPct * 100) / 100,
         montoAvance,
@@ -442,6 +444,7 @@ export async function getReportPreview(
       return []
     }
 
+    const budgetTotals = await getApprovedOrBaselineBudgetTotals(projectIds)
     // Gastado hasta el momento: suma de transacciones financieras no eliminadas por proyecto
     const spentByProject = await prisma.financeTransaction.groupBy({
       by: ['projectId'],
@@ -473,7 +476,7 @@ export async function getReportPreview(
 
     const keys = selectedColumns.length ? selectedColumns : ['projectNumber', 'name', 'status']
     return projects.map((p) => {
-      const totalBudget = p.totalBudget != null ? Number(p.totalBudget) : 0
+      const totalBudget = budgetTotals[p.id] ?? 0
       const gastadoHastaElMomento = spentMap.get(p.id) ?? 0
       const montoAvance = certTotalByProject.get(p.id) ?? 0
       const avanceObraPct = totalBudget > 0 ? (montoAvance / totalBudget) * 100 : 0
@@ -481,7 +484,7 @@ export async function getReportPreview(
 
       const base: Record<string, unknown> = {
         ...p,
-        totalBudget: totalBudget || null,
+        totalBudget: totalBudget > 0 ? totalBudget : null,
         gastadoHastaElMomento,
         avanceObraPct: Math.round(avanceObraPct * 100) / 100,
         montoAvance,

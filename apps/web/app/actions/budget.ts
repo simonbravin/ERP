@@ -1683,45 +1683,56 @@ export async function getApprovedOrBaselineVersionId(projectId: string): Promise
 }
 
 /**
- * Total de venta (con márgenes e IVA) de la versión APPROVED o BASELINE del proyecto.
- * Se usa en el resumen del proyecto para mostrar el presupuesto aprobado.
+ * Total de venta calculado con la misma fórmula que la página de presupuesto (versión):
+ * costo directo → + overhead → + financial + profit → + tax.
+ * Usa versión APPROVED o BASELINE si existe; si no, la última versión (ej. DRAFT).
  */
 export async function getApprovedOrBaselineBudgetTotal(projectId: string): Promise<number> {
   try {
     const { org } = await getAuthContext()
-    const version = await prisma.budgetVersion.findFirst({
+    // 1) Prefer APPROVED or BASELINE
+    let version = await prisma.budgetVersion.findFirst({
       where: {
         projectId,
         orgId: org.orgId,
         status: { in: ['APPROVED', 'BASELINE'] },
       },
       orderBy: [{ status: 'desc' }, { createdAt: 'desc' }],
-      include: {
-        budgetLines: {
-          select: {
-            directCostTotal: true,
-            quantity: true,
-            overheadPct: true,
-            financialPct: true,
-            profitPct: true,
-            taxPct: true,
-          },
-        },
+      select: {
+        globalOverheadPct: true,
+        globalFinancialPct: true,
+        globalProfitPct: true,
+        globalTaxPct: true,
+        budgetLines: { select: { directCostTotal: true } },
       },
     })
-    if (!version?.budgetLines?.length) return 0
-    let total = 0
-    for (const line of version.budgetLines) {
-      const qty = Number(line.quantity) || 1
-      const unitDirect = qty > 0 ? Number(line.directCostTotal) / qty : 0
-      const oh = Number(line.overheadPct ?? 0)
-      const fin = Number(line.financialPct ?? 0)
-      const prof = Number(line.profitPct ?? 0)
-      const tax = Number(line.taxPct ?? 21)
-      const calc = calculateBudgetLine(unitDirect, oh, fin, prof, tax)
-      total += Number(calc.totalPrice) * qty
+    // 2) If none, use latest version (e.g. DRAFT)
+    if (!version) {
+      version = await prisma.budgetVersion.findFirst({
+        where: { projectId, orgId: org.orgId },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          globalOverheadPct: true,
+          globalFinancialPct: true,
+          globalProfitPct: true,
+          globalTaxPct: true,
+          budgetLines: { select: { directCostTotal: true } },
+        },
+      })
     }
-    return total
+    if (!version?.budgetLines?.length) return 0
+    const totalDirectCost = version.budgetLines.reduce(
+      (sum, bl) => sum + Number(bl.directCostTotal ?? 0),
+      0
+    )
+    const gg = Number(version.globalOverheadPct)
+    const gf = Number(version.globalFinancialPct)
+    const util = Number(version.globalProfitPct)
+    const tax = Number(version.globalTaxPct)
+    const subtotal1 = totalDirectCost * (1 + gg / 100)
+    const subtotal2 = subtotal1 * (1 + gf / 100 + util / 100)
+    const totalSale = subtotal2 * (1 + tax / 100)
+    return totalSale
   } catch {
     return 0
   }

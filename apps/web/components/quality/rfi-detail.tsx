@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { answerRfi, closeRfi } from '@/app/actions/quality'
 import { cn } from '@/lib/utils'
@@ -18,10 +19,17 @@ type RfiDetailProps = {
     dueDate: Date | null
     answeredDate: Date | null
     closedDate: Date | null
+    createdAt: Date
     raisedBy: { user: { fullName: string; email: string | null } }
     assignedTo: { user: { fullName: string; email: string | null } } | null
     wbsNode: { code: string; name: string } | null
   }
+  comments?: Array<{
+    id: string
+    comment: string
+    createdAt: Date
+    author: { user: { fullName: string } }
+  }>
   projectId: string
   canAnswer: boolean
 }
@@ -34,50 +42,58 @@ function formatDate(d: Date | null): string {
   })
 }
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status, label }: { status: string; label: string }) {
   const styles: Record<string, string> = {
     OPEN: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
     ANSWERED: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-    CLOSED: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300',
+    CLOSED: 'bg-muted text-muted-foreground',
   }
   return (
     <span
       className={cn(
-        'rounded px-2 py-0.5 text-xs font-medium',
-        styles[status] ?? 'bg-gray-100 text-gray-700'
+        'rounded-md px-2 py-0.5 text-xs font-medium',
+        styles[status] ?? 'bg-muted text-muted-foreground'
       )}
     >
-      {status}
+      {label}
     </span>
   )
 }
 
-function PriorityBadge({ priority }: { priority: string }) {
+function PriorityBadge({ priority, label }: { priority: string; label: string }) {
   const styles: Record<string, string> = {
-    LOW: 'bg-gray-100 text-gray-700',
-    MEDIUM: 'bg-blue-100 text-blue-800',
-    HIGH: 'bg-red-100 text-red-800',
+    LOW: 'bg-muted text-muted-foreground',
+    MEDIUM: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+    HIGH: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
   }
   return (
     <span
       className={cn(
-        'rounded px-2 py-0.5 text-xs font-medium',
-        styles[priority] ?? 'bg-gray-100 text-gray-700'
+        'rounded-md px-2 py-0.5 text-xs font-medium',
+        styles[priority] ?? 'bg-muted text-muted-foreground'
       )}
     >
-      {priority}
+      {label}
     </span>
   )
 }
+
+const textareaClassName =
+  'flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
 
 export function RfiDetail({
   rfi,
+  comments = [],
   projectId,
   canAnswer,
 }: RfiDetailProps) {
+  const t = useTranslations('quality')
   const router = useRouter()
   const [submitting, setSubmitting] = useState(false)
   const [answer, setAnswer] = useState(rfi.answer ?? '')
+
+  const statusLabel = t(`status.${rfi.status}` as 'status.OPEN')
+  const priorityLabel = t(`priority.${rfi.priority}` as 'priority.LOW')
 
   async function handleAnswer() {
     if (!answer.trim()) return
@@ -86,7 +102,7 @@ export function RfiDetail({
       await answerRfi(rfi.id, answer)
       router.refresh()
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to answer')
+      alert(err instanceof Error ? err.message : t('answer'))
     } finally {
       setSubmitting(false)
     }
@@ -98,65 +114,97 @@ export function RfiDetail({
       await closeRfi(rfi.id)
       router.refresh()
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to close')
+      alert(err instanceof Error ? err.message : t('status.CLOSED'))
     } finally {
       setSubmitting(false)
     }
   }
 
+  const activityItems: { label: string; date: Date | null }[] = [
+    { label: t('createdAt'), date: rfi.createdAt },
+    { label: t('answeredAt'), date: rfi.answeredDate },
+    { label: t('closedAt'), date: rfi.closedDate },
+  ].filter((x) => x.date)
+
   return (
     <div className="space-y-6">
-      <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
-        <div className="mb-4 flex items-start justify-between gap-4">
+      <div className="rounded-lg border border-border bg-card p-4 shadow-sm md:p-6">
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
+            <h2 className="text-lg font-semibold text-foreground">
               RFI-{String(rfi.number).padStart(3, '0')} — {rfi.subject}
-            </h1>
-            <div className="mt-2 flex gap-2">
-              <StatusBadge status={rfi.status} />
-              <PriorityBadge priority={rfi.priority} />
+            </h2>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <StatusBadge status={rfi.status} label={statusLabel} />
+              <PriorityBadge priority={rfi.priority} label={priorityLabel} />
             </div>
           </div>
         </div>
 
         <dl className="grid gap-3 sm:grid-cols-2">
           <div>
-            <dt className="text-xs font-medium uppercase text-gray-500">Raised by</dt>
-            <dd className="mt-0.5 text-sm">{rfi.raisedBy.user.fullName}</dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium uppercase text-gray-500">Assigned to</dt>
-            <dd className="mt-0.5 text-sm">
-              {rfi.assignedTo?.user.fullName ?? '—'}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium uppercase text-gray-500">WBS / Location</dt>
-            <dd className="mt-0.5 text-sm">
+            <dt className="text-xs font-medium uppercase text-muted-foreground">
+              {t('wbsLocation')}
+            </dt>
+            <dd className="mt-0.5 text-sm text-foreground">
               {rfi.wbsNode ? `${rfi.wbsNode.code} — ${rfi.wbsNode.name}` : '—'}
             </dd>
           </div>
           <div>
-            <dt className="text-xs font-medium uppercase text-gray-500">Due date</dt>
-            <dd className="mt-0.5 text-sm">{formatDate(rfi.dueDate)}</dd>
+            <dt className="text-xs font-medium uppercase text-muted-foreground">
+              {t('dueDate')}
+            </dt>
+            <dd className="mt-0.5 text-sm text-foreground">
+              {formatDate(rfi.dueDate)}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs font-medium uppercase text-muted-foreground">
+              {t('raisedBy')}
+            </dt>
+            <dd className="mt-0.5 text-sm text-foreground">
+              {rfi.raisedBy.user.fullName}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs font-medium uppercase text-muted-foreground">
+              {t('assignTo')}
+            </dt>
+            <dd className="mt-0.5 text-sm text-foreground">
+              {rfi.assignedTo?.user.fullName ?? '—'}
+            </dd>
           </div>
         </dl>
 
-        <div className="mt-4 border-t border-gray-200 pt-4 dark:border-gray-700">
-          <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-            Question
-          </h3>
-          <p className="mt-1 whitespace-pre-wrap text-gray-900 dark:text-white">
+        {activityItems.length > 0 && (
+          <div className="mt-4 rounded-md border border-border/60 bg-muted/30 px-3 py-2">
+            <h3 className="text-xs font-medium uppercase text-muted-foreground">
+              {t('activityLog')}
+            </h3>
+            <ul className="mt-2 space-y-1 text-sm text-foreground">
+              {activityItems.map((item) => (
+                <li key={item.label}>
+                  {item.label}: {formatDate(item.date)}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <div className="mt-4 border-t border-border pt-4">
+          <h3 className="text-sm font-medium text-foreground">{t('question')}</h3>
+          <p className="mt-1 whitespace-pre-wrap text-muted-foreground">
             {rfi.question}
           </p>
         </div>
 
         {rfi.answer && (
-          <div className="mt-4 rounded-md bg-blue-50 p-4 dark:bg-blue-900/20">
-            <h3 className="text-sm font-medium text-blue-900 dark:text-blue-300">
-              Answer {rfi.answeredDate && `(${formatDate(rfi.answeredDate)})`}
+          <div className="mt-4 rounded-md border border-border bg-muted/30 p-4">
+            <h3 className="text-sm font-medium text-foreground">
+              {t('answer')}{' '}
+              {rfi.answeredDate && `(${formatDate(rfi.answeredDate)})`}
             </h3>
-            <p className="mt-1 whitespace-pre-wrap text-blue-800 dark:text-blue-200">
+            <p className="mt-1 whitespace-pre-wrap text-foreground">
               {rfi.answer}
             </p>
           </div>
@@ -164,17 +212,22 @@ export function RfiDetail({
 
         {canAnswer && rfi.status === 'OPEN' && (
           <div className="mt-4 space-y-2">
-            <label className="block text-sm font-medium">Provide answer</label>
+            <label className="text-sm font-medium text-foreground">
+              {t('provideAnswer')}
+            </label>
             <textarea
               value={answer}
               onChange={(e) => setAnswer(e.target.value)}
               rows={4}
-              className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-              placeholder="Type your answer..."
+              className={textareaClassName}
+              placeholder="…"
             />
             <div className="flex gap-2">
-              <Button onClick={handleAnswer} disabled={submitting || !answer.trim()}>
-                {submitting ? 'Saving…' : 'Answer RFI'}
+              <Button
+                onClick={handleAnswer}
+                disabled={submitting || !answer.trim()}
+              >
+                {submitting ? '…' : t('answerRfi')}
               </Button>
             </div>
           </div>
@@ -183,7 +236,7 @@ export function RfiDetail({
         {canAnswer && rfi.status === 'ANSWERED' && (
           <div className="mt-4">
             <Button onClick={handleClose} disabled={submitting}>
-              {submitting ? 'Closing…' : 'Close RFI'}
+              {submitting ? '…' : t('closeRfi')}
             </Button>
           </div>
         )}

@@ -84,10 +84,12 @@ export default async function RfiDetailPage({ params }: PageProps) {
           dueDate: rfi.dueDate,
           answeredDate: rfi.answeredDate,
           closedDate: rfi.closedDate,
+          createdAt: rfi.createdAt,
           raisedBy: rfi.raisedBy,
           assignedTo: rfi.assignedTo,
           wbsNode: rfi.wbsNode,
         }}
+        comments={rfi.comments}
         projectId={projectId}
         canAnswer={canAnswer}
       />

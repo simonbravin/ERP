@@ -5,6 +5,19 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { useTranslations } from 'next-intl'
+import { createSubmittal } from '@/app/actions/quality'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { cn } from '@/lib/utils'
 
 const SUBMITTAL_TYPES = [
   'MATERIAL',
@@ -16,17 +29,13 @@ const SUBMITTAL_TYPES = [
 ] as const
 
 const createSubmittalSchema = z.object({
-  submittalType: z.string().min(1, 'Type is required'),
+  submittalType: z.string().min(1),
   specSection: z.string().max(50).optional().nullable(),
   wbsNodeId: z.string().uuid().optional().nullable(),
   submittedByPartyId: z.string().uuid().optional().nullable(),
   dueDate: z.coerce.date(),
 })
 type CreateSubmittalInput = z.infer<typeof createSubmittalSchema>
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { createSubmittal } from '@/app/actions/quality'
 
 type WbsNode = { id: string; code: string; name: string }
 type Party = { id: string; name: string }
@@ -37,20 +46,31 @@ type SubmittalFormProps = {
   parties: Party[]
 }
 
+const inputClassName =
+  'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50'
+
 export function SubmittalForm({
   projectId,
   wbsNodes,
   parties,
 }: SubmittalFormProps) {
+  const t = useTranslations('quality')
   const router = useRouter()
   const {
     register,
     handleSubmit,
+    setValue,
+    watch,
     setError,
     formState: { errors, isSubmitting },
   } = useForm<CreateSubmittalInput>({
     resolver: zodResolver(createSubmittalSchema),
+    defaultValues: { submittalType: 'MATERIAL' },
   })
+
+  const submittalType = watch('submittalType')
+  const wbsNodeId = watch('wbsNodeId')
+  const submittedByPartyId = watch('submittedByPartyId')
 
   async function onSubmit(data: CreateSubmittalInput) {
     try {
@@ -68,97 +88,113 @@ export function SubmittalForm({
       }
     } catch (err) {
       setError('root', {
-        message: err instanceof Error ? err.message : 'Failed to create submittal',
+        message: err instanceof Error ? err.message : t('createSubmittal'),
       })
     }
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="erp-form-page space-y-4">
-      <div>
-        <Label htmlFor="submittalType">Type</Label>
-        <select
-          id="submittalType"
-          {...register('submittalType')}
-          className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-        >
-          {SUBMITTAL_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {t.replace(/_/g, ' ')}
-            </option>
-          ))}
-        </select>
-      </div>
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <div className="grid gap-4 sm:grid-cols-1">
+        <div className="space-y-2">
+          <Label>{t('type')}</Label>
+          <Select
+            value={submittalType}
+            onValueChange={(v) => setValue('submittalType', v)}
+          >
+            <SelectTrigger className={inputClassName}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SUBMITTAL_TYPES.map((type) => (
+                <SelectItem key={type} value={type}>
+                  {t(`submittalType.${type}`)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-      <div>
-        <Label htmlFor="specSection">Spec Section</Label>
-        <Input
-          id="specSection"
-          {...register('specSection')}
-          placeholder="e.g. 03 30 00"
-          className="mt-1"
-        />
-      </div>
+        <div className="space-y-2">
+          <Label htmlFor="specSection">{t('specSection')}</Label>
+          <Input
+            id="specSection"
+            {...register('specSection')}
+            placeholder={t('specSectionPlaceholder')}
+            className={inputClassName}
+          />
+        </div>
 
-      <div>
-        <Label htmlFor="dueDate">Due Date</Label>
-        <Input
-          id="dueDate"
-          type="date"
-          {...register('dueDate')}
-          className="mt-1"
-          required
-        />
-        {errors.dueDate && (
-          <p className="mt-1 text-sm text-destructive">{errors.dueDate.message}</p>
-        )}
-      </div>
+        <div className="space-y-2">
+          <Label htmlFor="dueDate">{t('dueDate')}</Label>
+          <Input
+            id="dueDate"
+            type="date"
+            {...register('dueDate')}
+            className={inputClassName}
+            required
+          />
+          {errors.dueDate && (
+            <p className="text-sm text-destructive">{errors.dueDate.message}</p>
+          )}
+        </div>
 
-      <div>
-        <Label htmlFor="wbsNodeId">WBS / Location</Label>
-        <select
-          id="wbsNodeId"
-          {...register('wbsNodeId')}
-          className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-        >
-          <option value="">— Select —</option>
-          {wbsNodes.map((n) => (
-            <option key={n.id} value={n.id}>
-              {n.code} — {n.name}
-            </option>
-          ))}
-        </select>
-      </div>
+        <div className="space-y-2">
+          <Label>{t('wbsLocation')}</Label>
+          <Select
+            value={wbsNodeId ?? '_none'}
+            onValueChange={(v) => setValue('wbsNodeId', v === '_none' ? null : v)}
+          >
+            <SelectTrigger className={inputClassName}>
+              <SelectValue placeholder={t('selectOption')} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="_none">{t('selectOption')}</SelectItem>
+              {wbsNodes.map((n) => (
+                <SelectItem key={n.id} value={n.id}>
+                  {n.code} — {n.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-      <div>
-        <Label htmlFor="submittedByPartyId">Submitted By (Party)</Label>
-        <select
-          id="submittedByPartyId"
-          {...register('submittedByPartyId')}
-          className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-        >
-          <option value="">— Select —</option>
-          {parties.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
+        <div className="space-y-2">
+          <Label>{t('submittedByParty')}</Label>
+          <Select
+            value={submittedByPartyId ?? '_none'}
+            onValueChange={(v) =>
+              setValue('submittedByPartyId', v === '_none' ? null : v)
+            }
+          >
+            <SelectTrigger className={inputClassName}>
+              <SelectValue placeholder={t('selectOption')} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="_none">{t('selectOption')}</SelectItem>
+              {parties.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {errors.root && (
         <p className="text-sm text-destructive">{errors.root.message}</p>
       )}
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Creating…' : 'Create Submittal'}
+          {isSubmitting ? '…' : t('createSubmittal')}
         </Button>
-        <Link href={`/projects/${projectId}/quality/submittals`}>
-          <Button type="button" variant="outline">
-            Cancel
-          </Button>
-        </Link>
+        <Button type="button" variant="outline" asChild>
+          <Link href={`/projects/${projectId}/quality/submittals`}>
+            {t('cancel')}
+          </Link>
+        </Button>
       </div>
     </form>
   )

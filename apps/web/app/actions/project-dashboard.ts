@@ -56,15 +56,29 @@ export async function getProjectDashboardData(projectId: string): Promise<Projec
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
 
   const [budgetVersion, actualExpenses, committedExpenses, certifications, wbsNodes, supplierParties, transactionsForCashflow, financeLinesForWbs] = await Promise.all([
-    prisma.budgetVersion.findFirst({
-      where: { projectId, orgId: org.orgId, status: 'APPROVED' },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        budgetLines: {
-          include: { wbsNode: { select: { id: true, code: true, name: true } } },
+    (async () => {
+      let version = await prisma.budgetVersion.findFirst({
+        where: { projectId, orgId: org.orgId, status: { in: ['APPROVED', 'BASELINE'] } },
+        orderBy: [{ status: 'desc' }, { createdAt: 'desc' }],
+        include: {
+          budgetLines: {
+            include: { wbsNode: { select: { id: true, code: true, name: true } } },
+          },
         },
-      },
-    }),
+      })
+      if (!version) {
+        version = await prisma.budgetVersion.findFirst({
+          where: { projectId, orgId: org.orgId },
+          orderBy: { createdAt: 'desc' },
+          include: {
+            budgetLines: {
+              include: { wbsNode: { select: { id: true, code: true, name: true } } },
+            },
+          },
+        })
+      }
+      return version ?? null
+    })(),
     prisma.financeTransaction.aggregate({
       where: {
         projectId,
@@ -119,10 +133,20 @@ export async function getProjectDashboardData(projectId: string): Promise<Projec
     }),
   ])
 
-  const totalBudget = budgetVersion?.budgetLines.reduce(
-    (sum, bl) => sum + Number(bl.directCostTotal),
-    0
-  ) ?? 0
+  const totalBudget = (() => {
+    if (!budgetVersion?.budgetLines?.length) return 0
+    const totalDirectCost = budgetVersion.budgetLines.reduce(
+      (sum, bl) => sum + Number(bl.directCostTotal ?? 0),
+      0
+    )
+    const gg = Number(budgetVersion.globalOverheadPct)
+    const gf = Number(budgetVersion.globalFinancialPct)
+    const util = Number(budgetVersion.globalProfitPct)
+    const tax = Number(budgetVersion.globalTaxPct)
+    const subtotal1 = totalDirectCost * (1 + gg / 100)
+    const subtotal2 = subtotal1 * (1 + gf / 100 + util / 100)
+    return subtotal2 * (1 + tax / 100)
+  })()
   const totalSpent = Number(actualExpenses._sum.amountBaseCurrency ?? 0)
   const totalCommitted = Number(committedExpenses._sum.totalBaseCurrency ?? 0)
   const remaining = totalBudget - totalSpent - totalCommitted
@@ -145,12 +169,18 @@ export async function getProjectDashboardData(projectId: string): Promise<Projec
     }
   }
   const budgetedByWbs = new Map<string, { code: string; name: string; total: number }>()
-  if (budgetVersion) {
+  if (budgetVersion?.budgetLines?.length) {
+    const gg = Number(budgetVersion.globalOverheadPct)
+    const gf = Number(budgetVersion.globalFinancialPct)
+    const util = Number(budgetVersion.globalProfitPct)
+    const tax = Number(budgetVersion.globalTaxPct)
+    const factor = (1 + gg / 100) * (1 + gf / 100 + util / 100) * (1 + tax / 100)
     for (const bl of budgetVersion.budgetLines) {
       const wbs = bl.wbsNode
       if (!wbs) continue
+      const directCost = Number(bl.directCostTotal ?? 0)
+      const sale = directCost * factor
       const prev = budgetedByWbs.get(wbs.id)
-      const sale = Number(bl.salePriceTotal)
       if (prev) {
         prev.total += sale
       } else {

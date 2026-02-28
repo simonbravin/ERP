@@ -57,15 +57,8 @@ export default async function ProjectDetailPage({ params }: PageProps) {
     ])
     if (!project) return notFound()
 
-  // Presupuesto: mostrar total de versión aprobada/baseline si existe; si no, el campo del proyecto
-  const totalBudget =
-    approvedBudgetTotal > 0
-      ? approvedBudgetTotal
-      : project.totalBudget
-        ? typeof project.totalBudget === 'number'
-          ? project.totalBudget
-          : Number(project.totalBudget)
-        : 0
+  // Total de venta del presupuesto (suma salePriceTotal); sin fallback a costo
+  const totalBudget = approvedBudgetTotal
 
   return (
     <div className="erp-stack">

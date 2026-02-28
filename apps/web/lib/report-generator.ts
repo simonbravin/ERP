@@ -1,5 +1,6 @@
 import { prisma } from '@repo/database'
 import ExcelJS from 'exceljs'
+import { getApprovedOrBaselineBudgetTotals } from '@/app/actions/budget'
 
 type FilterConfig = {
   status?: string
@@ -44,6 +45,9 @@ export async function generateProjectsReport(
     },
   })
 
+  const projectIds = projects.map((p) => p.id)
+  const budgetTotals = projectIds.length > 0 ? await getApprovedOrBaselineBudgetTotals(projectIds) : {}
+
   return projects.map((p) => {
     const row: Record<string, unknown> = {}
     if (columns.includes('id')) row.id = p.id
@@ -56,8 +60,10 @@ export async function generateProjectsReport(
       row.startDate = p.startDate?.toISOString().slice(0, 10)
     if (columns.includes('plannedEndDate'))
       row.plannedEndDate = p.plannedEndDate?.toISOString().slice(0, 10)
-    if (columns.includes('totalBudget'))
-      row.totalBudget = p.totalBudget != null ? Number(p.totalBudget) : null
+    if (columns.includes('totalBudget')) {
+      const total = budgetTotals[p.id] ?? 0
+      row.totalBudget = total > 0 ? total : null
+    }
     if (columns.includes('location')) row.location = p.location
     return row
   })
