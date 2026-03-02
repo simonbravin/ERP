@@ -137,7 +137,7 @@ export function BudgetVersionTabsWithSearch({
           )}
           </div>
         </div>
-        {summaryData.length === 0 && canSeeAdmin && summaryViewMode === 'admin' ? (
+        {canSeeAdmin && summaryViewMode === 'admin' && treeData.length === 0 ? (
           <p className="text-sm text-muted-foreground">{t('noSummaryLinesInVersion')}</p>
         ) : canSeeAdmin && summaryViewMode === 'admin' ? (
           <>

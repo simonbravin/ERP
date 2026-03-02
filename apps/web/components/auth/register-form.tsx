@@ -254,7 +254,11 @@ export function RegisterForm({ onSwitchToLogin, embedded }: RegisterFormProps) {
           )}
         </div>
       </div>
-      <Button type="submit" className="w-full" variant="default" disabled={isSubmitting}>
+      <Button
+        type="submit"
+        className="h-12 w-full rounded-lg bg-auth-primary text-base font-medium text-auth-primary-foreground hover:bg-auth-primary-hover dark:bg-auth-primary dark:hover:bg-auth-primary-hover dark:text-auth-primary-foreground"
+        disabled={isSubmitting}
+      >
         {isSubmitting ? t('creatingAccount') : t('createAccountButton')}
       </Button>
       <p className="text-center text-sm text-gray-600 dark:text-gray-400">
