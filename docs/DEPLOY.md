@@ -50,16 +50,26 @@ Puedes dejar R2 en blanco si no usas almacenamiento en Cloudflare aún.
 
 Las tablas se crean con Prisma. Hay **una sola migración inicial** (`20250101000000_initial_schema`) que crea el schema completo; así `prisma migrate deploy` funciona en una base vacía.
 
+**Env local vs prod:** En local usá siempre `packages/database/.env` (localhost). Para prod no edites ese `.env`: creá `packages/database/.env.production.local` (no se commitea; ya está en `.gitignore`) con `DATABASE_URL`, `DIRECT_URL` y si aplica `SUPER_ADMIN_PASSWORD` para Neon. Ejemplo:
+
+```env
+DATABASE_URL="postgresql://user:pass@ep-xxx-pooler.region.aws.neon.tech/neondb?sslmode=require&pgbouncer=true"
+DIRECT_URL="postgresql://user:pass@ep-xxx.region.aws.neon.tech/neondb?sslmode=require"
+SUPER_ADMIN_PASSWORD="contraseña_segura"
+```
+
+Así nunca migrás al lugar equivocado.
+
 **Base de datos nueva (Neon recién creada):**
 
-1. Configura `DATABASE_URL` y `DIRECT_URL` en tu `.env` (o en Vercel/CI) apuntando a Neon.
+1. Crea `packages/database/.env.production.local` con las URLs de Neon (pooled y direct).
 2. En la raíz del monorepo:
 
 ```bash
-pnpm db:migrate:deploy
+pnpm db:migrate:deploy:prod
 ```
 
-Esto aplica la migración inicial y deja la base lista.
+Eso carga `.env.production.local` y aplica las migraciones en Neon. La base queda lista. (Alternativa: usar `pnpm db:migrate:deploy` solo si ya tenés las variables de Neon en el entorno actual.)
 
 **Si ya tenías una base en producción** creada con el historial de migraciones anterior, una sola vez marca la baseline como aplicada (sin ejecutarla) para alinear el historial:
 
@@ -68,6 +78,11 @@ cd packages/database && npx prisma migrate resolve --applied 20250101000000_init
 ```
 
 A partir de ahí, cualquier cambio nuevo de schema: probar en local con `pnpm db:migrate` (genera una nueva migración), commitearla y en deploy ejecutar `pnpm db:migrate:deploy`.
+
+**Regla de migraciones (obligatoria):**
+
+- **Cambios de schema:** Siempre `pnpm db:migrate` en local (genera la migración). Hacé commit de la carpeta `packages/database/prisma/migrations/`.
+- **Deploy / prod:** Ejecutá `pnpm db:migrate:deploy` (en CI o manual antes/después del deploy). No uses `db:migrate` ni `db:push` contra Neon desde una máquina suelta; usá el script de prod (ver sección 3 y 5).
 
 ---
 
@@ -89,17 +104,18 @@ A partir de ahí, cualquier cambio nuevo de schema: probar en local con `pnpm db
 
 Tras el primer deploy, la base en Neon está vacía de usuarios. Para poder entrar al panel de Super Admin (`/super-admin/login`):
 
-1. En `packages/database/.env` asegura que `DATABASE_URL` y `DIRECT_URL` apunten a **Neon (producción)**.
-2. (Recomendado) Define una contraseña segura solo para producción:
+1. En `packages/database/.env.production.local` tené `DATABASE_URL`, `DIRECT_URL` y (recomendado) `SUPER_ADMIN_PASSWORD` para Neon. No uses `packages/database/.env` para prod: ese archivo debe quedar siempre para localhost.
+2. (Recomendado) En `.env.production.local` define una contraseña segura:
    ```env
    SUPER_ADMIN_PASSWORD=tu_contraseña_segura_aqui
    ```
    Si no la defines, se usará la por defecto de desarrollo (`Livestrong=15`); en producción conviene usar una contraseña fuerte.
-3. Desde la raíz del repo ejecuta:
+3. Desde la raíz del repo ejecutá:
    ```bash
-   pnpm db:create-superadmin
+   pnpm db:create-superadmin:prod
    ```
-4. El script crea (o actualiza) el usuario **superadmin** con `isSuperAdmin: true`. Luego puedes entrar en:
+   Eso carga `.env.production.local` y crea/actualiza el superadmin en Neon.
+4. El script crea (o actualiza) el usuario **superadmin** con `isSuperAdmin: true`. Luego podés entrar en:
    - **https://portal.bloqer.app/es/super-admin/login** (o tu dominio)
    - Usuario: `superadmin`
    - Contraseña: la que pusiste en `SUPER_ADMIN_PASSWORD` o la por defecto.

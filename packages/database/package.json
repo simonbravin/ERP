@@ -14,6 +14,7 @@
     "db:studio": "prisma studio",
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
+    "db:migrate:deploy:prod": "dotenv -e .env.production.local -- prisma migrate deploy",
     "db:seed": "tsx src/seed.ts",
     "db:seed-templates": "tsx src/seed-templates.ts",
     "db:seed-presupuesto-oficial": "tsx src/seed-presupuesto-oficial.ts",
@@ -25,6 +26,7 @@
     "set-org-role": "tsx src/set-org-role.ts",
     "set-bravin-password": "tsx src/set-bravin-password.ts",
     "set-superadmin-password": "tsx src/set-superadmin-password.ts",
+    "db:create-superadmin:prod": "dotenv -e .env.production.local -- tsx src/set-superadmin-password.ts",
     "build": "prisma generate",
     "lint": "echo \"Add lint\""
   },
@@ -33,6 +35,7 @@
     "bcryptjs": "^2.4.3"
   },
   "devDependencies": {
+    "dotenv-cli": "^7.4.2",
     "prisma": "^5.22.0",
     "tsx": "^4.19.0"
   }

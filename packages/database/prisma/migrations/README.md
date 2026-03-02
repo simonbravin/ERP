@@ -5,6 +5,11 @@
 - **Una migración baseline:** `20250101000000_initial_schema` crea el schema completo (todas las tablas) en una base vacía. Así `prisma migrate deploy` funciona en Neon u otra base nueva sin pasos previos.
 - Las migraciones incrementales antiguas se consolidaron en esta baseline; no se conserva carpeta de archivo.
 
+## Regla de migraciones
+
+- **Schema:** Siempre `pnpm db:migrate` en local; commit de `migrations/`.
+- **Prod:** Solo `pnpm db:migrate:deploy` (o `db:migrate:deploy:prod` con env de Neon). Nunca `db:migrate` ni `db:push` contra producción.
+
 ## Flujo de trabajo
 
 1. **Local (desarrollo):** Al cambiar `schema.prisma`, crear una migración:
