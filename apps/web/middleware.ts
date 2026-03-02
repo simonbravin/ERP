@@ -116,12 +116,12 @@ export default async function middleware(req: NextRequest) {
       return response
     }
 
+    // Protected paths (dashboard, etc.): when token is missing in Edge, let the request through.
+    // The dashboard layout (Node) will call getSession() and redirect to login if there's no session.
+    // This avoids Edge getToken() returning null due to env/secret differences on Vercel while the cookie is valid.
     if (isProtectedPath(pathname)) {
       if (!token) {
-        const locale = getLocaleFromPath(pathname)
-        const url = new URL(`/${locale}/login`, req.url)
-        url.searchParams.set('callbackUrl', pathname)
-        return NextResponse.redirect(url)
+        return response
       }
       if (token.isSuperAdmin) {
         const locale = getLocaleFromPath(pathname)
