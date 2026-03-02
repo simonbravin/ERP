@@ -17,6 +17,7 @@
     "db:migrate:deploy:prod": "dotenv -e .env.production.local -- prisma migrate deploy",
     "db:seed": "tsx src/seed.ts",
     "db:seed-templates": "tsx src/seed-templates.ts",
+    "db:seed-templates:prod": "dotenv -e .env.production.local -- tsx src/seed-templates.ts",
     "db:seed-presupuesto-oficial": "tsx src/seed-presupuesto-oficial.ts",
     "db:seed-demo": "tsx src/seed-demo.ts",
     "db:seed-test-user": "tsx src/seed-test-user.ts",

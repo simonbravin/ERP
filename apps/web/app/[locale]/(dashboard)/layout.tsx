@@ -3,12 +3,12 @@ import { redirect } from '@/i18n/navigation'
 import { getLocale } from 'next-intl/server'
 import { getSession } from '@/lib/session'
 import { getOrgContext, isRestrictedToProjects } from '@/lib/org-context'
-import { getDownloadUrl } from '@/lib/r2-client'
-import { prisma } from '@repo/database'
 import { DashboardLayout } from '@/components/layouts/dashboard-layout'
 import { SignOutConfirmButton } from '@/components/auth/sign-out-confirm-button'
 
 export const dynamic = 'force-dynamic'
+
+/** Logo is not fetched here to keep layout fast; can be loaded client-side later if needed. */
 
 function DashboardError({ message }: { message: string }) {
   return (
@@ -39,8 +39,7 @@ export default async function DashboardLayoutPage({
   children: React.ReactNode
 }) {
   try {
-    const session = await getSession()
-    const locale = await getLocale()
+    const [session, locale] = await Promise.all([getSession(), getLocale()])
     if (!session?.user?.id) {
       return redirect({ href: '/login', locale })
     }
@@ -67,24 +66,10 @@ export default async function DashboardLayoutPage({
       )
     }
 
-    let orgLogoUrl: string | null = null
-    try {
-      const profile = await prisma.orgProfile.findUnique({
-        where: { orgId: orgContext.orgId },
-        select: { logoStorageKey: true },
-      })
-      if (profile?.logoStorageKey) {
-        const url = await getDownloadUrl(profile.logoStorageKey)
-        if (url.startsWith('http') || url.startsWith('/')) orgLogoUrl = url
-      }
-    } catch {
-      // R2 or DB; sidebar will show org name without logo
-    }
-
     return (
       <DashboardLayout
         orgName={orgContext.orgName}
-        orgLogoUrl={orgLogoUrl}
+        orgLogoUrl={null}
         user={{
           name: session.user.name ?? session.user.email ?? 'User',
           email: session.user.email ?? null,

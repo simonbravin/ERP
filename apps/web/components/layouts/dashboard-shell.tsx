@@ -33,16 +33,46 @@ function useIsMobile() {
  * No top header bar: page titles live in each section; mobile gets a floating menu button to open the sidebar.
  */
 export function DashboardShell({ children, orgName, orgLogoUrl, user, restrictedToProjects }: DashboardShellProps) {
+  const [resolvedLogoUrl, setResolvedLogoUrl] = useState<string | null>(orgLogoUrl ?? null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const isMobile = useIsMobile()
+
+  // Keep local state in sync if server ever provides a logo URL.
+  useEffect(() => {
+    setResolvedLogoUrl(orgLogoUrl ?? null)
+  }, [orgLogoUrl])
+
+  // Lazy-load org logo via API so navigation is not blocked by R2/DB calls.
+  useEffect(() => {
+    if (resolvedLogoUrl !== null) return
+    let cancelled = false
+
+    async function loadLogo() {
+      try {
+        const res = await fetch('/api/org/logo')
+        if (!res.ok) return
+        const data = (await res.json()) as { logoUrl?: string | null }
+        if (!cancelled && data.logoUrl) {
+          setResolvedLogoUrl(data.logoUrl)
+        }
+      } catch {
+        // Ignore logo errors; sidebar will just show org initials/name.
+      }
+    }
+
+    loadLogo()
+    return () => {
+      cancelled = true
+    }
+  }, [resolvedLogoUrl])
 
   return (
     <div className="flex h-screen w-full bg-background">
       <div className="flex h-full w-full min-w-0 overflow-hidden">
         <DynamicSidebar
           orgName={orgName}
-          orgLogoUrl={orgLogoUrl}
+          orgLogoUrl={resolvedLogoUrl}
           user={user}
           restrictedToProjects={restrictedToProjects}
           isMobile={isMobile}

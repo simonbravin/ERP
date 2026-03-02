@@ -18,7 +18,7 @@ export default async function SuperAdminLayout({
     return (
       <div className="fixed inset-0 flex items-center justify-center overflow-auto bg-background p-4">
         <div
-          className="w-full overflow-hidden rounded-2xl border border-border bg-card shadow-xl"
+          className="w-full overflow-hidden rounded-3xl border border-border bg-card shadow-2xl"
           style={{ width: 'min(100%, 420px)', minWidth: '320px' }}
         >
           <div className="border-b border-border bg-muted/80 px-8 py-6">

@@ -27,7 +27,8 @@
     "db:migrate:deploy:prod": "pnpm --filter @repo/database db:migrate:deploy:prod",
     "db:create-superadmin": "pnpm --filter @repo/database set-superadmin-password",
     "db:create-superadmin:prod": "pnpm --filter @repo/database db:create-superadmin:prod",
-    "ensure-demo-org:prod": "pnpm --filter @repo/database ensure-demo-org:prod"
+    "ensure-demo-org:prod": "pnpm --filter @repo/database ensure-demo-org:prod",
+    "db:seed-templates:prod": "pnpm --filter @repo/database db:seed-templates:prod"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

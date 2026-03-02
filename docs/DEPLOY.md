@@ -161,6 +161,14 @@ Tras el primer deploy, la base en Neon está vacía de usuarios. Para poder entr
 
 Solo hace falta ejecutarlo una vez por entorno (o cuando quieras resetear la contraseña del superadmin).
 
+**Templates de proyecto (Nuevo Proyecto):** Si en "Nuevo Proyecto" no aparecen los templates para elegir, es porque la base en Neon está vacía de datos de plantillas. Ejecutá una vez (con `packages/database/.env.production.local` apuntando a Neon):
+
+```bash
+pnpm db:seed-templates:prod
+```
+
+Eso crea los templates (Obra Pública, Obra Privada, Ampliación Cocina, Ampliación Baño) y los sistemas constructivos. Después de eso, el paso "Seleccionar Template" mostrará las opciones.
+
 ---
 
 ## 6. Comprobar que la app responde (producción lista para comercializar)
@@ -175,6 +183,8 @@ Solo hace falta ejecutarlo una vez por entorno (o cuando quieras resetear la con
 
 Si todo eso pasa, la app está activa y podés registrar clientes y comercializar.
 
+**Usuario sin organización:** Si creaste un usuario (ej. Demo) a mano o migraste y no puede entrar, asignale una org con: `pnpm ensure-demo-org:prod` (desde la raíz; usa `packages/database/.env.production.local`). El script crea una org y lo deja como OWNER.
+
 **Debug en producción:** El widget de estado del sistema (flotante) solo se muestra si en Vercel definís `NEXT_PUBLIC_SHOW_DEBUG_WIDGET=true`. No lo definas en producción si no lo necesitás; el dashboard de Super Admin ya incluye un bloque de estado embebido para ops.
 
 ### Diagnóstico: "vuelve al login" sin mensaje de error
@@ -185,7 +195,7 @@ Si todo eso pasa, la app está activa y podés registrar clientes y comercializa
 2. En la **misma pestaña**, abrí esta URL: **https://portal.bloqer.app/api/auth/session**
 3. Mirá qué muestra la página:
    - Si ves **`{}`** o **"null"** → la sesión no se está guardando. Revisá en Vercel que `NEXTAUTH_URL` sea exactamente `https://portal.bloqer.app` (sin barra final) y que `NEXTAUTH_SECRET` esté definido. Redeploy y probá de nuevo.
-   - Si ves un **objeto JSON con `user`** (ej. `{"user":{"name":"...","email":"..."}}`) → la sesión sí existe; el problema sería la redirección después del login (avisanos y lo revisamos).
+   - Si ves un **objeto JSON con `user`** (ej. `{"user":{"name":"...","email":"..."}}`) → la sesión sí existe. Si aun así la app te devolvía al login, el middleware ya no redirige por token en Edge; el layout (Node) hace la verificación con `getSession()` y deberías entrar al dashboard.
 
 Con eso ya sabés si el fallo es de cookie/sesión (NEXTAUTH_URL o secret) o de la lógica de la app.
 

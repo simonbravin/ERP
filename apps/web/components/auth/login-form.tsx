@@ -131,7 +131,7 @@ export function LoginForm() {
         )}
         <Button
           type="submit"
-          className="h-12 w-full rounded-lg bg-auth-primary text-base font-medium text-auth-primary-foreground hover:bg-auth-primary-hover"
+          className="h-12 w-full rounded-lg bg-auth-primary text-base font-medium text-auth-primary-foreground hover:bg-auth-primary-hover dark:bg-auth-primary dark:hover:bg-auth-primary-hover dark:text-auth-primary-foreground"
           disabled={isSubmitting}
         >
           {isSubmitting ? t('signingIn') : t('signIn')}

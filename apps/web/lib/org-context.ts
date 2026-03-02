@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import { prisma } from '@repo/database'
 import type { CustomPermissionsMap } from '@/lib/permissions'
 
@@ -34,7 +35,8 @@ export async function getVisibleProjectIds(ctx: OrgContext): Promise<string[] | 
   return rows.map((r) => r.projectId)
 }
 
-export async function getOrgContext(userId: string): Promise<OrgContext | null> {
+/** Cached per request so layout + page don't double-fetch. */
+export const getOrgContext = cache(async function getOrgContext(userId: string): Promise<OrgContext | null> {
   const member = await prisma.orgMember.findFirst({
     where: { userId, active: true },
     select: {
@@ -56,4 +58,4 @@ export async function getOrgContext(userId: string): Promise<OrgContext | null> 
     restrictedToProjects: member.restrictedToProjects ?? false,
     customPermissions: (member.customPermissions as CustomPermissionsMap) ?? null,
   }
-}
+})
