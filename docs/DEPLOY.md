@@ -4,6 +4,33 @@ Esta guía es para llevar Bloqer a producción en **Vercel + Neon** desde cero (
 
 ---
 
+## Flujo de trabajo: local vs producción
+
+**Desarrollo en local (nuevas funcionalidades, testear):**
+
+- En `packages/database/` usá **`.env`** apuntando a **localhost** (PostgreSQL local). Copiá de `packages/database/.env.example` si no tenés uno. Si tu `.env` hoy apunta a Neon, reemplazalo con los valores de `.env.example` para desarrollar; las URLs de Neon dejalas solo en `.env.production.local`.
+- Comandos: `pnpm dev`, `pnpm db:migrate` para cambios de schema. Probá todo en local.
+- Cuando esté listo: **commit + push** a `main` (o tu rama). No hace falta tocar Neon para desarrollar.
+
+**Producción (Vercel + Neon) — ya migraste:**
+
+- Cada **push a `main`** dispara el deploy en Vercel. La app en producción usa las variables de entorno que configuraste en Vercel (DATABASE_URL, etc.) y la base Neon.
+- **Migraciones en Neon:** no uses `.env` para eso. Tené `packages/database/.env.production.local` con las URLs de Neon y ejecutá:
+  - `pnpm db:migrate:deploy:prod` — aplica migraciones en Neon.
+  - `pnpm db:create-superadmin:prod` — crea o actualiza el usuario superadmin en Neon.
+- **Registro de usuarios y comercializar:** si en Vercel tenés bien `DATABASE_URL`, `DIRECT_URL` (sin prefijo `psql '`), `NEXTAUTH_URL`, `NEXTAUTH_SECRET`, `NEXT_PUBLIC_APP_URL`, la app en producción ya permite registro e inicio de sesión. Verificá con `/api/health` y probando registrar un usuario en portal.bloqer.app.
+
+**Resumen:**
+
+| Qué querés hacer | Dónde | Qué usar |
+|------------------|-------|----------|
+| Desarrollar y testear | Local | `.env` con localhost, `pnpm dev`, `pnpm db:migrate` |
+| Subir código a producción | Git | `git push` a `main` → Vercel despliega solo |
+| Aplicar migraciones en Neon | Local (una vez) | `.env.production.local` + `pnpm db:migrate:deploy:prod` |
+| Crear/actualizar superadmin en Neon | Local (una vez) | `.env.production.local` + `pnpm db:create-superadmin:prod` |
+
+---
+
 ## 1. Base de datos en Neon
 
 1. Entra en [Neon](https://neon.tech) y crea una cuenta si no la tienes.
@@ -124,11 +151,17 @@ Solo hace falta ejecutarlo una vez por entorno (o cuando quieras resetear la con
 
 ---
 
-## 6. Comprobar que la app responde
+## 6. Comprobar que la app responde (producción lista para comercializar)
 
-- Abre la URL del deploy.
-- Si hay un endpoint de health (ej. `/api/health`) que haga un `SELECT 1` a la DB, úsalo para confirmar que la conexión a Neon funciona.
-- Prueba login/registro y que no aparezca el error de "revisar DATABASE_URL".
+**Checklist:**
+
+- [ ] En Vercel: `DATABASE_URL` y `DIRECT_URL` para **Production**, valor = solo la URL (sin `psql '` ni comillas). Redeploy después de cambiar.
+- [ ] `/api/health` responde `{"status":"ok"}` (ej. `https://portal.bloqer.app/api/health`).
+- [ ] Registro de usuario nuevo funciona en la URL de producción.
+- [ ] Inicio de sesión con ese usuario funciona.
+- [ ] Super Admin: `pnpm db:create-superadmin:prod` ya ejecutado; podés entrar en `/es/super-admin/login` con usuario `superadmin`.
+
+Si todo eso pasa, la app está activa y podés registrar clientes y comercializar.
 
 ---
 
@@ -156,10 +189,10 @@ Si usas [Inngest](https://inngest.com) en producción:
 ## Resumen rápido (orden)
 
 1. Crear proyecto Neon y copiar **pooled** + **direct** URLs.
-2. Añadir en Vercel todas las variables (Auth, DB, Resend, opcional Inngest).
-3. Ejecutar `pnpm db:migrate:deploy` con `DATABASE_URL` y `DIRECT_URL` apuntando a Neon.
-4. Deploy en Vercel; ajustar `NEXTAUTH_URL` y `NEXT_PUBLIC_APP_URL` con la URL final.
-5. Crear superadmin en producción: `SUPER_ADMIN_PASSWORD` en `packages/database/.env` + `pnpm db:create-superadmin`.
+2. Añadir en Vercel todas las variables (Auth, DB, Resend, opcional Inngest). Valores crudos: sin `psql '` ni comillas.
+3. Crear `packages/database/.env.production.local` con esas URLs y ejecutar `pnpm db:migrate:deploy:prod`.
+4. Deploy en Vercel (push a `main`); ajustar `NEXTAUTH_URL` y `NEXT_PUBLIC_APP_URL` con la URL final.
+5. Crear superadmin en producción: `SUPER_ADMIN_PASSWORD` en `.env.production.local` + `pnpm db:create-superadmin:prod`.
 6. Configurar Resend y probar emails.
 
-A partir de aquí puedes ir probando el MVP y, cuando quieras, añadir notificaciones por WhatsApp (ver plan de producción en el repo).
+A partir de aquí podés ir probando el MVP y, cuando quieras, añadir notificaciones por WhatsApp (ver plan de producción en el repo).

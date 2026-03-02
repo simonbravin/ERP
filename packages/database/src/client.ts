@@ -13,8 +13,10 @@ if (!process.env.DATABASE_URL?.trim() && process.env.PRIMARY_DATABASE_URL?.trim(
   process.env.DATABASE_URL = process.env.PRIMARY_DATABASE_URL
 }
 
-// Fail fast in production if DB is not configured (avoids cryptic Prisma connection errors)
-if (process.env.NODE_ENV === 'production' && !process.env.DATABASE_URL?.trim()) {
+// Fail fast in production on the SERVER only (browser: no throw; next build: no throw; Vercel runtime: throw if missing).
+const isServer = typeof window === 'undefined'
+const isVercelRuntime = process.env.VERCEL === '1'
+if (isServer && process.env.NODE_ENV === 'production' && isVercelRuntime && !process.env.DATABASE_URL?.trim()) {
   const vercelEnv = process.env.VERCEL_ENV ?? 'production'
   throw new Error(
     `DATABASE_URL is required in production. In Vercel: Project Settings → Environment Variables → add DATABASE_URL for "${vercelEnv}". If you use Neon’s integration, use the same Vercel project that serves this domain and assign vars to Production. Value = raw URL only (postgresql://...), no "psql \'" prefix or quotes. Then redeploy.`
