@@ -38,4 +38,12 @@ cd packages/database
 npx prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script > prisma/migrations/NOMBRE_NUEVO/migration.sql
 ```
 
+En Windows, para evitar problemas de encoding en el `.sql`, usa redirección con UTF-8. En PowerShell:
+
+```powershell
+npx prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script | Set-Content -Path "prisma/migrations/NOMBRE_NUEVO/migration.sql" -Encoding UTF8
+```
+
+O desde Node (UTF-8 sin BOM): `node -e "const fs=require('fs'); const {execSync}=require('child_process'); const sql=execSync('npx prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script',{encoding:'utf8',cwd:__dirname}); fs.writeFileSync('prisma/migrations/NOMBRE_NUEVO/migration.sql', sql, 'utf8');"` (ejecutar desde `packages/database`).
+
 No borres ni edites a mano la baseline sin coordinar con el equipo; el deploy y los entornos dependen de ella.

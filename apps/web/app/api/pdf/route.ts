@@ -158,7 +158,9 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Versión no encontrada' }, { status: 404 })
       }
       const { version, rows, grandTotal } = data
-      console.log('[PDF budget] rows count (WBS nodes):', rows.length)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[PDF budget] rows count (WBS nodes):', rows.length)
+      }
       const project = await getProject(version.projectId)
       if (!project) {
         return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 })

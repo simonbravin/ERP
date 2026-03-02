@@ -115,11 +115,13 @@ A partir de ahí, cualquier cambio nuevo de schema: probar en local con `pnpm db
 
 ## 4. Deploy en Vercel
 
+La configuración de build y deploy está en el **`vercel.json` de la raíz del repo** (único punto de verdad). El deploy oficial se hace siempre con **Root Directory** = raíz del monorepo.
+
 1. Conecta el repo si no está conectado (Vercel detecta el monorepo).
 2. **Root Directory**: deja la raíz del repo (no `apps/web`).
-3. **Build Command**: debe ser `cd ../.. && pnpm build --filter=web` (o el que ya tengas en `apps/web/vercel.json`).
-4. **Install Command**: `cd ../.. && pnpm install` (según tu `vercel.json`).
-5. **Output Directory**: `apps/web/.next` (o el que Vercel asigne a la app Next.js).
+3. **Build Command**: `pnpm build --filter=web` (definido en `vercel.json` de la raíz).
+4. **Install Command**: `pnpm install` (definido en `vercel.json` de la raíz).
+5. **Output Directory**: `apps/web/.next`.
 6. Guarda y haz **Deploy**. Tras el primer deploy, copia la URL (ej. `https://bloqer-xxx.vercel.app`) y actualiza en Vercel:
    - `NEXTAUTH_URL`
    - `NEXT_PUBLIC_APP_URL`
@@ -156,12 +158,14 @@ Solo hace falta ejecutarlo una vez por entorno (o cuando quieras resetear la con
 **Checklist:**
 
 - [ ] En Vercel: `DATABASE_URL` y `DIRECT_URL` para **Production**, valor = solo la URL (sin `psql '` ni comillas). Redeploy después de cambiar.
-- [ ] `/api/health` responde `{"status":"ok"}` (ej. `https://portal.bloqer.app/api/health`).
+- [ ] `/api/health` responde `{"status":"ok"}` (ej. `https://portal.bloqer.app/api/health`). Para diagnosticar env en runtime: `GET /api/env-check` devuelve si `DATABASE_URL` y `DIRECT_URL` están definidos (sin revelar valores).
 - [ ] Registro de usuario nuevo funciona en la URL de producción.
 - [ ] Inicio de sesión con ese usuario funciona.
 - [ ] Super Admin: `pnpm db:create-superadmin:prod` ya ejecutado; podés entrar en `/es/super-admin/login` con usuario `superadmin`.
 
 Si todo eso pasa, la app está activa y podés registrar clientes y comercializar.
+
+**Debug en producción:** El widget de estado del sistema (flotante) solo se muestra si en Vercel definís `NEXT_PUBLIC_SHOW_DEBUG_WIDGET=true`. No lo definas en producción si no lo necesitás; el dashboard de Super Admin ya incluye un bloque de estado embebido para ops.
 
 ---
 

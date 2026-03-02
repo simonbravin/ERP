@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/env-check
  * Diagnóstico: indica si el runtime tiene DATABASE_URL (sin revelar el valor).
