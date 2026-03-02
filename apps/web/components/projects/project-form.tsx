@@ -16,6 +16,7 @@ import { Textarea } from '@/components/ui/textarea'
 import Link from 'next/link'
 import { useRouter } from '@/i18n/navigation'
 import { updateProject } from '@/app/actions/projects'
+import { toast } from 'sonner'
 
 type ProjectFormProps = {
   mode: 'create' | 'edit'
@@ -112,6 +113,7 @@ export function ProjectForm({
     }
     // Navegar al resumen: refrescar caché y luego ir para que el resumen muestre datos actualizados (phase, estado)
     if (projectId != null && result && 'success' in result && result.success) {
+      toast.success(t('saved', { defaultMessage: 'Guardado' }))
       router.refresh()
       router.push(`/projects/${projectId}`)
     }

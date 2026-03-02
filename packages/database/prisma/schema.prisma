@@ -682,6 +682,7 @@ model WbsNode {
   @@unique([projectId, code])
   @@index([projectId, parentId])
   @@index([projectId, category])
+  @@index([projectId, active])
   @@index([actualHours])
   @@index([progressPct])
   @@index([healthStatus])
@@ -726,6 +727,8 @@ model BudgetVersion {
   @@unique([projectId, versionCode])
   @@index([projectId, status])
   @@index([orgId])
+  @@index([orgId, projectId, status])
+  @@index([orgId, projectId, createdAt])
   @@map("budget_versions")
   @@schema("public")
 }

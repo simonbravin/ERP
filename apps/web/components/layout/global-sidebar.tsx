@@ -143,6 +143,7 @@ export function GlobalSidebar({ orgName = 'Bloqer', orgLogoUrl, user, restricted
         {collapsed ? (
           <Link
             href="/dashboard"
+            prefetch
             onClick={isMobile ? onSidebarClose : undefined}
             className="flex h-8 w-8 flex-1 items-center justify-center rounded-lg text-sidebar-muted transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
             title={t('dashboard')}
@@ -150,7 +151,7 @@ export function GlobalSidebar({ orgName = 'Bloqer', orgLogoUrl, user, restricted
             <Home className="h-5 w-5" />
           </Link>
         ) : (
-          <Link href="/dashboard" onClick={isMobile ? onSidebarClose : undefined} className="flex min-w-0 flex-1 items-center gap-2">
+          <Link href="/dashboard" prefetch onClick={isMobile ? onSidebarClose : undefined} className="flex min-w-0 flex-1 items-center gap-2">
             {orgLogoUrl ? (
               <img
                 src={orgLogoUrl}
@@ -212,6 +213,7 @@ export function GlobalSidebar({ orgName = 'Bloqer', orgLogoUrl, user, restricted
                       <Link
                         key={item.href}
                         href={item.href}
+                        prefetch
                         onClick={isMobile ? onSidebarClose : undefined}
                         title={item.name}
                         className={cn(
@@ -232,6 +234,7 @@ export function GlobalSidebar({ orgName = 'Bloqer', orgLogoUrl, user, restricted
                         <div className="flex items-center">
                           <Link
                             href={item.href}
+                            prefetch
                             onClick={isMobile ? onSidebarClose : undefined}
                             className={cn(
                               'flex flex-1 min-w-0 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
@@ -265,6 +268,7 @@ export function GlobalSidebar({ orgName = 'Bloqer', orgLogoUrl, user, restricted
                                 <Link
                                   key={child.href}
                                   href={child.href}
+                                  prefetch
                                   onClick={isMobile ? onSidebarClose : undefined}
                                   className={cn(
                                     'block rounded-lg px-3 py-1.5 text-sm transition-colors',
@@ -287,6 +291,7 @@ export function GlobalSidebar({ orgName = 'Bloqer', orgLogoUrl, user, restricted
                     <Link
                       key={item.href}
                       href={item.href}
+                      prefetch
                       onClick={isMobile ? onSidebarClose : undefined}
                       className={cn(
                         'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',

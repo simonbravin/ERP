@@ -4,14 +4,16 @@ import { getSession } from '@/lib/session'
 import { getOrgContext, isRestrictedToProjects } from '@/lib/org-context'
 import { hasMinimumRole } from '@/lib/rbac'
 import { listProjects } from '@/app/actions/projects'
-import { getApprovedOrBaselineBudgetTotal } from '@/app/actions/budget'
+import { getApprovedOrBaselineBudgetTotals } from '@/app/actions/budget'
 import { ProjectsListClient } from '@/components/projects/projects-list-client'
 import { Link } from '@/i18n/navigation'
 import { Button } from '@/components/ui/button'
 import { Plus, FileSpreadsheet } from 'lucide-react'
 
+const PAGE_SIZE = 25
+
 type PageProps = {
-  searchParams: Promise<{ status?: string; phase?: string; search?: string }>
+  searchParams: Promise<{ status?: string; phase?: string; search?: string; page?: string }>
 }
 
 export default async function ProjectsPage({ searchParams }: PageProps) {
@@ -22,18 +24,23 @@ export default async function ProjectsPage({ searchParams }: PageProps) {
   const t = await getTranslations('projects')
 
   const params = await searchParams
-  const projects = await listProjects({
+  const page = Math.max(1, parseInt(params.page ?? '1', 10) || 1)
+  const result = await listProjects({
     status: params.status,
     phase: params.phase,
     search: params.search,
+    page,
+    pageSize: PAGE_SIZE,
   })
-  // Enrich with approved/baseline budget total so list shows correct presupuesto
-  const budgetTotals = await Promise.all(
-    projects.map((p) => getApprovedOrBaselineBudgetTotal(p.id))
-  )
-  const projectsWithBudget = projects.map((p, i) => ({
+  const isPaginated = typeof result === 'object' && 'projects' in result && 'total' in result
+  const projects = isPaginated ? result.projects : result
+  const total = isPaginated ? result.total : projects.length
+  const pageSize = isPaginated ? result.pageSize : projects.length
+  // Single batch query for budget totals (no N+1)
+  const budgetTotals = await getApprovedOrBaselineBudgetTotals(projects.map((p) => p.id))
+  const projectsWithBudget = projects.map((p) => ({
     ...p,
-    totalBudget: budgetTotals[i] ?? 0,
+    totalBudget: budgetTotals[p.id] ?? 0,
   }))
   const canEdit = hasMinimumRole(org.role, 'EDITOR')
   const restrictedNoProjects = isRestrictedToProjects(org) && projects.length === 0
@@ -80,7 +87,15 @@ export default async function ProjectsPage({ searchParams }: PageProps) {
       </div>
 
       {/* Projects list/grid */}
-      <ProjectsListClient projects={projectsWithBudget} canEdit={canEdit} showExport={true} />
+      <ProjectsListClient
+        projects={projectsWithBudget}
+        canEdit={canEdit}
+        showExport={true}
+        total={total}
+        page={page}
+        pageSize={pageSize}
+        searchParams={params}
+      />
     </div>
   )
 }

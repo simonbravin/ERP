@@ -194,6 +194,7 @@ export function ProjectSidebar({ projectId, orgName = 'Bloqer', orgLogoUrl, user
         {collapsed ? (
           <Link
             href="/dashboard"
+            prefetch
             onClick={closeOnNav}
             className="flex h-8 w-8 flex-1 items-center justify-center rounded-lg text-sidebar-muted transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
             title={t('dashboard')}
@@ -201,7 +202,7 @@ export function ProjectSidebar({ projectId, orgName = 'Bloqer', orgLogoUrl, user
             <Home className="h-5 w-5" />
           </Link>
         ) : (
-          <Link href="/dashboard" onClick={closeOnNav} className="flex min-w-0 flex-1 items-center gap-2">
+          <Link href="/dashboard" prefetch onClick={closeOnNav} className="flex min-w-0 flex-1 items-center gap-2">
             {orgLogoUrl ? (
               <img
                 src={orgLogoUrl}
@@ -219,6 +220,7 @@ export function ProjectSidebar({ projectId, orgName = 'Bloqer', orgLogoUrl, user
           {!collapsed && (
             <Link
               href="/projects"
+              prefetch
               onClick={closeOnNav}
               className="flex items-center gap-1.5 text-xs text-sidebar-muted transition-colors hover:text-sidebar-foreground"
               title={t('backToProjects')}
@@ -284,6 +286,7 @@ export function ProjectSidebar({ projectId, orgName = 'Bloqer', orgLogoUrl, user
                       <Link
                         key={item.href}
                         href={item.href}
+                        prefetch
                         onClick={closeOnNav}
                         title={item.name}
                         className={cn(
@@ -303,6 +306,7 @@ export function ProjectSidebar({ projectId, orgName = 'Bloqer', orgLogoUrl, user
                       <div className="flex items-center">
                         <Link
                           href={item.href}
+                          prefetch
                           onClick={closeOnNav}
                           className={cn(
                             'flex flex-1 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
@@ -338,6 +342,7 @@ export function ProjectSidebar({ projectId, orgName = 'Bloqer', orgLogoUrl, user
                                 <div key={child.href} className="space-y-0.5">
                                   <Link
                                     href={child.href}
+                                    prefetch
                                     onClick={closeOnNav}
                                     className={cn(
                                       'block rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
@@ -355,6 +360,7 @@ export function ProjectSidebar({ projectId, orgName = 'Bloqer', orgLogoUrl, user
                                         <Link
                                           key={sub.href}
                                           href={sub.href}
+                                          prefetch
                                           onClick={closeOnNav}
                                           className={cn(
                                             'block rounded-lg px-3 py-1 text-sm transition-colors',
@@ -375,6 +381,7 @@ export function ProjectSidebar({ projectId, orgName = 'Bloqer', orgLogoUrl, user
                               <Link
                                 key={child.href}
                                 href={child.href}
+                                prefetch
                                 onClick={closeOnNav}
                                 className={cn(
                                   'block rounded-lg px-3 py-1.5 text-sm transition-colors',

@@ -36,7 +36,7 @@ type SummaryLine = {
   taxPct: number
 }
 
-type BudgetVersionTabsWithSearchProps = {
+export type BudgetVersionTabsWithSearchProps = {
   treeData: BudgetTreeNode[]
   version: VersionForTabs
   totalDirectCostNum: number

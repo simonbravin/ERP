@@ -45,6 +45,10 @@ export function BudgetVersionStatusDropdown({
 
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [pendingStatus, setPendingStatus] = useState<string | null>(null)
+  /** Optimistic status: show new value immediately, revert on server error */
+  const [optimisticStatus, setOptimisticStatus] = useState<string | null>(null)
+
+  const displayStatus = optimisticStatus ?? currentStatus
 
   const statuses = [
     {
@@ -70,7 +74,7 @@ export function BudgetVersionStatusDropdown({
     },
   ]
 
-  const currentStatusData = statuses.find((s) => s.value === currentStatus)
+  const currentStatusData = statuses.find((s) => s.value === displayStatus)
 
   function handleStatusChange(newStatus: string) {
     if (newStatus === currentStatus) return
@@ -84,6 +88,7 @@ export function BudgetVersionStatusDropdown({
   }
 
   function confirmStatusChange(status: string) {
+    setOptimisticStatus(status)
     startTransition(async () => {
       try {
         const result = await updateBudgetVersionStatus(
@@ -95,11 +100,13 @@ export function BudgetVersionStatusDropdown({
           toast.success(t('statusUpdated'), { description: t('statusUpdatedDesc') })
           router.refresh()
         } else {
+          setOptimisticStatus(null)
           toast.error(t('error'), {
             description: result.error || t('statusUpdateError'),
           })
         }
       } catch {
+        setOptimisticStatus(null)
         toast.error(t('error'), { description: t('statusUpdateError') })
       } finally {
         setShowConfirmDialog(false)
@@ -113,7 +120,7 @@ export function BudgetVersionStatusDropdown({
     return (
       <Badge className={currentStatusData?.color ?? 'bg-muted text-foreground'}>
         <Icon className="mr-1 h-3 w-3" />
-        {currentStatusData?.label ?? currentStatus}
+        {currentStatusData?.label ?? displayStatus}
       </Badge>
     )
   }
@@ -122,7 +129,7 @@ export function BudgetVersionStatusDropdown({
 
   return (
     <>
-      <Select value={currentStatus} onValueChange={handleStatusChange} disabled={isPending}>
+      <Select value={displayStatus} onValueChange={handleStatusChange} disabled={isPending}>
         <SelectTrigger className="w-[180px]">
           <SelectValue>
             {isPending ? (

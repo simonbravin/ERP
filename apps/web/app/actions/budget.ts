@@ -1755,21 +1755,86 @@ export async function getApprovedOrBaselineBudgetTotal(projectId: string): Promi
   }
 }
 
+function computeTotalSaleFromVersion(
+  version: { globalOverheadPct: unknown; globalFinancialPct: unknown; globalProfitPct: unknown; globalTaxPct: unknown; budgetLines: { directCostTotal: unknown }[] }
+): number {
+  if (!version?.budgetLines?.length) return 0
+  const totalDirectCost = version.budgetLines.reduce(
+    (sum, bl) => sum + Number(bl.directCostTotal ?? 0),
+    0
+  )
+  const gg = Number(version.globalOverheadPct)
+  const gf = Number(version.globalFinancialPct)
+  const util = Number(version.globalProfitPct)
+  const tax = Number(version.globalTaxPct)
+  const subtotal1 = totalDirectCost * (1 + gg / 100)
+  const subtotal2 = subtotal1 * (1 + gf / 100 + util / 100)
+  return subtotal2 * (1 + tax / 100)
+}
+
 /**
  * Totales de presupuesto (approved/baseline) para una lista de proyectos.
- * Misma fuente que la columna Presupuesto de la lista de proyectos.
+ * Batch implementation: 1–2 DB queries instead of N. Same result as getApprovedOrBaselineBudgetTotal per project.
  */
 export async function getApprovedOrBaselineBudgetTotals(
   projectIds: string[]
 ): Promise<Record<string, number>> {
   if (projectIds.length === 0) return {}
-  const results = await Promise.all(
-    projectIds.map(async (id) => {
-      const total = await getApprovedOrBaselineBudgetTotal(id)
-      return { id, total }
+  try {
+    const { org } = await getAuthContext()
+    const record: Record<string, number> = {}
+
+    // 1) Fetch all APPROVED/BASELINE versions for these projects (one query)
+    const approvedOrBaseline = await prisma.budgetVersion.findMany({
+      where: {
+        projectId: { in: projectIds },
+        orgId: org.orgId,
+        status: { in: ['APPROVED', 'BASELINE'] },
+      },
+      orderBy: [{ status: 'desc' }, { createdAt: 'desc' }],
+      select: {
+        projectId: true,
+        globalOverheadPct: true,
+        globalFinancialPct: true,
+        globalProfitPct: true,
+        globalTaxPct: true,
+        budgetLines: { select: { directCostTotal: true } },
+      },
     })
-  )
-  const record: Record<string, number> = {}
-  for (const { id, total } of results) record[id] = total
-  return record
+    const byProject = new Map<string, typeof approvedOrBaseline[0]>()
+    for (const v of approvedOrBaseline) {
+      if (!byProject.has(v.projectId)) byProject.set(v.projectId, v)
+    }
+    const missingIds = projectIds.filter((id) => !byProject.has(id))
+    for (const [projectId, version] of byProject) {
+      record[projectId] = computeTotalSaleFromVersion(version)
+    }
+
+    if (missingIds.length === 0) return record
+
+    // 2) For projects without APPROVED/BASELINE, use latest version (one query)
+    const latest = await prisma.budgetVersion.findMany({
+      where: { projectId: { in: missingIds }, orgId: org.orgId },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        projectId: true,
+        globalOverheadPct: true,
+        globalFinancialPct: true,
+        globalProfitPct: true,
+        globalTaxPct: true,
+        budgetLines: { select: { directCostTotal: true } },
+      },
+    })
+    const latestByProject = new Map<string, typeof latest[0]>()
+    for (const v of latest) {
+      if (!latestByProject.has(v.projectId)) latestByProject.set(v.projectId, v)
+    }
+    for (const projectId of missingIds) {
+      const version = latestByProject.get(projectId)
+      record[projectId] = version ? computeTotalSaleFromVersion(version) : 0
+    }
+    return record
+  } catch {
+    return {}
+  }
 }

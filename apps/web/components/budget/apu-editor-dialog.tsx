@@ -243,6 +243,27 @@ export function APUEditorDialog({
   }
 
   function handleSaveMargins() {
+    const previousBudgetLine = budgetLine
+    const previousMargins = budgetLine
+      ? {
+          overheadPct: budgetLine.overheadPct ?? 0,
+          financialPct: budgetLine.financialPct ?? 0,
+          profitPct: budgetLine.profitPct ?? 0,
+          taxPct: budgetLine.taxPct ?? 0,
+        }
+      : null
+    setBudgetLine((prev) =>
+      prev
+        ? {
+            ...prev,
+            overheadPct: marginForm.overheadPct,
+            financialPct: marginForm.financialPct,
+            profitPct: marginForm.profitPct,
+            taxPct: marginForm.taxPct,
+          }
+        : null
+    )
+    toast.success(t('marginsSaved', { defaultValue: 'Márgenes guardados' }))
     startTransition(async () => {
       const result = await updateBudgetLine(budgetLineId, {
         overheadPct: marginForm.overheadPct,
@@ -251,21 +272,18 @@ export function APUEditorDialog({
         taxPct: marginForm.taxPct,
       })
       if (result && 'error' in result) {
+        if (previousBudgetLine && previousMargins) {
+          setBudgetLine({
+            ...previousBudgetLine,
+            overheadPct: previousMargins.overheadPct,
+            financialPct: previousMargins.financialPct,
+            profitPct: previousMargins.profitPct,
+            taxPct: previousMargins.taxPct,
+          })
+        }
         toast.error(t('error'), { description: (result.error as { _form?: string[] })?._form?.[0] })
         return
       }
-      setBudgetLine((prev) =>
-        prev
-          ? {
-              ...prev,
-              overheadPct: marginForm.overheadPct,
-              financialPct: marginForm.financialPct,
-              profitPct: marginForm.profitPct,
-              taxPct: marginForm.taxPct,
-            }
-          : null
-      )
-      toast.success(t('marginsSaved', { defaultValue: 'Márgenes guardados' }))
       router.refresh()
     })
   }

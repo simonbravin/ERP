@@ -1,10 +1,15 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import dynamic from 'next/dynamic'
 import { useTranslations } from 'next-intl'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
-import { ExportDialog } from '@/components/export/export-dialog'
 import { exportProjectsToExcel } from '@/app/actions/export'
+
+const ExportDialog = dynamic(
+  () => import('@/components/export/export-dialog').then((m) => ({ default: m.ExportDialog })),
+  { ssr: false }
+)
 import { FileDown } from 'lucide-react'
 import {
   flexRender,
@@ -56,17 +61,23 @@ interface ProjectsListClientProps {
   projects: Project[]
   canEdit: boolean
   showExport?: boolean
+  /** When provided, list is server-paginated; show pagination controls and do not filter locally. */
+  total?: number
+  page?: number
+  pageSize?: number
+  searchParams?: { status?: string; phase?: string; search?: string; page?: string }
 }
 
 /**
  * Projects list with TanStack Table, filtering, sorting, and view toggle
  */
-export function ProjectsListClient({ projects, canEdit, showExport = false }: ProjectsListClientProps) {
+export function ProjectsListClient({ projects, canEdit, showExport = false, total: totalFromServer, page: pageFromServer = 1, pageSize: pageSizeFromServer, searchParams: searchParamsFromPage }: ProjectsListClientProps) {
   const t = useTranslations('projects')
   const tCommon = useTranslations('common')
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const isPaginated = totalFromServer != null && pageFromServer != null && pageSizeFromServer != null
 
   const [sorting, setSorting] = useState<SortingState>([])
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('grid')
@@ -98,18 +109,38 @@ export function ProjectsListClient({ projects, canEdit, showExport = false }: Pr
     searchParams.get('phase') || 'all'
   )
 
-  // Update URL when filters change
+  // Build query string for navigation (filters + optional page)
+  const buildQuery = (opts: { search?: string; status?: string; phase?: string; page?: number }) => {
+    const p = new URLSearchParams()
+    if (opts.search) p.set('search', opts.search)
+    if (opts.status && opts.status !== 'all') p.set('status', opts.status)
+    if (opts.phase && opts.phase !== 'all') p.set('phase', opts.phase)
+    if (opts.page != null && opts.page > 1) p.set('page', String(opts.page))
+    return p.toString()
+  }
+
+  // Update URL when filters change (reset to page 1 when paginated)
   const updateFilters = (
     newSearch: string,
     newStatus: string,
     newPhase: string
   ) => {
-    const params = new URLSearchParams()
-    if (newSearch) params.set('search', newSearch)
-    if (newStatus !== 'all') params.set('status', newStatus)
-    if (newPhase !== 'all') params.set('phase', newPhase)
+    const queryString = buildQuery({
+      search: newSearch,
+      status: newStatus,
+      phase: newPhase,
+      page: isPaginated ? 1 : undefined,
+    })
+    router.push(`${pathname}${queryString ? '?' + queryString : ''}`)
+  }
 
-    const queryString = params.toString()
+  const goToPage = (newPage: number) => {
+    const queryString = buildQuery({
+      search: searchParams.get('search') || '',
+      status: searchParams.get('status') || 'all',
+      phase: searchParams.get('phase') || 'all',
+      page: newPage > 1 ? newPage : undefined,
+    })
     router.push(`${pathname}${queryString ? '?' + queryString : ''}`)
   }
 
@@ -230,37 +261,29 @@ export function ProjectsListClient({ projects, canEdit, showExport = false }: Pr
     [t, tCommon]
   )
 
-  // Filter projects locally
+  // When server-paginated, server already applied filters; otherwise filter locally
   const filteredProjects = useMemo(() => {
+    if (isPaginated) return projects
     return projects.filter((project) => {
-      // Search filter
       if (search) {
         const searchLower = search.toLowerCase()
         const matchesSearch =
           project.name.toLowerCase().includes(searchLower) ||
           project.projectNumber.toLowerCase().includes(searchLower) ||
           project.clientName?.toLowerCase().includes(searchLower)
-
         if (!matchesSearch) return false
       }
-
-      // Status filter
-      if (statusFilter !== 'all' && project.status !== statusFilter) {
-        return false
-      }
-
-      // Phase filter
-      if (phaseFilter !== 'all' && project.phase !== phaseFilter) {
-        return false
-      }
-
+      if (statusFilter !== 'all' && project.status !== statusFilter) return false
+      if (phaseFilter !== 'all' && project.phase !== phaseFilter) return false
       return true
     })
-  }, [projects, search, statusFilter, phaseFilter])
+  }, [projects, search, statusFilter, phaseFilter, isPaginated])
+
+  const listData = filteredProjects
 
   // Table instance
   const table = useReactTable({
-    data: filteredProjects,
+    data: listData,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -371,11 +394,39 @@ export function ProjectsListClient({ projects, canEdit, showExport = false }: Pr
         </div>
       </div>
 
-      {/* Results count */}
-      <p className="text-sm text-muted-foreground">
-        {t('showing')} {filteredProjects.length} {t('of')} {projects.length}{' '}
-        {t('projectsCount')}
-      </p>
+      {/* Results count and pagination */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <p className="text-sm text-muted-foreground">
+          {isPaginated && totalFromServer != null
+            ? totalFromServer === 0
+              ? `${t('showing')} 0 ${t('of')} 0 ${t('projectsCount')}`
+              : `${t('showing')} ${Math.min((pageFromServer - 1) * pageSizeFromServer + 1, totalFromServer)}–${Math.min(pageFromServer * pageSizeFromServer, totalFromServer)} ${t('of')} ${totalFromServer} ${t('projectsCount')}`
+            : `${t('showing')} ${listData.length} ${t('of')} ${projects.length} ${t('projectsCount')}`}
+        </p>
+        {isPaginated && totalFromServer != null && totalFromServer > pageSizeFromServer && (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pageFromServer <= 1}
+              onClick={() => goToPage(pageFromServer - 1)}
+            >
+              {tCommon('previous', { defaultMessage: 'Anterior' })}
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              {t('page', { defaultMessage: 'Página' })} {pageFromServer} {t('of', { defaultMessage: 'de' })} {Math.ceil(totalFromServer / pageSizeFromServer)}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pageFromServer * pageSizeFromServer >= totalFromServer}
+              onClick={() => goToPage(pageFromServer + 1)}
+            >
+              {tCommon('next', { defaultMessage: 'Siguiente' })}
+            </Button>
+          </div>
+        )}
+      </div>
 
       {/* Table or Grid view */}
       {viewMode === 'table' ? (
@@ -436,8 +487,8 @@ export function ProjectsListClient({ projects, canEdit, showExport = false }: Pr
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredProjects.length > 0 ? (
-            filteredProjects.map((project) => (
+          {listData.length > 0 ? (
+            listData.map((project) => (
               <ProjectCard key={project.id} project={project} />
             ))
           ) : (

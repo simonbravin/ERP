@@ -1,8 +1,9 @@
 'use client'
 
-import React, { Fragment, useState, useTransition } from 'react'
+import React, { Fragment, useMemo, useRef, useState, useTransition } from 'react'
 import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import {
   DndContext,
   PointerSensor,
@@ -100,6 +101,31 @@ function getSiblingIds(nodes: BudgetTreeNode[], parentId: string | null): string
     if (ids.length > 0) return ids
   }
   return []
+}
+
+const VIRTUAL_THRESHOLD = 80
+const ROW_HEIGHT_PX = 32
+
+/** Flattened row for virtualization: one entry per visible node or partida line */
+type FlattenedRow =
+  | { kind: 'node'; node: BudgetTreeNode; level: number; displayLabel: string }
+  | { kind: 'line'; node: BudgetTreeNode; line: BudgetTreeNode['lines'][number]; level: number }
+
+function flattenToRows(nodes: BudgetTreeNode[], expanded: Set<string>, level = 0): FlattenedRow[] {
+  const out: FlattenedRow[] = []
+  for (const node of nodes) {
+    out.push({ kind: 'node', node, level, displayLabel: node.wbsNode.code })
+    const isExpanded = expanded.has(node.wbsNode.id)
+    if (isExpanded && node.children.length === 0) {
+      for (const line of node.lines) {
+        out.push({ kind: 'line', node, line, level: level + 1 })
+      }
+    }
+    if (isExpanded && node.children.length > 0) {
+      out.push(...flattenToRows(node.children, expanded, level + 1))
+    }
+  }
+  return out
 }
 
 function SortableBudgetRow({
@@ -223,6 +249,13 @@ export function BudgetLinesCompactTable({
 
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())
   const [editingAPU, setEditingAPU] = useState<string | null>(null)
+  const parentRef = useRef<HTMLDivElement>(null)
+
+  const flatRows = useMemo(
+    () => flattenToRows(filteredData, expandedNodes),
+    [filteredData, expandedNodes]
+  )
+  const useVirtual = hideActions && flatRows.length > VIRTUAL_THRESHOLD
 
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [addDialogParent, setAddDialogParent] = useState<{
@@ -242,6 +275,14 @@ export function BudgetLinesCompactTable({
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   )
+
+  const rowVirtualizer = useVirtualizer({
+    count: flatRows.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => ROW_HEIGHT_PX,
+    overscan: 5,
+  })
+  const virtualItems = useVirtual ? rowVirtualizer.getVirtualItems() : []
 
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
@@ -368,6 +409,91 @@ export function BudgetLinesCompactTable({
       if (found) return found
     }
     return null
+  }
+
+  /** Renders a single row for the virtualized list (read-only planilla when many rows). */
+  function renderVirtualRow(entry: FlattenedRow, rowStyle?: React.CSSProperties): React.ReactNode {
+    const bgColors = ['bg-muted/30', 'bg-muted/50', 'bg-muted/70', 'bg-muted/80']
+    const level = entry.level
+    const bgColor = bgColors[Math.min(level, bgColors.length - 1)] ?? 'bg-muted/30'
+    if (entry.kind === 'line') {
+      const { node, line } = entry
+      const sums = lineResourceSums(line)
+      return (
+        <TableRow key={line.id} style={rowStyle} className={`${bgColor} h-8 hover:bg-muted/50`}>
+          <TableCell className="min-w-[5rem] w-[5rem] px-2 py-1 text-center font-mono text-xs text-muted-foreground">—</TableCell>
+          <TableCell style={{ paddingLeft: `${(level + 1) * 16 + 8}px` }} className="px-2 py-1">
+            <span className="text-xs text-muted-foreground">{line.description}</span>
+          </TableCell>
+          <TableCell className="px-2 py-1 font-mono text-[10px] text-muted-foreground">{line.unit}</TableCell>
+          <TableCell className="px-2 py-1 text-right font-mono text-xs tabular-nums">{formatNumber(Number(line.quantity))}</TableCell>
+          {showBreakdown && (
+            <>
+              <TableCell className="px-2 py-1 text-right font-mono text-xs tabular-nums">{formatCurrency(sums.material)}</TableCell>
+              <TableCell className="px-2 py-1 text-right font-mono text-xs tabular-nums">{formatCurrency(sums.labor)}</TableCell>
+              <TableCell className="px-2 py-1 text-right font-mono text-xs tabular-nums">{formatCurrency(sums.equipment)}</TableCell>
+            </>
+          )}
+          <TableCell className="erp-table-cell-currency px-2 py-1 font-mono text-xs font-semibold tabular-nums">
+            {formatCurrency(Number(line.directCostTotal))}
+          </TableCell>
+          <TableCell className="erp-table-cell-currency px-2 py-1 text-muted-foreground font-mono text-xs tabular-nums">
+            {showIncidence && projectTotalSale
+              ? ((calculateLineSaleTotal(line) / projectTotalSale) * 100).toFixed(2) + '%'
+              : formatCurrency(Number(line.actualCostTotal ?? 0))}
+          </TableCell>
+        </TableRow>
+      )
+    }
+    const { node, displayLabel } = entry
+    const isExpanded = expandedNodes.has(node.wbsNode.id)
+    const hasChildren = node.children.length > 0 || node.lines.length > 0
+    const showChevron = hasChildren
+    const nodeTotal = calculateNodeTotal(node)
+    return (
+      <TableRow key={node.wbsNode.id} style={rowStyle} className={`${bgColor} h-8 hover:bg-muted/50`}>
+        <TableCell className="min-w-[5rem] w-[5rem] px-2 py-1 font-mono text-xs text-muted-foreground tabular-nums">
+          <div className="flex items-center gap-1.5">
+            <span className="w-6 shrink-0" aria-hidden />
+            <span className="min-w-[2rem] flex-1 text-right">{displayLabel || '—'}</span>
+          </div>
+        </TableCell>
+        <TableCell style={{ paddingLeft: `${level * 16 + 8}px` }} className="px-2 py-1">
+          <div className="flex items-center gap-1">
+            {showChevron && (
+              <button
+                type="button"
+                onClick={() => toggleNode(node.wbsNode.id)}
+                className="rounded p-0.5 hover:bg-muted"
+              >
+                {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+              </button>
+            )}
+            <span className="text-xs font-medium text-foreground">{node.wbsNode.name}</span>
+          </div>
+        </TableCell>
+        <TableCell className="px-2 py-1" />
+        <TableCell className="px-2 py-1" />
+        {showBreakdown && (() => {
+          const sums = nodeResourceSums(node)
+          return (
+            <>
+              <TableCell className="px-2 py-1 text-right font-mono text-xs tabular-nums">{formatCurrency(sums.material)}</TableCell>
+              <TableCell className="px-2 py-1 text-right font-mono text-xs tabular-nums">{formatCurrency(sums.labor)}</TableCell>
+              <TableCell className="px-2 py-1 text-right font-mono text-xs tabular-nums">{formatCurrency(sums.equipment)}</TableCell>
+            </>
+          )
+        })()}
+        <TableCell className="erp-table-cell-currency px-2 py-1 font-mono text-xs font-semibold">
+          {formatCurrencyForDisplay(nodeTotal)}
+        </TableCell>
+        <TableCell className="erp-table-cell-currency px-2 py-1 text-muted-foreground font-mono text-xs tabular-nums">
+          {showIncidence && projectTotalSale
+            ? ((calculateNodeSaleTotal(node) / projectTotalSale) * 100).toFixed(2) + '%'
+            : formatCurrency(calculateNodeActualTotal(node))}
+        </TableCell>
+      </TableRow>
+    )
   }
 
   /** displayLabel = wbsNode.code for Nº column (e.g. 1, 1.1, 1.1.1) */
@@ -863,7 +989,10 @@ export function BudgetLinesCompactTable({
   return (
     <>
       <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-        <div className="overflow-x-auto rounded-lg border border-border bg-card">
+        <div
+          ref={useVirtual ? parentRef : undefined}
+          className={useVirtual ? 'overflow-auto max-h-[60vh] rounded-lg border border-border bg-card' : 'overflow-x-auto rounded-lg border border-border bg-card'}
+        >
           <Table>
             <TableHeader className="sticky top-0 z-10 bg-muted">
             <TableRow className="h-8">
@@ -919,19 +1048,56 @@ export function BudgetLinesCompactTable({
               )}
             </TableRow>
           </TableHeader>
-          <TableBody>
+          <TableBody
+            style={useVirtual && flatRows.length > 0 ? { height: rowVirtualizer.getTotalSize() + ROW_HEIGHT_PX, position: 'relative' } : undefined}
+          >
             {filteredData.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={showBreakdown ? (hideActions ? 9 : 10) : (hideActions ? 6 : 7)} className="py-8 text-center text-muted-foreground">
                   {searchQuery.trim() ? t('noResultsFound') : t('noBudgetLinesYet')}
                 </TableCell>
               </TableRow>
+            ) : useVirtual ? (
+              <>
+                {virtualItems.map((virtualRow) => (
+                  <Fragment key={virtualRow.key}>
+                    {renderVirtualRow(flatRows[virtualRow.index], {
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      transform: `translateY(${virtualRow.start}px)`,
+                    })}
+                  </Fragment>
+                ))}
+                <TableRow
+                  className="h-8 border-t-2 border-border bg-muted font-bold"
+                  style={{ position: 'absolute', top: rowVirtualizer.getTotalSize(), left: 0, width: '100%' }}
+                >
+                  <TableCell colSpan={4} className="px-2 py-1 text-right text-xs">
+                    {t('grandTotal')}:
+                  </TableCell>
+                  {showBreakdown && (
+                    <>
+                      <TableCell className="px-2 py-1" />
+                      <TableCell className="px-2 py-1" />
+                      <TableCell className="px-2 py-1" />
+                    </>
+                  )}
+                  <TableCell className="erp-table-cell-currency px-2 py-1 text-sm">
+                    {formatCurrencyForDisplay(grandTotal)}
+                  </TableCell>
+                  <TableCell className="erp-table-cell-currency px-2 py-1 text-sm text-muted-foreground">
+                    {showIncidence ? '100.00%' : formatCurrencyForDisplay(grandActualTotal)}
+                  </TableCell>
+                </TableRow>
+              </>
             ) : (
               <SortableContext
                 items={filteredData.map((n) => n.wbsNode.id)}
                 strategy={verticalListSortingStrategy}
               >
-                {filteredData.map((node, i) => (
+                {filteredData.map((node) => (
                   <Fragment key={node.wbsNode.id}>
                     {renderNode(node, 0, node.wbsNode.code)}
                   </Fragment>

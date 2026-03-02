@@ -9,7 +9,7 @@
  * validate no duplicate codes and consistent hierarchy. Create BudgetLine per row if applicable.
  */
 
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, unstable_cache } from 'next/cache'
 import { prisma, Prisma } from '@repo/database'
 import { getSession } from '@/lib/session'
 import { getOrgContext } from '@/lib/org-context'
@@ -935,29 +935,37 @@ export async function getNextWbsCode(
   }
 }
 
-/** Root WBS templates for the "library" in Add phase dialog (from all project templates). */
+const getCachedWbsTemplatesLibrary = unstable_cache(
+  async () => {
+    const rows = await prisma.wbsTemplate.findMany({
+      where: { parentId: null },
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        unit: true,
+        _count: { select: { resourceTemplates: true } },
+      },
+      orderBy: [{ code: 'asc' }, { name: 'asc' }],
+    })
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      code: r.code,
+      unit: r.unit ?? 'un',
+      hasResources: (r._count?.resourceTemplates ?? 0) > 0,
+    }))
+  },
+  ['wbs-templates-library'],
+  { revalidate: 300 }
+)
+
+/** Root WBS templates for the "library" in Add phase dialog (from all project templates). Cached 5 min. */
 export async function listWbsTemplatesForLibrary(): Promise<
   Array<{ id: string; name: string; code: string; unit: string; hasResources: boolean }>
 > {
   await getAuthContext()
-  const rows = await prisma.wbsTemplate.findMany({
-    where: { parentId: null },
-    select: {
-      id: true,
-      name: true,
-      code: true,
-      unit: true,
-      _count: { select: { resourceTemplates: true } },
-    },
-    orderBy: [{ code: 'asc' }, { name: 'asc' }],
-  })
-  return rows.map((r) => ({
-    id: r.id,
-    name: r.name,
-    code: r.code,
-    unit: r.unit ?? 'un',
-    hasResources: (r._count?.resourceTemplates ?? 0) > 0,
-  }))
+  return getCachedWbsTemplatesLibrary()
 }
 
 async function ensureBudgetLineForVersion(

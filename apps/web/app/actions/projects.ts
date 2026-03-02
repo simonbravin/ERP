@@ -37,9 +37,21 @@ export type ListProjectsFilters = {
   status?: string
   phase?: string
   search?: string
+  page?: number
+  pageSize?: number
 }
 
-export async function listProjects(filters: ListProjectsFilters = {}) {
+const DEFAULT_PAGE_SIZE = 25
+
+export type ListProjectsResult = {
+  projects: Prisma.ProjectGetPayload<{ select: { id: true; projectNumber: true; name: true; clientName: true; phase: true; status: true; totalBudget: true; location: true; startDate: true; createdAt: true } }>[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+/** List projects with optional pagination. Returns array for backward compatibility when page/pageSize not used. */
+export async function listProjects(filters: ListProjectsFilters = {}): Promise<Prisma.ProjectGetPayload<{ select: { id: true; projectNumber: true; name: true; clientName: true; phase: true; status: true; totalBudget: true; location: true; startDate: true; createdAt: true } }>[] | ListProjectsResult> {
   const { org } = await getAuthContext()
   const where: Prisma.ProjectWhereInput = { orgId: org.orgId, active: true }
 
@@ -64,6 +76,37 @@ export async function listProjects(filters: ListProjectsFilters = {}) {
     ]
   }
 
+  const usePagination = filters.page != null && filters.page >= 1
+  const page = usePagination ? Math.max(1, filters.page!) : 1
+  const pageSize = usePagination
+    ? Math.min(100, Math.max(1, filters.pageSize ?? DEFAULT_PAGE_SIZE))
+    : undefined
+
+  if (usePagination && pageSize != null) {
+    const [projects, total] = await Promise.all([
+      prisma.project.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        select: {
+          id: true,
+          projectNumber: true,
+          name: true,
+          clientName: true,
+          phase: true,
+          status: true,
+          totalBudget: true,
+          location: true,
+          startDate: true,
+          createdAt: true,
+        },
+      }),
+      prisma.project.count({ where }),
+    ])
+    return { projects, total, page, pageSize }
+  }
+
   const projects = await prisma.project.findMany({
     where,
     orderBy: { createdAt: 'desc' },
@@ -80,7 +123,6 @@ export async function listProjects(filters: ListProjectsFilters = {}) {
       createdAt: true,
     },
   })
-  
   return projects
 }
 
