@@ -46,7 +46,7 @@ export default async function ProjectReportsPage({ params }: PageProps) {
       title: 'Gastos por Proveedor',
       description: 'Análisis de compras del proyecto',
       icon: DollarSign,
-      href: `/reports/predefined/expenses-by-supplier?projectId=${projectId}`,
+      href: `/reports/predefined/gastos-por-proveedor?projectIds=${projectId}`,
     },
     {
       title: 'Materiales del Proyecto',
@@ -59,7 +59,7 @@ export default async function ProjectReportsPage({ params }: PageProps) {
   ]
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="mx-auto max-w-6xl w-full space-y-6 p-6">
       <PageHeader
         title="Reportes del Proyecto"
         subtitle={`${project.name} • ${project.projectNumber}`}

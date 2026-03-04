@@ -333,7 +333,7 @@ export function ProjectSidebar({ projectId, orgName = 'Bloqer', orgLogoUrl, user
                         )}
                       </div>
                       {hasChildren && isExpanded && (
-                        <div className="sidebar-children mt-1 space-y-1">
+                        <div className="sidebar-children mt-1 ml-2 space-y-1 border-l border-sidebar-border pl-3">
                           {item.children!.map((child) => {
                             const childActive = pathname === child.href || pathname.startsWith(child.href + '/')
                             const hasNested = child.children && child.children.length > 0
@@ -353,7 +353,7 @@ export function ProjectSidebar({ projectId, orgName = 'Bloqer', orgLogoUrl, user
                                   >
                                     {child.name}
                                   </Link>
-                                  <div className="sidebar-children-nested space-y-0.5">
+                                  <div className="sidebar-children-nested ml-2 space-y-0.5 border-l border-sidebar-border pl-3">
                                     {child.children!.map((sub) => {
                                       const subActive = pathname === sub.href || pathname.startsWith(sub.href + '/')
                                       return (

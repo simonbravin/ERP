@@ -137,7 +137,7 @@ export default async function ProjectInventoryPage({ params }: PageProps) {
         }
       />
 
-      <div className="space-y-6 p-6">
+      <div className="mx-auto max-w-6xl w-full space-y-6 p-6">
         {projectLocations.length === 0 ? (
           <Card className="p-8 text-center">
             <Package className="mx-auto h-12 w-12 text-muted-foreground" />

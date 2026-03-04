@@ -2,6 +2,7 @@
 
 import { ChartCard } from '@/components/charts/chart-card'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import {
   BarChart,
   Bar,
@@ -11,11 +12,34 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts'
+import { Download } from 'lucide-react'
 import { formatCurrency } from '@/lib/format-utils'
 import type { ExpensesBySupplierRow } from '@/app/actions/predefined-reports'
 
 interface Props {
   data: ExpensesBySupplierRow[]
+}
+
+function downloadCsv(data: ExpensesBySupplierRow[]) {
+  const headers = ['Proveedor', 'Total Gastado', 'Transacciones', 'Proyectos', 'Promedio/Tx']
+  const rows = data.map((s) => [
+    s.supplierName.replace(/"/g, '""'),
+    s.total.toFixed(2),
+    String(s.count),
+    String(s.projectCount),
+    (s.total / s.count).toFixed(2),
+  ])
+  const csvContent = [
+    headers.join(','),
+    ...rows.map((r) => r.map((c) => `"${c}"`).join(',')),
+  ].join('\n')
+  const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `gastos-por-proveedor-${new Date().toISOString().slice(0, 10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 export function ExpensesBySupplierReportClient({ data }: Props) {
@@ -28,6 +52,12 @@ export function ExpensesBySupplierReportClient({ data }: Props) {
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <Button variant="outline" size="sm" onClick={() => downloadCsv(data)}>
+          <Download className="mr-2 h-4 w-4" />
+          Exportar CSV
+        </Button>
+      </div>
       <div className="grid gap-4 sm:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">

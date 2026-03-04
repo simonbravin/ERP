@@ -33,10 +33,8 @@ export default async function NewLocationPage() {
         ]}
       />
 
-      <div className="p-6">
-        <div className="mx-auto max-w-5xl">
-          <LocationForm projects={projects} />
-        </div>
+      <div className="mx-auto max-w-5xl w-full space-y-6 p-6">
+        <LocationForm projects={projects} />
       </div>
     </div>
   )

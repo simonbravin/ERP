@@ -26,7 +26,8 @@ export type ExpensesBySupplierRow = {
 }
 
 export async function getExpensesBySupplierReport(
-  supplierId?: string
+  supplierId?: string,
+  projectIds?: string[]
 ): Promise<ExpensesBySupplierRow[]> {
   const { orgId, allowedProjectIds } = await getAuth()
 
@@ -42,7 +43,11 @@ export async function getExpensesBySupplierReport(
     type: { in: ['EXPENSE', 'PURCHASE'] },
   }
   if (supplierId) where.partyId = supplierId
-  if (Array.isArray(allowedProjectIds)) where.projectId = { in: allowedProjectIds }
+  const effectiveProjectIds =
+    projectIds?.length && Array.isArray(allowedProjectIds)
+      ? projectIds.filter((id) => allowedProjectIds.includes(id))
+      : allowedProjectIds
+  if (Array.isArray(effectiveProjectIds)) where.projectId = { in: effectiveProjectIds }
 
   const transactions = await prisma.financeTransaction.findMany({
     where,

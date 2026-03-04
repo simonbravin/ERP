@@ -18,7 +18,7 @@ export default async function PredefinedReportsPage() {
       title: 'Gastos por Proveedor',
       description: 'Análisis de compras consolidado multi-proyecto',
       icon: BarChart3,
-      href: '/reports/predefined/expenses-by-supplier',
+      href: '/reports/predefined/gastos-por-proveedor',
       color: 'text-blue-600',
     },
     {

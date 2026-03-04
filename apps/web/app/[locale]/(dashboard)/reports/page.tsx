@@ -1,9 +1,10 @@
 import { redirectToLogin } from '@/lib/i18n-redirect'
 import { getSession } from '@/lib/session'
-import { getOrgContext } from '@/lib/org-context'
+import { getOrgContext, getVisibleProjectIds } from '@/lib/org-context'
 import { prisma } from '@repo/database'
 import { CustomReportsList } from '@/components/reports/custom-reports-list'
 import { QueryBuilder } from '@/components/reports/query-builder'
+import { ReportsPredefinedSection } from '@/components/reports/reports-predefined-section'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import { Link } from '@/i18n/navigation'
@@ -15,6 +16,18 @@ export default async function ReportsPage() {
 
   const org = await getOrgContext(session.user.id)
   if (!org) return redirectToLogin()
+
+  const allowedProjectIds = await getVisibleProjectIds(org)
+  const projects = await prisma.project.findMany({
+    where: {
+      orgId: org.orgId,
+      ...(Array.isArray(allowedProjectIds) && allowedProjectIds.length > 0
+        ? { id: { in: allowedProjectIds } }
+        : {}),
+    },
+    select: { id: true, name: true, projectNumber: true },
+    orderBy: { name: 'asc' },
+  })
 
   const reports = await prisma.customReport.findMany({
     where: {
@@ -34,7 +47,7 @@ export default async function ReportsPage() {
 
   const predefinedReports = [
     {
-      id: 'expenses-by-supplier',
+      id: 'gastos-por-proveedor',
       name: 'Gastos por Proveedor',
       description: 'Análisis de compras consolidado por proveedor',
       category: 'FINANCE',
@@ -110,21 +123,10 @@ export default async function ReportsPage() {
         <h2 className="mb-4 text-lg font-semibold text-foreground">
           Reportes Predefinidos
         </h2>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {predefinedReports.map((report) => (
-            <Link
-              key={report.id}
-              href={`/reports/predefined/${report.id}`}
-              className="group rounded-lg border border-border bg-card p-4 transition-all hover:border-accent hover:shadow-md"
-            >
-              <div className="mb-3 text-3xl">{report.icon}</div>
-              <h3 className="font-semibold text-foreground group-hover:text-accent">
-                {report.name}
-              </h3>
-              <p className="mt-1 text-sm text-muted-foreground">{report.description}</p>
-            </Link>
-          ))}
-        </div>
+        <ReportsPredefinedSection
+          predefinedReports={predefinedReports}
+          projects={projects}
+        />
       </div>
 
       <div>

@@ -260,7 +260,7 @@ export function GlobalSidebar({ orgName = 'Bloqer', orgLogoUrl, user, restricted
                           </button>
                         </div>
                         {isExpanded && (
-                          <div className="sidebar-children mt-1 space-y-1">
+                          <div className="sidebar-children mt-1 ml-2 space-y-1 border-l border-sidebar-border pl-3">
                             {item.children!.map((child) => {
                               const childActive =
                                 pathname === child.href || pathname.startsWith(child.href + '/')

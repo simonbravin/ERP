@@ -1,35 +1,17 @@
 import { redirect } from 'next/navigation'
-import { getSession } from '@/lib/session'
-import { getOrgContext } from '@/lib/org-context'
-import { getExpensesBySupplierReport } from '@/app/actions/predefined-reports'
-import { ExpensesBySupplierReportClient } from '@/components/reports/expenses-by-supplier-report-client'
 
 type PageProps = {
   params: Promise<{ locale: string }>
+  searchParams: Promise<{ projectId?: string; projectIds?: string }>
 }
 
-export default async function ExpensesBySupplierPage({ params }: PageProps) {
-  const session = await getSession()
+/** Redirect legacy URL to canonical Spanish route, preserving query params. */
+export default async function ExpensesBySupplierPage({ params, searchParams }: PageProps) {
   const { locale } = await params
-  if (!session?.user?.id) redirect(`/${locale}/login`)
-
-  const org = await getOrgContext(session.user.id)
-  if (!org?.orgId) redirect(`/${locale}/login`)
-
-  const data = await getExpensesBySupplierReport()
-
-  return (
-    <div className="mx-auto max-w-6xl w-full space-y-6 p-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-foreground">
-          Gastos por Proveedor
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Análisis de compras consolidado
-        </p>
-      </div>
-
-      <ExpensesBySupplierReportClient data={data} />
-    </div>
-  )
+  const resolved = await searchParams
+  const query = new URLSearchParams()
+  if (resolved.projectId) query.set('projectIds', resolved.projectId)
+  if (resolved.projectIds) query.set('projectIds', resolved.projectIds)
+  const qs = query.toString()
+  redirect(`/${locale}/reports/predefined/gastos-por-proveedor${qs ? `?${qs}` : ''}`)
 }
