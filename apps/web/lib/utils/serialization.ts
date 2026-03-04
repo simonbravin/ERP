@@ -42,6 +42,7 @@ export function serializeForClient<T>(obj: T): Serialized<T> {
   if (obj == null) return obj as Serialized<T>
   if (typeof obj === 'number' && Number.isFinite(obj)) return obj as Serialized<T>
   if (typeof obj === 'string' || typeof obj === 'boolean') return obj as Serialized<T>
+  if (typeof obj === 'bigint') return Number(obj) as Serialized<T>
   if (obj instanceof Date) return obj.toISOString() as Serialized<T>
   const dec = obj as DecimalLike
   if (typeof dec?.toNumber === 'function') return dec.toNumber() as Serialized<T>

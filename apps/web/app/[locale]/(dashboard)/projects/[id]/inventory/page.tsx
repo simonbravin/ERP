@@ -46,13 +46,22 @@ export default async function ProjectInventoryPage({ params }: PageProps) {
   })
   if (!project) notFound()
 
-  const [projectLocations, locationsWithStats, recentMovements] = await Promise.all([
-    prisma.inventoryLocation.findMany({
-      where: { projectId, orgId: org.orgId, type: 'PROJECT_SITE', active: true },
-      select: { id: true, name: true, address: true },
-      orderBy: { name: 'asc' },
-    }),
-    prisma.$queryRaw<LocationStatsRow[]>`
+  const projectLocations = await prisma.inventoryLocation.findMany({
+    where: { projectId, orgId: org.orgId, type: 'PROJECT_SITE', active: true },
+    select: { id: true, name: true, address: true },
+    orderBy: { name: 'asc' },
+  })
+
+  let locationsWithStats: LocationStatsRow[] = projectLocations.map((loc) => ({
+    id: loc.id,
+    name: loc.name,
+    type: 'PROJECT_SITE',
+    address: loc.address,
+    items_count: BigInt(0),
+    total_quantity: 0,
+  }))
+  try {
+    locationsWithStats = await prisma.$queryRaw<LocationStatsRow[]>`
       SELECT 
         il.id,
         il.name,
@@ -73,9 +82,15 @@ export default async function ProjectInventoryPage({ params }: PageProps) {
       AND il.active = true
       GROUP BY il.id, il.name, il.type, il.address
       ORDER BY il.name
-    `,
+    `
+  } catch (rawError) {
+    console.error('[ProjectInventoryPage] Raw stats query failed, using fallback:', rawError)
+    // locationsWithStats already holds the zeroed fallback from initializer above
+  }
+
+  const recentMovements =
     projectLocations.length > 0
-      ? prisma.inventoryMovement.findMany({
+      ? await prisma.inventoryMovement.findMany({
           where: {
             orgId: org.orgId,
             OR: [
@@ -92,8 +107,7 @@ export default async function ProjectInventoryPage({ params }: PageProps) {
           orderBy: { createdAt: 'desc' },
           take: 30,
         })
-      : [],
-  ])
+      : []
 
   const movementsPlain = recentMovements.map((m) => serializeForClient(m))
   const statsByLocId = new Map(
