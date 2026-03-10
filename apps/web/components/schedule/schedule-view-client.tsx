@@ -1,11 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useTranslations } from 'next-intl'
 import { useRouter } from '@/i18n/navigation'
 import { useMessageBus } from '@/hooks/use-message-bus'
-import { GanttTimelineDynamic } from './gantt-timeline-dynamic'
-import { GanttDataTable } from './gantt-data-table'
+import { ScheduleGanttBlock } from './schedule-gantt-block'
 import { GanttControlPanel } from './gantt-control-panel'
 import { DependencyManager } from './dependency-manager'
 import { TaskEditDialog } from './task-edit-dialog'
@@ -38,6 +37,8 @@ import {
   AlertTriangle,
   ZoomIn,
   ZoomOut,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react'
 import { format, addDays, subDays, differenceInDays } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -76,6 +77,56 @@ export function ScheduleViewClient({
   const [showDependencies, setShowDependencies] = useState(true)
   const [showTodayLine, setShowTodayLine] = useState(true)
   const [groupBy, setGroupBy] = useState<'none' | 'phase' | 'assigned'>('none')
+  const [weekStartsOn, setWeekStartsOn] = useState<0 | 1>(1)
+
+  const schedulePrefsKey = `bloqer-schedule-prefs-${scheduleData.id}`
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(schedulePrefsKey)
+      if (!raw) return
+      const stored = JSON.parse(raw) as Partial<{
+        zoom: 'day' | 'week' | 'month'
+        showCriticalPath: boolean
+        showProgress: boolean
+        showDependencies: boolean
+        showTodayLine: boolean
+        groupBy: 'none' | 'phase' | 'assigned'
+        weekStartsOn: 0 | 1
+        viewMode: 'gantt' | 'calendar'
+      }>
+      if (stored.zoom && ['day', 'week', 'month'].includes(stored.zoom)) setZoom(stored.zoom)
+      if (typeof stored.showCriticalPath === 'boolean') setShowCriticalPath(stored.showCriticalPath)
+      if (typeof stored.showProgress === 'boolean') setShowProgress(stored.showProgress)
+      if (typeof stored.showDependencies === 'boolean') setShowDependencies(stored.showDependencies)
+      if (typeof stored.showTodayLine === 'boolean') setShowTodayLine(stored.showTodayLine)
+      if (stored.groupBy && ['none', 'phase', 'assigned'].includes(stored.groupBy)) setGroupBy(stored.groupBy)
+      if (stored.weekStartsOn === 0 || stored.weekStartsOn === 1) setWeekStartsOn(stored.weekStartsOn)
+      if (stored.viewMode && ['gantt', 'calendar'].includes(stored.viewMode)) setViewMode(stored.viewMode)
+    } catch {
+      // ignore invalid stored prefs
+    }
+  }, [schedulePrefsKey])
+
+  const hasPersistedOnce = useRef(false)
+  useEffect(() => {
+    if (!hasPersistedOnce.current) {
+      hasPersistedOnce.current = true
+      return
+    }
+    localStorage.setItem(
+      schedulePrefsKey,
+      JSON.stringify({
+        zoom,
+        showCriticalPath,
+        showProgress,
+        showDependencies,
+        showTodayLine,
+        groupBy,
+        weekStartsOn,
+        viewMode,
+      })
+    )
+  }, [schedulePrefsKey, zoom, showCriticalPath, showProgress, showDependencies, showTodayLine, groupBy, weekStartsOn, viewMode])
 
   const [visibleStartDate, setVisibleStartDate] = useState(
     () => new Date(scheduleData.projectStartDate)
@@ -93,6 +144,17 @@ export function ScheduleViewClient({
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())
   const [highlightedTask, setHighlightedTask] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [isScheduleFullscreen, setIsScheduleFullscreen] = useState(false)
+  const [viewMode, setViewMode] = useState<'gantt' | 'calendar'>('gantt')
+
+  useEffect(() => {
+    if (!isScheduleFullscreen) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsScheduleFullscreen(false)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [isScheduleFullscreen])
 
   const schedule = {
     ...scheduleData,
@@ -192,12 +254,20 @@ export function ScheduleViewClient({
       task.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
       task.name.toLowerCase().includes(searchQuery.toLowerCase())
   )
-  const visibleTableTasks = filteredTableTasks.filter((task) =>
+  const sortedByGroup =
+    groupBy === 'phase'
+      ? [...filteredTableTasks].sort((a, b) => {
+          const phaseA = a.code.split('.')[0]
+          const phaseB = b.code.split('.')[0]
+          return phaseA.localeCompare(phaseB, undefined, { numeric: true })
+        })
+      : filteredTableTasks
+  const visibleTableTasks = sortedByGroup.filter((task) =>
     shouldShowTask(task, tableTasks)
   )
-  const visibleGanttTasks = ganttTasks.filter((t) =>
-    visibleTableTasks.some((v) => v.id === t.id)
-  )
+  const visibleGanttTasks = visibleTableTasks
+    .map((t) => ganttTasks.find((g) => g.id === t.id))
+    .filter(Boolean) as typeof ganttTasks
 
   const totalTasks = schedule.tasks.length
   const criticalTasks = schedule.tasks.filter(
@@ -364,6 +434,41 @@ export function ScheduleViewClient({
     if (newEnd > projectEnd) {
       newEnd = new Date(projectEnd)
       newStart = subDays(newEnd, daysToShow - 1)
+    }
+    if (newStart < projectStart) {
+      newStart = new Date(projectStart)
+    }
+    handleRangeChange(newStart, newEnd)
+  }
+
+  function handleCenterOnTask(taskId: string) {
+    const task = schedule.tasks.find(
+      (t: (typeof schedule.tasks)[0]) => t.id === taskId
+    )
+    if (!task) return
+    const taskStart = new Date(task.plannedStartDate)
+    taskStart.setHours(0, 0, 0, 0)
+    const taskEnd = new Date(task.plannedEndDate)
+    taskEnd.setHours(0, 0, 0, 0)
+    const projectStart = new Date(schedule.projectStartDate)
+    projectStart.setHours(0, 0, 0, 0)
+    const projectEnd = new Date(schedule.projectEndDate)
+    projectEnd.setHours(0, 0, 0, 0)
+    const paddingDays = 7
+    const totalDays = Math.max(
+      14,
+      differenceInDays(taskEnd, taskStart) + 1 + paddingDays * 2
+    )
+    const half = Math.floor((totalDays - (differenceInDays(taskEnd, taskStart) + 1)) / 2)
+    let newStart = subDays(taskStart, half)
+    let newEnd = addDays(newStart, totalDays - 1)
+    if (newStart < projectStart) {
+      newStart = new Date(projectStart)
+      newEnd = addDays(newStart, totalDays - 1)
+    }
+    if (newEnd > projectEnd) {
+      newEnd = new Date(projectEnd)
+      newStart = subDays(newEnd, totalDays - 1)
     }
     if (newStart < projectStart) {
       newStart = new Date(projectStart)
@@ -644,6 +749,8 @@ export function ScheduleViewClient({
         onShowDependenciesChange={setShowDependencies}
         groupBy={groupBy}
         onGroupByChange={setGroupBy}
+        weekStartsOn={weekStartsOn}
+        onWeekStartsOnChange={setWeekStartsOn}
         onExportPDF={handleExportPDF}
       />
 
@@ -718,46 +825,121 @@ export function ScheduleViewClient({
               <Calendar className="h-3.5 w-3.5" />
               {t('legendToday')}
             </Button>
+            <Select
+              value={viewMode}
+              onValueChange={(v) => setViewMode(v as 'gantt' | 'calendar')}
+            >
+              <SelectTrigger className="h-7 w-[100px] border-0 bg-transparent text-xs shadow-none focus:ring-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="gantt">{t('viewGantt')}</SelectItem>
+                <SelectItem value="calendar">{t('viewCalendar')}</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1.5 text-xs"
+              onClick={() => setIsScheduleFullscreen(true)}
+              title={t('fullscreen')}
+            >
+              <Maximize2 className="h-3.5 w-3.5" />
+              {t('fullscreen')}
+            </Button>
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-lg border border-border">
-          <div className="flex min-h-0" style={{ minHeight: 'max(520px, 60vh)', maxHeight: '85vh' }}>
-            <div className="flex min-h-0 flex-1 overflow-auto">
-              <div className="min-w-[420px] shrink-0 border-r border-border">
-                <GanttDataTable
-                tasks={visibleTableTasks}
-                allTasks={tableTasks}
+        {isScheduleFullscreen && (
+          <div className="fixed inset-0 z-50 flex flex-col bg-background">
+            <div className="flex shrink-0 items-center justify-between border-b border-border bg-muted/30 px-3 py-2">
+              <span className="text-sm font-medium">{t('fullscreen')}</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsScheduleFullscreen(false)}
+                className="gap-1.5"
+              >
+                <Minimize2 className="h-4 w-4" />
+                {t('exitFullscreen')}
+              </Button>
+            </div>
+            <div
+              className="flex min-h-0 flex-1 flex-col overflow-hidden"
+              style={{ minHeight: 0 }}
+            >
+              <ScheduleGanttBlock
+                tableTasks={visibleTableTasks}
+                ganttTasks={visibleGanttTasks}
+                allTableTasks={tableTasks}
                 expandedNodes={expandedNodes}
                 onToggleExpand={handleToggleExpand}
-                onTaskClick={(taskId) => setSelectedTaskForEdit(taskId)}
+                onTaskClick={(taskId) => {
+                  setSelectedTaskForEdit(taskId)
+                  handleCenterOnTask(taskId)
+                }}
                 onDependenciesClick={(taskId) =>
                   setSelectedTaskForDependency(taskId)
                 }
                 onTaskDatesChange={handleTaskDragEnd}
                 canEdit={canEdit}
                 highlightedTask={highlightedTask}
+                onHighlightTask={setHighlightedTask}
                 searchQuery={searchQuery}
                 workingDaysPerWeek={schedule.workingDaysPerWeek}
+                groupBy={groupBy}
+                visibleStartDate={visibleStartDate}
+                visibleEndDate={visibleEndDate}
+                zoom={zoom}
+                showCriticalPath={showCriticalPath}
+                showDependencies={showDependencies}
+                showTodayLine={showTodayLine}
+                showProgress={showProgress}
+                onTaskDragEnd={handleTaskDragEnd}
+                ganttAriaLabel={t('ganttAriaLabel')}
+                weekStartsOn={weekStartsOn}
+                viewMode={viewMode}
               />
             </div>
-            <div className="min-h-0 min-w-0 flex-1">
-              <GanttTimelineDynamic
-            tasks={visibleGanttTasks}
-            visibleStartDate={visibleStartDate}
-            visibleEndDate={visibleEndDate}
-            zoom={zoom}
-            showCriticalPath={showCriticalPath}
-            showDependencies={showDependencies}
-            showTodayLine={showTodayLine}
-            workingDaysPerWeek={schedule.workingDaysPerWeek}
-            onTaskClick={(taskId) => setSelectedTaskForEdit(taskId)}
-            onTaskDragEnd={handleTaskDragEnd}
-            highlightedTask={highlightedTask}
-            onTaskHover={setHighlightedTask}
-          />
-              </div>
-            </div>
+          </div>
+        )}
+
+        <div className="overflow-hidden rounded-lg border border-border">
+          <div className="flex min-h-0" style={{ minHeight: 'max(520px, 60vh)', maxHeight: '85vh' }}>
+            <ScheduleGanttBlock
+              tableTasks={visibleTableTasks}
+              ganttTasks={visibleGanttTasks}
+              allTableTasks={tableTasks}
+              expandedNodes={expandedNodes}
+              onToggleExpand={handleToggleExpand}
+              onTaskClick={(taskId) => {
+                setSelectedTaskForEdit(taskId)
+                handleCenterOnTask(taskId)
+              }}
+              onDependenciesClick={(taskId) =>
+                setSelectedTaskForDependency(taskId)
+              }
+              onTaskDatesChange={handleTaskDragEnd}
+              canEdit={canEdit}
+              highlightedTask={highlightedTask}
+              onHighlightTask={setHighlightedTask}
+              searchQuery={searchQuery}
+              workingDaysPerWeek={schedule.workingDaysPerWeek}
+              groupBy={groupBy}
+              visibleStartDate={visibleStartDate}
+              visibleEndDate={visibleEndDate}
+              zoom={zoom}
+              showCriticalPath={showCriticalPath}
+              showDependencies={showDependencies}
+              showTodayLine={showTodayLine}
+              showProgress={showProgress}
+              onTaskDragEnd={handleTaskDragEnd}
+              ganttAriaLabel={t('ganttAriaLabel')}
+              weekStartsOn={weekStartsOn}
+              viewMode={viewMode}
+            />
           </div>
           <div
             className="flex flex-wrap items-center gap-4 border-t border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground"

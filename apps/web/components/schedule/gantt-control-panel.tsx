@@ -31,6 +31,8 @@ interface GanttControlPanelProps {
   onShowDependenciesChange: (show: boolean) => void
   groupBy: 'none' | 'phase' | 'assigned'
   onGroupByChange: (groupBy: 'none' | 'phase' | 'assigned') => void
+  weekStartsOn?: 0 | 1
+  onWeekStartsOnChange?: (value: 0 | 1) => void
   onExportPDF: () => void
 }
 
@@ -45,6 +47,8 @@ export function GanttControlPanel({
   onShowDependenciesChange,
   groupBy,
   onGroupByChange,
+  weekStartsOn = 1,
+  onWeekStartsOnChange,
   onExportPDF,
 }: GanttControlPanelProps) {
   const t = useTranslations('schedule')
@@ -75,11 +79,28 @@ export function GanttControlPanel({
                 onCheckedChange={onShowDependenciesChange}
               />
             </div>
+            {onWeekStartsOnChange && (
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm">{t('weekStartsOn')}</span>
+                <Select
+                  value={String(weekStartsOn)}
+                  onValueChange={(v) => onWeekStartsOnChange(v === '0' ? 0 : 1)}
+                >
+                  <SelectTrigger className="h-8 w-[120px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">{t('weekStartMonday')}</SelectItem>
+                    <SelectItem value="0">{t('weekStartSunday')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
 
           <div className="space-y-3">
             <Label className="text-sm font-medium">{t('tracking')}</Label>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between" title={t('baselineComingSoon')}>
               <div className="flex items-center gap-2">
                 <Eye className="h-4 w-4 text-blue-600" />
                 <span className="text-sm">{t('baseline')}</span>
@@ -87,6 +108,7 @@ export function GanttControlPanel({
               <Switch
                 checked={showBaseline}
                 onCheckedChange={onShowBaselineChange}
+                disabled
               />
             </div>
             <div className="flex items-center justify-between">
@@ -123,7 +145,9 @@ export function GanttControlPanel({
                 <SelectContent>
                   <SelectItem value="none">{t('noGrouping')}</SelectItem>
                   <SelectItem value="phase">{t('groupByPhase')}</SelectItem>
-                  <SelectItem value="assigned">{t('groupByAssigned')}</SelectItem>
+                  <SelectItem value="assigned" disabled title={t('groupByAssignedComingSoon')}>
+                    {t('groupByAssigned')}
+                  </SelectItem>
                 </SelectContent>
               </Select>
               <Button

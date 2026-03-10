@@ -1,14 +1,10 @@
 'use client'
 
 import { useRef, useEffect, useState } from 'react'
-import {
-  format,
-  eachDayOfInterval,
-  isSameDay,
-  addDays,
-} from 'date-fns'
+import { format, eachDayOfInterval, addDays } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { addWorkingDays, countWorkingDays } from '@/lib/schedule/working-days'
+import { getDayIndex } from '@/lib/schedule/gantt-position'
 import { GANTT_HEADER_HEIGHT, GANTT_ROW_HEIGHT } from '@/lib/schedule/gantt-constants'
 
 interface GanttTask {
@@ -35,11 +31,14 @@ interface GanttTimelineDynamicProps {
   showCriticalPath: boolean
   showDependencies: boolean
   showTodayLine: boolean
+  showProgress?: boolean
   workingDaysPerWeek: number
+  weekStartsOn?: 0 | 1
   onTaskClick?: (taskId: string) => void
   onTaskDragEnd?: (taskId: string, newStartDate: Date, newEndDate: Date) => void
   highlightedTask: string | null
   onTaskHover?: (taskId: string | null) => void
+  ariaLabel?: string
 }
 
 export function GanttTimelineDynamic({
@@ -50,11 +49,14 @@ export function GanttTimelineDynamic({
   showCriticalPath,
   showDependencies,
   showTodayLine,
+  showProgress = true,
   workingDaysPerWeek,
+  weekStartsOn = 1,
   onTaskClick,
   onTaskDragEnd,
   highlightedTask,
   onTaskHover,
+  ariaLabel,
 }: GanttTimelineDynamicProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -133,6 +135,8 @@ export function GanttTimelineDynamic({
     showCriticalPath,
     showDependencies,
     showTodayLine,
+    showProgress,
+    weekStartsOn,
     hoveredTask,
     highlightedTask,
     dragState,
@@ -183,7 +187,7 @@ export function GanttTimelineDynamic({
       })
     } else if (zoom === 'week') {
       days.forEach((day, idx) => {
-        if (day.getDay() === 1) {
+        if (day.getDay() === weekStartsOn) {
           const x = idx * DAY_WIDTH
           ctx.fillText(
             format(day, 'dd/MM', { locale: es }),
@@ -255,7 +259,7 @@ export function GanttTimelineDynamic({
 
   function drawTodayLine(ctx: CanvasRenderingContext2D) {
     const today = new Date()
-    const todayIdx = days.findIndex((d) => isSameDay(d, today))
+    const todayIdx = getDayIndex(today, days)
 
     if (todayIdx !== -1) {
       const x = todayIdx * DAY_WIDTH
@@ -281,12 +285,8 @@ export function GanttTimelineDynamic({
       const isDragging = dragState?.taskId === task.id
 
       if (isDragging && dragState) {
-        const ghostStartDay = days.findIndex((d) =>
-          isSameDay(d, dragState.initialStartDate)
-        )
-        const ghostEndDay = days.findIndex((d) =>
-          isSameDay(d, dragState.initialEndDate)
-        )
+        const ghostStartDay = getDayIndex(dragState.initialStartDate, days)
+        const ghostEndDay = getDayIndex(dragState.initialEndDate, days)
         if (
           ghostStartDay !== -1 &&
           ghostEndDay !== -1 &&
@@ -318,8 +318,8 @@ export function GanttTimelineDynamic({
         endDate = dragState.originalEndDate
       }
 
-      const startDay = days.findIndex((d) => isSameDay(d, startDate))
-      const endDay = days.findIndex((d) => isSameDay(d, endDate))
+      const startDay = getDayIndex(startDate, days)
+      const endDay = getDayIndex(endDate, days)
 
       if (startDay === -1 || endDay === -1) return
       if (startDate.getTime() === endDate.getTime()) return
@@ -388,7 +388,7 @@ export function GanttTimelineDynamic({
       } else {
         ctx.fillRect(barX, barY, barWidth, barHeight)
 
-        if (task.progress > 0) {
+        if (showProgress && task.progress > 0) {
           ctx.fillStyle = '#1e3a8a'
           const progressWidth = (barWidth * task.progress) / 100
           ctx.fillRect(barX, barY, progressWidth, barHeight)
@@ -398,7 +398,7 @@ export function GanttTimelineDynamic({
         ctx.lineWidth = isHovered ? 2 : 1
         ctx.strokeRect(barX, barY, barWidth, barHeight)
 
-        if (task.progress > 0 && barWidth > 40) {
+        if (showProgress && task.progress > 0 && barWidth > 40) {
           ctx.fillStyle = '#ffffff'
           ctx.font = 'bold 10px Inter'
           const progressText = `${task.progress}%`
@@ -431,8 +431,8 @@ export function GanttTimelineDynamic({
 
         const targetTask = tasks[targetIdx]
 
-        const startDay = days.findIndex((d) => isSameDay(d, task.endDate))
-        const endDay = days.findIndex((d) => isSameDay(d, targetTask.startDate))
+        const startDay = getDayIndex(task.endDate, days)
+        const endDay = getDayIndex(targetTask.startDate, days)
 
         if (startDay === -1 || endDay === -1) return
 
@@ -482,8 +482,8 @@ export function GanttTimelineDynamic({
     const task = tasks[taskIndex]
     if (task.taskType === 'SUMMARY') return null
 
-    const startDay = days.findIndex((d) => isSameDay(d, task.startDate))
-    const endDay = days.findIndex((d) => isSameDay(d, task.endDate))
+    const startDay = getDayIndex(task.startDate, days)
+    const endDay = getDayIndex(task.endDate, days)
 
     if (startDay === -1 || endDay === -1) return null
     if (task.startDate.getTime() === task.endDate.getTime()) return null
@@ -676,6 +676,8 @@ export function GanttTimelineDynamic({
     >
       <canvas
         ref={canvasRef}
+        role="img"
+        aria-label={ariaLabel}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}

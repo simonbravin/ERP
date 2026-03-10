@@ -53,6 +53,7 @@ interface GanttDataTableProps {
   highlightedTask: string | null
   searchQuery?: string
   workingDaysPerWeek?: number
+  groupBy?: 'none' | 'phase' | 'assigned'
 }
 
 export function GanttDataTable({
@@ -67,6 +68,7 @@ export function GanttDataTable({
   highlightedTask,
   searchQuery = '',
   workingDaysPerWeek = 5,
+  groupBy = 'none',
 }: GanttDataTableProps) {
   const allTasks = allTasksProp ?? tasks
   const t = useTranslations('schedule')

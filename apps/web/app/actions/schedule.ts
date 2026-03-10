@@ -19,6 +19,7 @@ import { Decimal } from '@prisma/client/runtime/library'
 import { calculateCriticalPath } from '@/lib/schedule/critical-path'
 import { addWorkingDays, countWorkingDays } from '@/lib/schedule/working-days'
 import { validateTaskDatesAgainstDependencies } from '@/lib/schedule/validate-dependencies'
+import { wouldCreateCycle } from '@/lib/schedule/dependency-cycle'
 import { createAuditLog } from '@/lib/audit-log'
 import { addDays, differenceInDays } from 'date-fns'
 
@@ -468,13 +469,13 @@ export async function addTaskDependency(data: {
       return { success: false, error: 'Solo se puede editar en DRAFT' }
     }
 
-    const wouldCreateCycle = await checkForCycle(
+    const createsCycle = await checkForCycle(
       data.scheduleId,
       data.predecessorId,
       data.successorId
     )
 
-    if (wouldCreateCycle) {
+    if (createsCycle) {
       return {
         success: false,
         error: 'Esta dependencia crearía un ciclo. No es permitido.',
@@ -790,9 +791,7 @@ async function recalculateParentSummaryTasks(
 
 /**
  * Detectar si agregar predecessorId -> successorId crearía un ciclo.
- * Ciclo existe si ya hay un camino desde successorId hasta predecessorId (en grafo de dependencias).
- * Grafo: arista (pred, succ) = pred -> succ. Si desde successorId podemos llegar a predecessorId,
- * entonces agregar pred -> succ daría: successorId -> ... -> predecessorId -> successorId = ciclo.
+ * Usa wouldCreateCycle (lógica pura testeable) con las dependencias del schedule.
  */
 async function checkForCycle(
   scheduleId: string,
@@ -803,28 +802,7 @@ async function checkForCycle(
     where: { scheduleId },
     select: { predecessorId: true, successorId: true },
   })
-
-  // Grafo de salida (solo dependencias existentes): adj[pred] = [succ] para cada arista pred -> succ
-  const adj = new Map<string, string[]>()
-  for (const d of deps) {
-    const list = adj.get(d.predecessorId) ?? []
-    list.push(d.successorId)
-    adj.set(d.predecessorId, list)
-  }
-
-  // DFS desde successorId: si alcanzamos predecessorId, ya existe camino successorId -> ... -> predecessorId;
-  // agregar predecessorId -> successorId cerraría el ciclo.
-  const visited = new Set<string>()
-  function dfs(nodeId: string): boolean {
-    if (nodeId === predecessorId) return true
-    if (visited.has(nodeId)) return false
-    visited.add(nodeId)
-    for (const next of adj.get(nodeId) ?? []) {
-      if (dfs(next)) return true
-    }
-    return false
-  }
-  return dfs(successorId)
+  return wouldCreateCycle(deps, predecessorId, successorId)
 }
 
 /**
