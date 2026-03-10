@@ -346,6 +346,10 @@ export function ScheduleViewClient({
   function handleGoToToday() {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
+    const projectStart = new Date(schedule.projectStartDate)
+    projectStart.setHours(0, 0, 0, 0)
+    const projectEnd = new Date(schedule.projectEndDate)
+    projectEnd.setHours(0, 0, 0, 0)
     const daysToShow = Math.max(
       14,
       differenceInDays(visibleEndDate, visibleStartDate) + 1
@@ -353,15 +357,16 @@ export function ScheduleViewClient({
     const half = Math.floor(daysToShow / 2)
     let newStart = subDays(today, half)
     let newEnd = addDays(newStart, daysToShow - 1)
-    if (newStart < schedule.projectStartDate) {
-      newStart = new Date(schedule.projectStartDate)
-      newStart.setHours(0, 0, 0, 0)
+    if (newStart < projectStart) {
+      newStart = new Date(projectStart)
       newEnd = addDays(newStart, daysToShow - 1)
     }
-    if (newEnd > schedule.projectEndDate) {
-      newEnd = new Date(schedule.projectEndDate)
-      newEnd.setHours(0, 0, 0, 0)
+    if (newEnd > projectEnd) {
+      newEnd = new Date(projectEnd)
       newStart = subDays(newEnd, daysToShow - 1)
+    }
+    if (newStart < projectStart) {
+      newStart = new Date(projectStart)
     }
     handleRangeChange(newStart, newEnd)
   }
@@ -717,7 +722,7 @@ export function ScheduleViewClient({
         </div>
 
         <div className="overflow-hidden rounded-lg border border-border">
-          <div className="flex h-[520px] min-h-0">
+          <div className="flex min-h-0" style={{ minHeight: 'max(520px, 60vh)', maxHeight: '85vh' }}>
             <div className="flex min-h-0 flex-1 overflow-auto">
               <div className="min-w-[420px] shrink-0 border-r border-border">
                 <GanttDataTable

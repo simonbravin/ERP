@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getToken } from 'next-auth/jwt'
+import { auth } from '@/lib/auth'
 import { prisma } from '@repo/database'
 import { getOrgContext } from '@/lib/org-context'
 import { getBudgetExportData } from '@/app/actions/budget'
@@ -36,19 +36,20 @@ function getCookiesFromRequest(request: NextRequest): { name: string; value: str
 }
 
 export async function GET(request: NextRequest) {
-  const token = await getToken({
-    req: request,
-    secret: process.env.NEXTAUTH_SECRET,
-  })
-  if (!token?.sub) {
+  const session = await auth()
+  if (!session?.user?.id) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   }
 
-  const member = await prisma.orgMember.findFirst({
-    where: { userId: token.sub, active: true },
-    select: { id: true, orgId: true },
-  })
-  if (!member) {
+  let orgId = (session.user as { orgId?: string }).orgId
+  if (!orgId) {
+    const member = await prisma.orgMember.findFirst({
+      where: { userId: session.user.id, active: true },
+      select: { orgId: true },
+    })
+    orgId = member?.orgId ?? undefined
+  }
+  if (!orgId) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   }
 
@@ -85,10 +86,10 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  const session = { userId: token.sub, orgId: member.orgId }
+  const accessSession = { userId: session.user.id, orgId }
 
   try {
-    await template.validateAccess({ session, id: id ?? undefined })
+    await template.validateAccess({ session: accessSession, id: id ?? undefined })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Sin acceso'
     const isNotFound = message.toLowerCase().includes('no encontrada') || message.toLowerCase().includes('no encontrado')
@@ -125,7 +126,7 @@ export async function GET(request: NextRequest) {
 
     if (template.id === 'budget' && id) {
       // Same dataset as Planilla Final: full WBS tree flattened (one row per node) via getBudgetExportData.
-      const org = await getOrgContext(token.sub)
+      const org = await getOrgContext(session.user.id)
       if (!org) {
         return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
       }
@@ -165,7 +166,7 @@ export async function GET(request: NextRequest) {
       if (!project) {
         return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 })
       }
-      const userName = (token as { name?: string }).name ?? (token as { email?: string }).email ?? ''
+      const userName = session.user.name ?? session.user.email ?? ''
       const formatDate = (d: Date | string | null | undefined) =>
         d ? new Date(d).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : null
       const endDate = (project as { plannedEndDate?: Date | null; baselinePlannedEndDate?: Date | null; actualEndDate?: Date | null }).plannedEndDate
@@ -219,7 +220,7 @@ export async function GET(request: NextRequest) {
       }
       pdfBuffer = await renderHtmlToPdf(html, baseUrl + '/', budgetPdfOptions)
     } else if (template.id === 'purchase-order' && id) {
-      const org = await getOrgContext(token.sub)
+      const org = await getOrgContext(session.user.id)
       if (!org) {
         return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
       }
@@ -261,7 +262,7 @@ export async function GET(request: NextRequest) {
       if (!commitment) {
         return NextResponse.json({ error: 'Orden de compra no encontrada' }, { status: 404 })
       }
-      const userName = (token as { name?: string }).name ?? (token as { email?: string }).email ?? ''
+      const userName = session.user.name ?? session.user.email ?? ''
       const layout = {
         orgName: org.orgName ?? 'Organización',
         orgLegalName: orgProfile?.legalName ?? null,
@@ -315,7 +316,7 @@ export async function GET(request: NextRequest) {
         },
       })
     } else if (template.id === 'schedule' && id) {
-      const org = await getOrgContext(token.sub)
+      const org = await getOrgContext(session.user.id)
       if (!org) {
         return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
       }
@@ -389,7 +390,7 @@ export async function GET(request: NextRequest) {
           // optional
         }
       }
-      const userName = (token as { name?: string }).name ?? (token as { email?: string }).email ?? ''
+      const userName = session.user.name ?? session.user.email ?? ''
       const layout = {
         orgName: org.orgName ?? 'Organización',
         orgLegalName: orgProfile?.legalName ?? null,

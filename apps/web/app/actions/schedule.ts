@@ -791,6 +791,8 @@ async function recalculateParentSummaryTasks(
 /**
  * Detectar si agregar predecessorId -> successorId crearía un ciclo.
  * Ciclo existe si ya hay un camino desde successorId hasta predecessorId (en grafo de dependencias).
+ * Grafo: arista (pred, succ) = pred -> succ. Si desde successorId podemos llegar a predecessorId,
+ * entonces agregar pred -> succ daría: successorId -> ... -> predecessorId -> successorId = ciclo.
  */
 async function checkForCycle(
   scheduleId: string,
@@ -802,24 +804,22 @@ async function checkForCycle(
     select: { predecessorId: true, successorId: true },
   })
 
-  // Grafo inverso: para cada (pred, succ) tenemos arista succ -> pred (quién apunta a quién en reverso)
-  const revAdj = new Map<string, string[]>()
+  // Grafo de salida (solo dependencias existentes): adj[pred] = [succ] para cada arista pred -> succ
+  const adj = new Map<string, string[]>()
   for (const d of deps) {
-    const list = revAdj.get(d.successorId) ?? []
-    list.push(d.predecessorId)
-    revAdj.set(d.successorId, list)
+    const list = adj.get(d.predecessorId) ?? []
+    list.push(d.successorId)
+    adj.set(d.predecessorId, list)
   }
-  // Nueva arista: predecessorId -> successorId, en reverso successorId -> predecessorId
-  const newList = revAdj.get(successorId) ?? []
-  newList.push(predecessorId)
-  revAdj.set(successorId, newList)
 
+  // DFS desde successorId: si alcanzamos predecessorId, ya existe camino successorId -> ... -> predecessorId;
+  // agregar predecessorId -> successorId cerraría el ciclo.
   const visited = new Set<string>()
   function dfs(nodeId: string): boolean {
     if (nodeId === predecessorId) return true
     if (visited.has(nodeId)) return false
     visited.add(nodeId)
-    for (const next of revAdj.get(nodeId) ?? []) {
+    for (const next of adj.get(nodeId) ?? []) {
       if (dfs(next)) return true
     }
     return false
