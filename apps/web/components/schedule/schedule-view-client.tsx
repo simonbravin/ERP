@@ -15,6 +15,13 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { toast } from 'sonner'
 import {
   setScheduleAsBaseline,
@@ -29,8 +36,10 @@ import {
   Download,
   Loader2,
   AlertTriangle,
+  ZoomIn,
+  ZoomOut,
 } from 'lucide-react'
-import { format } from 'date-fns'
+import { format, addDays, subDays, differenceInDays } from 'date-fns'
 import { es } from 'date-fns/locale'
 
 export type ScheduleViewData = NonNullable<
@@ -334,6 +343,29 @@ export function ScheduleViewClient({
     setVisibleEndDate(endDate)
   }
 
+  function handleGoToToday() {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const daysToShow = Math.max(
+      14,
+      differenceInDays(visibleEndDate, visibleStartDate) + 1
+    )
+    const half = Math.floor(daysToShow / 2)
+    let newStart = subDays(today, half)
+    let newEnd = addDays(newStart, daysToShow - 1)
+    if (newStart < schedule.projectStartDate) {
+      newStart = new Date(schedule.projectStartDate)
+      newStart.setHours(0, 0, 0, 0)
+      newEnd = addDays(newStart, daysToShow - 1)
+    }
+    if (newEnd > schedule.projectEndDate) {
+      newEnd = new Date(schedule.projectEndDate)
+      newEnd.setHours(0, 0, 0, 0)
+      newStart = subDays(newEnd, daysToShow - 1)
+    }
+    handleRangeChange(newStart, newEnd)
+  }
+
   const selectedTaskForEditData = selectedTaskForEdit
     ? schedule.tasks.find(
         (t: (typeof schedule.tasks)[0]) => t.id === selectedTaskForEdit
@@ -618,16 +650,70 @@ export function ScheduleViewClient({
         onRangeChange={handleRangeChange}
         zoom={zoom}
         onZoomChange={setZoom}
+        onGoToToday={handleGoToToday}
       />
 
       <div className="space-y-1">
-        <div className="flex w-full items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2">
           <Input
             placeholder={t('searchTasks')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="h-8 min-w-[320px] flex-1 max-w-full text-xs"
           />
+          <div className="flex items-center gap-1 rounded-md border border-border bg-muted/30 px-2 py-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={() => {
+                if (zoom === 'month') setZoom('week')
+                else if (zoom === 'week') setZoom('day')
+              }}
+              disabled={zoom === 'day'}
+              title={t('daily')}
+            >
+              <ZoomIn className="h-3.5 w-3.5" />
+            </Button>
+            <Select
+              value={zoom}
+              onValueChange={(v) => setZoom(v as 'day' | 'week' | 'month')}
+            >
+              <SelectTrigger className="h-7 w-[90px] border-0 bg-transparent text-xs shadow-none focus:ring-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="day">{t('daily')}</SelectItem>
+                <SelectItem value="week">{t('weekly')}</SelectItem>
+                <SelectItem value="month">{t('monthly')}</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={() => {
+                if (zoom === 'day') setZoom('week')
+                else if (zoom === 'week') setZoom('month')
+              }}
+              disabled={zoom === 'month'}
+              title={t('monthly')}
+            >
+              <ZoomOut className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1.5 text-xs"
+              onClick={handleGoToToday}
+            >
+              <Calendar className="h-3.5 w-3.5" />
+              {t('legendToday')}
+            </Button>
+          </div>
         </div>
 
         <div className="overflow-hidden rounded-lg border border-border">
@@ -751,6 +837,7 @@ export function ScheduleViewClient({
           scheduleId={schedule.id}
           taskId={selectedTaskForDependency!}
           taskName={`${selectedTaskForDependencyData.wbsNode.code} ${selectedTaskForDependencyData.wbsNode.name}`}
+          canEdit={canEdit}
           availableTasks={schedule.tasks.map(
             (t: (typeof schedule.tasks)[0]) => ({
               id: t.id,

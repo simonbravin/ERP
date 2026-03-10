@@ -32,6 +32,7 @@ interface DependencyManagerProps {
   scheduleId: string
   taskId: string
   taskName: string
+  canEdit?: boolean
   availableTasks: Array<{
     id: string
     code: string
@@ -54,6 +55,7 @@ export function DependencyManager({
   scheduleId,
   taskId,
   taskName,
+  canEdit = true,
   availableTasks,
   existingDependencies,
 }: DependencyManagerProps) {
@@ -203,7 +205,7 @@ export function DependencyManager({
                         variant="ghost"
                         size="sm"
                         onClick={() => handleRemoveDependency(dep.id)}
-                        disabled={isPending}
+                        disabled={isPending || !canEdit}
                       >
                         <Trash2 className="h-4 w-4 text-red-600" />
                       </Button>
@@ -228,7 +230,7 @@ export function DependencyManager({
                 <Select
                   value={selectedTask}
                   onValueChange={setSelectedTask}
-                  disabled={isPending}
+                  disabled={isPending || !canEdit}
                 >
                   <SelectTrigger id="predecessor" className="mt-1 w-full">
                     <SelectValue placeholder={t('selectTask')} />
@@ -257,7 +259,7 @@ export function DependencyManager({
                     onValueChange={(v) =>
                       setDependencyType(v as 'FS' | 'SS' | 'FF' | 'SF')
                     }
-                    disabled={isPending}
+                    disabled={isPending || !canEdit}
                   >
                     <SelectTrigger id="depType" className="mt-1 w-full">
                       <SelectValue />
@@ -290,7 +292,7 @@ export function DependencyManager({
                     onChange={(e) =>
                       setLagDays(parseInt(e.target.value, 10) || 0)
                     }
-                    disabled={isPending}
+                    disabled={isPending || !canEdit}
                     className="mt-1 w-full"
                   />
                 </div>
@@ -298,7 +300,7 @@ export function DependencyManager({
 
               <Button
                 onClick={handleAddDependency}
-                disabled={isPending || !selectedTask}
+                disabled={isPending || !selectedTask || !canEdit}
                 className="w-full"
               >
                 {isPending ? (

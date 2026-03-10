@@ -553,63 +553,58 @@ export function GanttTimelineDynamic({
 
     if (dragState) {
       const deltaX = x - dragState.startX
-      const daysDelta = Math.round(deltaX / DAY_WIDTH)
+      const totalDaysDelta = Math.round(deltaX / DAY_WIDTH)
+      const task = tasks.find((t) => t.id === dragState.taskId)
+      if (!task) return
 
-      if (daysDelta !== 0) {
-        const task = tasks.find((t) => t.id === dragState.taskId)
-        if (!task) return
+      const { initialStartDate, initialEndDate } = dragState
 
-        if (dragState.dragType === 'move') {
-          const newStart = addWorkingDays(
-            dragState.originalStartDate,
-            daysDelta,
-            workingDaysPerWeek
-          )
-          const duration = countWorkingDays(
-            dragState.originalStartDate,
-            dragState.originalEndDate,
-            workingDaysPerWeek
-          )
-          const newEnd = addWorkingDays(
-            newStart,
-            duration,
-            workingDaysPerWeek
-          )
-
+      if (dragState.dragType === 'move') {
+        const newStart = addWorkingDays(
+          initialStartDate,
+          totalDaysDelta,
+          workingDaysPerWeek
+        )
+        const duration = countWorkingDays(
+          initialStartDate,
+          initialEndDate,
+          workingDaysPerWeek
+        )
+        const newEnd = addWorkingDays(
+          newStart,
+          duration,
+          workingDaysPerWeek
+        )
+        setDragState({
+          ...dragState,
+          originalStartDate: newStart,
+          originalEndDate: newEnd,
+        })
+      } else if (dragState.dragType === 'resize-start') {
+        const newStart = addWorkingDays(
+          initialStartDate,
+          totalDaysDelta,
+          workingDaysPerWeek
+        )
+        if (newStart < initialEndDate) {
           setDragState({
             ...dragState,
             originalStartDate: newStart,
+          })
+        }
+      } else if (dragState.dragType === 'resize-end') {
+        const newEnd = addWorkingDays(
+          initialEndDate,
+          totalDaysDelta,
+          workingDaysPerWeek
+        )
+        if (newEnd > initialStartDate) {
+          setDragState({
+            ...dragState,
             originalEndDate: newEnd,
           })
-        } else if (dragState.dragType === 'resize-start') {
-          const newStart = addWorkingDays(
-            dragState.originalStartDate,
-            daysDelta,
-            workingDaysPerWeek
-          )
-
-          if (newStart < dragState.originalEndDate) {
-            setDragState({
-              ...dragState,
-              originalStartDate: newStart,
-            })
-          }
-        } else if (dragState.dragType === 'resize-end') {
-          const newEnd = addWorkingDays(
-            dragState.originalEndDate,
-            daysDelta,
-            workingDaysPerWeek
-          )
-
-          if (newEnd > dragState.originalStartDate) {
-            setDragState({
-              ...dragState,
-              originalEndDate: newEnd,
-            })
-          }
         }
       }
-
       return
     }
 

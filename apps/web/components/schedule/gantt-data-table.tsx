@@ -269,20 +269,23 @@ export function GanttDataTable({
                   </TableCell>
 
                   <TableCell className="px-1 py-0.5 text-center">
-                    {(task.predecessorCount > 0 ||
-                      task.successorCount > 0) && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onDependenciesClick(task.id)}
-                        className="h-6 w-6 p-0"
-                      >
-                        <GitBranch className="h-3 w-3 text-muted-foreground" />
-                        <span className="ml-1 text-[9px]">
-                          {task.predecessorCount + task.successorCount}
-                        </span>
-                      </Button>
-                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onDependenciesClick(task.id)}
+                      disabled={!canEdit}
+                      className="h-6 w-6 p-0"
+                      title={
+                        task.predecessorCount + task.successorCount > 0
+                          ? `${task.predecessorCount + task.successorCount} ${t('deps')}`
+                          : t('manageDependencies')
+                      }
+                    >
+                      <GitBranch className="h-3 w-3 text-muted-foreground" />
+                      <span className="ml-1 text-[9px]">
+                        {task.predecessorCount + task.successorCount || '−'}
+                      </span>
+                    </Button>
                   </TableCell>
 
                   <TableCell className="px-1 py-0.5 text-center">

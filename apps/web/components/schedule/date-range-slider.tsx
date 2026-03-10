@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
@@ -24,6 +24,7 @@ interface DateRangeSliderProps {
   onRangeChange: (startDate: Date, endDate: Date) => void
   zoom?: 'day' | 'week' | 'month'
   onZoomChange?: (zoom: 'day' | 'week' | 'month') => void
+  onGoToToday?: () => void
 }
 
 export function DateRangeSlider({
@@ -34,6 +35,7 @@ export function DateRangeSlider({
   onRangeChange,
   zoom = 'week',
   onZoomChange,
+  onGoToToday,
 }: DateRangeSliderProps) {
   const t = useTranslations('schedule')
 
@@ -49,6 +51,17 @@ export function DateRangeSlider({
         (1000 * 60 * 60 * 24)
     )
   )
+
+  useEffect(() => {
+    setRangeStart(format(currentStartDate, 'yyyy-MM-dd'))
+    setRangeEnd(format(currentEndDate, 'yyyy-MM-dd'))
+    setDaysToShow(
+      Math.ceil(
+        (currentEndDate.getTime() - currentStartDate.getTime()) /
+          (1000 * 60 * 60 * 24)
+      )
+    )
+  }, [currentStartDate, currentEndDate])
 
   function handleDaysChange(days: number) {
     const newDays = Math.max(5, Math.min(365, days))
@@ -145,6 +158,11 @@ export function DateRangeSlider({
                 <ZoomOut className="h-3.5 w-3.5" />
               </Button>
             </div>
+          )}
+          {onGoToToday && (
+            <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={onGoToToday}>
+              {t('legendToday')}
+            </Button>
           )}
           <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={handleResetToProject}>
             {t('resetToProject')}
