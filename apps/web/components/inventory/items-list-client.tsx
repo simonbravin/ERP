@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Search, Grid3x3, List, Package } from 'lucide-react'
+import { ListFiltersBar } from '@/components/list'
 import { ItemsTable } from './items-table'
 import { ItemsGrid } from './items-grid'
 import { Link } from '@/i18n/navigation'
@@ -60,58 +61,40 @@ export function ItemsListClient({ items, categories }: ItemsListClientProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4 md:flex-row md:items-end">
-        <div className="flex-1">
-          <label className="mb-2 block text-sm font-medium">Buscar</label>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por SKU o nombre..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              className="pl-9"
-            />
-          </div>
+      <ListFiltersBar onApply={handleSearch} onClear={handleClearFilters}>
+        <div className="relative min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por SKU o nombre..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+            className="h-9 pl-9"
+          />
         </div>
-
-        <div className="w-full md:w-48">
-          <label className="mb-2 block text-sm font-medium">Categoría</label>
-          <select
-            value={selectedCategoryId}
-            onChange={(e) => setSelectedCategoryId(e.target.value)}
-            className="flex h-10 w-full rounded-md border border-input bg-card dark:bg-background px-3 py-2 text-sm"
-          >
-            <option value="">Todas</option>
-            {categories.map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="w-full md:w-48">
-          <label className="mb-2 block text-sm font-medium">Estado stock</label>
-          <select
-            value={stockFilter}
-            onChange={(e) => setStockFilter(e.target.value)}
-            className="flex h-10 w-full rounded-md border border-input bg-card dark:bg-background px-3 py-2 text-sm"
-          >
-            <option value="">Todos</option>
-            <option value="ok">Stock OK</option>
-            <option value="low">Stock Bajo</option>
-            <option value="zero">Sin Stock</option>
-          </select>
-        </div>
-
-        <div className="flex gap-2">
-          <Button onClick={handleSearch}>Filtrar</Button>
-          <Button variant="outline" onClick={handleClearFilters}>
-            Limpiar
-          </Button>
-        </div>
-      </div>
+        <select
+          value={selectedCategoryId}
+          onChange={(e) => setSelectedCategoryId(e.target.value)}
+          className="flex h-9 w-full min-w-[140px] rounded-md border border-input bg-card px-3 py-2 text-sm dark:bg-background"
+        >
+          <option value="">Todas</option>
+          {categories.map((cat) => (
+            <option key={cat.id} value={cat.id}>
+              {cat.name}
+            </option>
+          ))}
+        </select>
+        <select
+          value={stockFilter}
+          onChange={(e) => setStockFilter(e.target.value)}
+          className="flex h-9 min-w-[120px] rounded-md border border-input bg-card px-3 py-2 text-sm dark:bg-background"
+        >
+          <option value="">Todos</option>
+          <option value="ok">Stock OK</option>
+          <option value="low">Stock Bajo</option>
+          <option value="zero">Sin Stock</option>
+        </select>
+      </ListFiltersBar>
 
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">

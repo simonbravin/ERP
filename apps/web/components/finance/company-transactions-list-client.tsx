@@ -21,6 +21,7 @@ import {
   exportCompanyTransactionsToExcel,
   type CompanyTransactionsExportFilters,
 } from '@/app/actions/export'
+import { ListFiltersBar, SummaryCard } from '@/components/list'
 import { ExportDialog } from '@/components/export/export-dialog'
 import { TransactionFormDialog } from './transaction-form-dialog'
 import { DOCUMENT_TYPE_LABELS, TYPE_LABELS, getStatusLabel } from '@/lib/finance-labels'
@@ -126,6 +127,20 @@ export function CompanyTransactionsListClient({
 
   const totalAmount = transactions.reduce((sum, tx) => sum + (tx.amountBaseCurrency ?? tx.total ?? 0), 0)
 
+  function clearFilters() {
+    setProjectFilter('all')
+    setTypeFilter('all')
+    setPartyFilter('all')
+    setStatusFilter('all')
+    setDateFrom('')
+    setDateTo('')
+    setSearchTerm('')
+    startTransition(async () => {
+      const result = await getCompanyTransactions({})
+      setTransactions(result as unknown as CompanyTransactionRow[])
+    })
+  }
+
   function buildExportFilters(): CompanyTransactionsExportFilters {
     const f: CompanyTransactionsExportFilters = {}
     if (projectFilter === 'overhead') f.projectId = 'null'
@@ -191,33 +206,33 @@ export function CompanyTransactionsListClient({
   return (
     <div className="space-y-4">
       {companyBalance !== undefined && (
-        <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-border bg-card px-4 py-3">
-          <div className="flex items-center gap-2">
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium text-muted-foreground">
-              Balance de la empresa:
-            </span>
+        <SummaryCard
+          icon={TrendingUp}
+          label={t('companyBalanceLabel', { defaultValue: 'Balance de la empresa:' })}
+          value={
             <span
-              className={`tabular-nums font-semibold ${
+              className={
                 companyBalance >= 0
                   ? 'text-emerald-600 dark:text-emerald-400'
                   : 'text-red-600 dark:text-red-400'
-              }`}
+              }
             >
               {formatCurrency(companyBalance, 'ARS')}
             </span>
-          </div>
-          <Button variant="link" size="sm" className="h-auto p-0" asChild>
-            <Link href="/finance">Ver Dashboard</Link>
-          </Button>
-        </div>
+          }
+          action={
+            <Button variant="link" size="sm" className="h-auto p-0" asChild>
+              <Link href="/finance">{t('viewDashboard', { defaultValue: 'Ver Dashboard' })}</Link>
+            </Button>
+          }
+        />
       )}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h2 className="text-lg font-semibold text-foreground">{t('transactions')}</h2>
         <div className="flex gap-2">
           <Button type="button" variant="outline" size="sm" onClick={() => setShowExportDialog(true)}>
             <FileDown className="mr-2 h-4 w-4" />
-            Exportar
+            {tCommon('export')}
           </Button>
           {canCreate && (
             <Button type="button" onClick={() => setIsFormOpen(true)}>
@@ -227,8 +242,7 @@ export function CompanyTransactionsListClient({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-3 dark:border-gray-700 dark:bg-gray-900">
-        <span className="text-sm font-medium text-foreground">{t('filters')}:</span>
+      <ListFiltersBar onApply={() => applyFilters()} onClear={clearFilters} isPending={isPending}>
         <Select
           value={projectFilter}
           onValueChange={(v) => {
@@ -327,10 +341,7 @@ export function CompanyTransactionsListClient({
           onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
           className="max-w-[220px]"
         />
-        <Button type="button" variant="secondary" onClick={applyFilters} disabled={isPending}>
-          {isPending ? 'Filtrando...' : 'Aplicar'}
-        </Button>
-      </div>
+      </ListFiltersBar>
 
       <div className="overflow-hidden rounded-lg border border-border bg-card dark:border-gray-700 dark:bg-gray-900">
         <table className="w-full text-sm">
@@ -425,7 +436,7 @@ export function CompanyTransactionsListClient({
       <ExportDialog
         open={showExportDialog}
         onOpenChange={setShowExportDialog}
-        title="Exportar transacciones de empresa (según filtros actuales)"
+        title={t('exportCompanyTransactionsTitle', { defaultValue: 'Exportar transacciones de empresa (según filtros actuales)' })}
         columns={exportColumns}
         onExport={handleExport}
         showPdfOptions

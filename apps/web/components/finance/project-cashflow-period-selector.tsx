@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import {
   Select,
   SelectContent,
@@ -18,6 +19,7 @@ interface Props {
 }
 
 export function ProjectCashflowPeriodSelector({ range }: Props) {
+  const t = useTranslations('common')
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -133,7 +135,7 @@ export function ProjectCashflowPeriodSelector({ range }: Props) {
               onClick={handleCustomApply}
               disabled={!customFrom || !customTo}
             >
-              Aplicar
+              {t('apply')}
             </Button>
           </>
         )}

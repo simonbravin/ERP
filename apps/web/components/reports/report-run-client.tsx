@@ -2,8 +2,10 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/button'
+import { useTranslations } from 'next-intl'
 import { runSavedReport } from '@/app/actions/reports'
+import { ExportDropdown, type ExportFormat } from '@/components/list'
+import { toast } from 'sonner'
 
 type ReportRunClientProps = {
   reportId: string
@@ -15,16 +17,20 @@ export function ReportRunClient({
   reportName,
 }: ReportRunClientProps) {
   const router = useRouter()
+  const t = useTranslations('reports')
   const [running, setRunning] = useState(false)
 
-  async function handleExport(format: 'EXCEL' | 'CSV') {
+  async function handleExport(format: ExportFormat) {
+    if (format !== 'excel' && format !== 'csv') return
     setRunning(true)
     try {
-      await runSavedReport(reportId, format)
-      window.open(`/api/reports/${reportId}/export?format=${format}`, '_blank')
+      const apiFormat = format === 'excel' ? 'EXCEL' : 'CSV'
+      await runSavedReport(reportId, apiFormat)
+      window.open(`/api/reports/${reportId}/export?format=${apiFormat}`, '_blank')
       router.refresh()
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Export failed')
+      const message = err instanceof Error ? err.message : 'Export failed'
+      toast.error(message)
     } finally {
       setRunning(false)
     }
@@ -32,24 +38,14 @@ export function ReportRunClient({
 
   return (
     <div className="space-y-4">
-      <p className="text-gray-600 dark:text-gray-400">
-        Export &quot;{reportName}&quot; to download the report data.
+      <p className="text-muted-foreground text-sm">
+        {t('exportReportHint', { name: reportName })}
       </p>
-      <div className="flex flex-wrap gap-3">
-        <Button
-          onClick={() => handleExport('EXCEL')}
-          disabled={running}
-        >
-          {running ? 'Preparing…' : 'Export to Excel'}
-        </Button>
-        <Button
-          variant="outline"
-          onClick={() => handleExport('CSV')}
-          disabled={running}
-        >
-          Export to CSV
-        </Button>
-      </div>
+      <ExportDropdown
+        formats={['excel', 'csv']}
+        onExport={handleExport}
+        isLoading={running}
+      />
     </div>
   )
 }

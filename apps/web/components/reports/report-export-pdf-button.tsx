@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
-import { FileDown } from 'lucide-react'
+import { FileDown, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 type ReportExportPdfButtonProps = {
@@ -15,9 +16,11 @@ type ReportExportPdfButtonProps = {
 export function ReportExportPdfButton({
   templateId,
   queryParams = {},
-  label = 'Exportar PDF',
+  label,
 }: ReportExportPdfButtonProps) {
+  const t = useTranslations('common')
   const [isExporting, setIsExporting] = useState(false)
+  const displayLabel = label ?? t('exportPdf')
 
   const handleExport = async () => {
     setIsExporting(true)
@@ -61,8 +64,12 @@ export function ReportExportPdfButton({
       onClick={handleExport}
       disabled={isExporting}
     >
-      <FileDown className="mr-2 h-4 w-4" />
-      {isExporting ? 'Exportando...' : label}
+      {isExporting ? (
+        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+      ) : (
+        <FileDown className="mr-2 h-4 w-4" />
+      )}
+      {isExporting ? t('exporting') : displayLabel}
     </Button>
   )
 }

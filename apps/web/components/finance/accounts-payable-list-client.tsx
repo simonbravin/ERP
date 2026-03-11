@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
+import { ListFiltersBar, SummaryCard } from '@/components/list'
 import { DOCUMENT_TYPE_LABELS } from '@/lib/finance-labels'
 import { ArrowDownCircle } from 'lucide-react'
 
@@ -63,28 +64,40 @@ export function AccountsPayableListClient({
     })
   }
 
+  function clearFilters() {
+    setDueDateFrom('')
+    setDueDateTo('')
+    setPartyFilter('all')
+    setProjectFilter(projectId ?? 'all')
+    startTransition(async () => {
+      const list = isProjectScope && projectId
+        ? await getProjectAccountsPayable(projectId, {})
+        : await getCompanyAccountsPayable({})
+      setItems(list)
+    })
+  }
+
   const totalAmount = items.reduce((sum, tx) => sum + (tx.amountBaseCurrency ?? tx.total ?? 0), 0)
 
   return (
     <div className="space-y-4">
-      {projectId && saldoPagar !== undefined && (
-        <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-border bg-card px-4 py-3">
-          <div className="flex items-center gap-2">
-            <ArrowDownCircle className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium text-muted-foreground">Saldo a pagar:</span>
-            <span className="tabular-nums font-semibold text-foreground">
-              {formatCurrency(saldoPagar, 'ARS')}
-            </span>
-          </div>
-          <Button variant="link" size="sm" className="h-auto p-0" asChild>
-            <Link href={`/projects/${projectId}/finance/cash-projection`}>Ver proyección de caja</Link>
-          </Button>
-        </div>
+      {projectId != null && saldoPagar !== undefined && (
+        <SummaryCard
+          icon={ArrowDownCircle}
+          label={t('balanceToPay')}
+          value={formatCurrency(saldoPagar, 'ARS')}
+          action={
+            <Button variant="link" size="sm" className="h-auto p-0" asChild>
+              <Link href={`/projects/${projectId}/finance/cash-projection`}>
+                {t('viewCashProjection')}
+              </Link>
+            </Button>
+          }
+        />
       )}
       <h2 className="text-lg font-semibold text-foreground">{title}</h2>
 
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-3">
-        <span className="text-sm font-medium text-foreground">{t('filters')}</span>
+      <ListFiltersBar onApply={applyFilters} onClear={clearFilters} isPending={isPending}>
         {!isProjectScope && (
           <Select
             value={projectFilter}
@@ -135,10 +148,7 @@ export function AccountsPayableListClient({
           placeholder={t('dueTo')}
           className="max-w-[140px]"
         />
-        <Button type="button" variant="secondary" onClick={applyFilters} disabled={isPending}>
-          {isPending ? t('filtering') : t('apply')}
-        </Button>
-      </div>
+      </ListFiltersBar>
 
       <div className="overflow-hidden rounded-lg border border-border bg-card">
         <table className="w-full text-sm">

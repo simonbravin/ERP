@@ -37,6 +37,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
+import { ListFiltersBar } from '@/components/list'
 import { ProjectCard } from './project-card'
 import { ProjectStatusBadge } from './project-status-badge'
 import { ProjectPhaseBadge } from './project-phase-badge'
@@ -132,6 +133,13 @@ export function ProjectsListClient({ projects, canEdit, showExport = false, tota
       page: isPaginated ? 1 : undefined,
     })
     router.push(`${pathname}${queryString ? '?' + queryString : ''}`)
+  }
+
+  function clearFilters() {
+    setSearch('')
+    setStatusFilter('all')
+    setPhaseFilter('all')
+    updateFilters('', 'all', 'all')
   }
 
   const goToPage = (newPage: number) => {
@@ -315,15 +323,17 @@ export function ProjectsListClient({ projects, canEdit, showExport = false, tota
         {showExport && (
           <Button variant="outline" size="sm" onClick={() => setShowExportDialog(true)} className="shrink-0">
             <FileDown className="mr-2 h-4 w-4" />
-            {tCommon('export')} Lista
+            {tCommon('export')}
           </Button>
         )}
       </div>
 
-      {/* Fila 2: Estado + Fase + Vista en la misma línea */}
+      {/* Fila 2: Filtros (Estado + Fase) + Vista */}
       <div className="flex flex-wrap items-center gap-4">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-muted-foreground">{t('status')}:</span>
+        <ListFiltersBar
+          onClear={clearFilters}
+          className="flex-1 min-w-0"
+        >
           <Select
             value={statusFilter}
             onValueChange={(value) => {
@@ -342,9 +352,6 @@ export function ProjectsListClient({ projects, canEdit, showExport = false, tota
               <SelectItem value="COMPLETED">{t('statusComplete')}</SelectItem>
             </SelectContent>
           </Select>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-muted-foreground">{t('phase')}:</span>
           <Select
             value={phaseFilter}
             onValueChange={(value) => {
@@ -366,7 +373,7 @@ export function ProjectsListClient({ projects, canEdit, showExport = false, tota
               <SelectItem value="CLOSEOUT">{t('phaseCloseout')}</SelectItem>
             </SelectContent>
           </Select>
-        </div>
+        </ListFiltersBar>
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-muted-foreground">Vista:</span>
           <div className="flex items-center gap-1 rounded-lg border border-border p-1">

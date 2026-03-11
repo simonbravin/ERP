@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -165,6 +166,7 @@ export function MovementsListClient({
   items,
   locations,
 }: MovementsListClientProps) {
+  const tCommon = useTranslations('common')
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -302,7 +304,7 @@ export function MovementsListClient({
         <div className="flex justify-end">
           <Button variant="ghost" size="sm" onClick={handleClearFilters}>
             <X className="mr-2 h-4 w-4" />
-            Limpiar filtros
+            {tCommon('clear')}
           </Button>
         </div>
       )}

@@ -4,6 +4,14 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { COList, type ChangeOrderRow } from './co-list'
 import { Button } from '@/components/ui/button'
+import { ListFiltersBar } from '@/components/list'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 type ChangeOrdersListClientProps = {
   projectId: string
@@ -27,10 +35,14 @@ export function ChangeOrdersListClient({
     router.refresh()
   }
 
+  function clearFilters() {
+    setFilter('')
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+        <h2 className="text-lg font-semibold text-foreground">
           Change orders
         </h2>
         {canEdit && (
@@ -39,21 +51,21 @@ export function ChangeOrdersListClient({
           </Link>
         )}
       </div>
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="text-sm text-gray-500 dark:text-gray-400">Filter:</span>
-        <select
-          value={status}
-          onChange={(e) => setFilter(e.target.value)}
-          className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900"
-        >
-          <option value="">All statuses</option>
-          <option value="DRAFT">Draft</option>
-          <option value="SUBMITTED">Submitted</option>
-          <option value="APPROVED">Approved</option>
-          <option value="REJECTED">Rejected</option>
-          <option value="CHANGES_REQUESTED">Changes requested</option>
-        </select>
-      </div>
+      <ListFiltersBar onClear={clearFilters}>
+        <Select value={status || 'all'} onValueChange={(v) => setFilter(v === 'all' ? '' : v)}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All statuses</SelectItem>
+            <SelectItem value="DRAFT">Draft</SelectItem>
+            <SelectItem value="SUBMITTED">Submitted</SelectItem>
+            <SelectItem value="APPROVED">Approved</SelectItem>
+            <SelectItem value="REJECTED">Rejected</SelectItem>
+            <SelectItem value="CHANGES_REQUESTED">Changes requested</SelectItem>
+          </SelectContent>
+        </Select>
+      </ListFiltersBar>
       <COList projectId={projectId} orders={orders} canEdit={canEdit} />
     </div>
   )

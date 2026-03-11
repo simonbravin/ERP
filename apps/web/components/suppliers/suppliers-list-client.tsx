@@ -16,6 +16,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Card, CardContent } from '@/components/ui/card'
+import { ListFiltersBar } from '@/components/list'
 import { Search, List, Grid3x3, Building2, Pencil, ArrowUpDown } from 'lucide-react'
 import { SupplierSearch } from './supplier-search'
 import { GlobalSupplierCard } from './global-supplier-card'
@@ -173,26 +174,22 @@ export function SuppliersListClient({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-[200px]">
+      <ListFiltersBar onApply={handleSearch} onClear={handleClearFilters}>
+        <div className="relative min-w-[200px]">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder={t('searchPlaceholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-            className="pl-9"
+            className="h-9 pl-9"
           />
         </div>
-        <Button onClick={handleSearch}>{t('filter')}</Button>
-        <Button variant="outline" onClick={handleClearFilters}>
-          {t('clearFilters')}
-        </Button>
         {categories.length > 0 && (
           <select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
-            className="flex h-10 rounded-md border border-input bg-card dark:bg-background px-3 py-2 text-sm"
+            className="flex h-9 min-w-[140px] rounded-md border border-input bg-card px-3 py-2 text-sm dark:bg-background"
           >
             <option value="">{t('debtFilterAll')}</option>
             {categories.map((cat) => (
@@ -202,7 +199,7 @@ export function SuppliersListClient({
             ))}
           </select>
         )}
-      </div>
+      </ListFiltersBar>
 
       <Tabs value={currentTab} onValueChange={handleTabChange}>
         <div className="flex flex-wrap items-center gap-4">

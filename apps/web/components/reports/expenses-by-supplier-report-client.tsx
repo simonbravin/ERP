@@ -1,8 +1,8 @@
 'use client'
 
+import { useState } from 'react'
 import { ChartCard } from '@/components/charts/chart-card'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import {
   BarChart,
   Bar,
@@ -12,9 +12,9 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts'
-import { Download } from 'lucide-react'
 import { formatCurrency } from '@/lib/format-utils'
-import { ReportExportPdfButton } from '@/components/reports/report-export-pdf-button'
+import { ExportDropdown, type ExportFormat } from '@/components/list'
+import { toast } from 'sonner'
 import type { ExpensesBySupplierRow } from '@/app/actions/predefined-reports'
 
 interface Props {
@@ -45,7 +45,10 @@ function downloadCsv(data: ExpensesBySupplierRow[]) {
   URL.revokeObjectURL(url)
 }
 
+const PDF_TEMPLATE = 'gastos-por-proveedor'
+
 export function ExpensesBySupplierReportClient({ data, pdfQueryParams }: Props) {
+  const [exporting, setExporting] = useState(false)
   const chartData = data.slice(0, 10).map((s) => ({
     name: s.supplierName.length > 20 ? s.supplierName.substring(0, 20) + '…' : s.supplierName,
     Total: s.total,
@@ -53,16 +56,54 @@ export function ExpensesBySupplierReportClient({ data, pdfQueryParams }: Props) 
 
   const totalSpent = data.reduce((sum, s) => sum + s.total, 0)
 
+  async function handleExport(format: ExportFormat) {
+    if (format === 'csv') {
+      downloadCsv(data)
+      return
+    }
+    if (format !== 'pdf') return
+    {
+      setExporting(true)
+      try {
+        const locale = typeof document !== 'undefined' ? document.documentElement.lang || 'es' : 'es'
+        const params = new URLSearchParams({
+          template: PDF_TEMPLATE,
+          locale,
+          showEmitidoPor: '1',
+          showFullCompanyData: '1',
+          ...(pdfQueryParams ?? {}),
+        })
+        const res = await fetch(`/api/pdf?${params.toString()}`, { credentials: 'include' })
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}))
+          toast.error(body?.error ?? 'Error al exportar PDF')
+          return
+        }
+        const blob = await res.blob()
+        const disposition = res.headers.get('Content-Disposition')
+        const match = disposition?.match(/filename="?([^";]+)"?/)
+        const filename = match?.[1] ?? `${PDF_TEMPLATE}.pdf`
+        const link = document.createElement('a')
+        link.href = URL.createObjectURL(blob)
+        link.download = filename
+        link.click()
+        URL.revokeObjectURL(link.href)
+        toast.success('PDF exportado correctamente')
+      } catch {
+        toast.error('Error al exportar PDF')
+      } finally {
+        setExporting(false)
+      }
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-end gap-2">
-        <Button variant="outline" size="sm" onClick={() => downloadCsv(data)}>
-          <Download className="mr-2 h-4 w-4" />
-          Exportar CSV
-        </Button>
-        <ReportExportPdfButton
-          templateId="gastos-por-proveedor"
-          queryParams={pdfQueryParams}
+        <ExportDropdown
+          formats={['csv', 'pdf']}
+          onExport={handleExport}
+          isLoading={exporting}
         />
       </div>
       <div className="grid gap-4 sm:grid-cols-3">

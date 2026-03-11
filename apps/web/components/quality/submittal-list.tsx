@@ -4,7 +4,14 @@ import { useState } from 'react'
 import { Link } from '@/i18n/navigation'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { ListFiltersBar } from '@/components/list'
 import { formatDateShort } from '@/lib/format-utils'
 
 export type SubmittalRow = {
@@ -64,22 +71,25 @@ export function SubmittalList({ submittals, projectId }: SubmittalListProps) {
     )
   }
 
+  function clearFilters() {
+    setStatusFilter('')
+  }
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <Label className="text-sm text-muted-foreground">Filter by status:</Label>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="rounded-md border border-input bg-card px-2 py-1 text-sm"
-        >
-          {STATUS_OPTIONS.map((s) => (
-            <option key={s || 'all'} value={s}>
-              {s === '' ? 'All' : s.replace(/_/g, ' ')}
-            </option>
-          ))}
-        </select>
-      </div>
+      <ListFiltersBar onClear={clearFilters}>
+        <Select value={statusFilter || 'all'} onValueChange={(v) => setStatusFilter(v === 'all' ? '' : v)}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Filter by status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All</SelectItem>
+            {STATUS_OPTIONS.filter(Boolean).map((s) => (
+              <SelectItem key={s} value={s}>{s.replace(/_/g, ' ')}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </ListFiltersBar>
 
       <div className="erp-card overflow-hidden">
         <table className="erp-table w-full text-sm">

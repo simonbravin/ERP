@@ -14,7 +14,8 @@ import {
 } from '@/components/ui/table'
 import { CertStatusBadge } from './cert-status-badge'
 import { formatPeriod, formatCurrency } from '@/lib/certification-utils'
-import { PlusIcon, Eye, FileDown } from 'lucide-react'
+import { PlusIcon, Eye, FileDown, Wallet } from 'lucide-react'
+import { ListFiltersBar, SummaryCard } from '@/components/list'
 import { ExportDialog } from '@/components/export/export-dialog'
 import { exportCertificationsToExcel } from '@/app/actions/export'
 
@@ -93,87 +94,74 @@ export function CertificationsListClient({
     return sortOrder === 'period-desc' ? periodB - periodA : periodA - periodB
   })
 
+  function clearFilters() {
+    setStatusFilter('')
+    setPeriodYearFilter('')
+    setPeriodMonthFilter('')
+    setSortOrder('period-desc')
+  }
+
   return (
     <div className="space-y-4">
       {approvedTotal > 0 && (
-        <div className="rounded-lg border border-border bg-muted/50 px-4 py-3">
-          <p className="text-sm font-medium text-muted-foreground">
-            {tBudget('runningTotalApproved')}: {formatCurrency(approvedTotal)}
-          </p>
-        </div>
+        <SummaryCard
+          icon={Wallet}
+          label={tBudget('runningTotalApproved')}
+          value={formatCurrency(approvedTotal)}
+        />
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-2">
-            <label htmlFor="status-filter" className="text-sm text-muted-foreground">
-              {t('filterByStatus')}
-            </label>
-            <select
-              id="status-filter"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="rounded-md border border-input bg-card dark:bg-background px-2 py-1 text-sm"
-            >
-              <option value="">{tCommon('all')}</option>
-              {STATUS_OPTIONS.filter(Boolean).map((s) => (
-                <option key={s} value={s}>
-                  {t(`statuses.${s}`)}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex items-center gap-2">
-            <label htmlFor="period-year" className="text-sm text-muted-foreground">
-              Período (año)
-            </label>
-            <select
-              id="period-year"
-              value={periodYearFilter}
-              onChange={(e) => setPeriodYearFilter(e.target.value)}
-              className="rounded-md border border-input bg-card dark:bg-background px-2 py-1 text-sm"
-            >
-              <option value="">Todos</option>
-              {years.map((y) => (
-                <option key={y} value={y}>{y}</option>
-              ))}
-            </select>
-          </div>
-          <div className="flex items-center gap-2">
-            <label htmlFor="period-month" className="text-sm text-muted-foreground">
-              Mes
-            </label>
-            <select
-              id="period-month"
-              value={periodMonthFilter}
-              onChange={(e) => setPeriodMonthFilter(e.target.value)}
-              className="rounded-md border border-input bg-card dark:bg-background px-2 py-1 text-sm"
-            >
-              {months.map((m) => (
-                <option key={m.value || 'all'} value={m.value}>{m.label}</option>
-              ))}
-            </select>
-          </div>
-          <div className="flex items-center gap-2">
-            <label htmlFor="sort-order" className="text-sm text-muted-foreground">
-              Ordenar
-            </label>
-            <select
-              id="sort-order"
-              value={sortOrder}
-              onChange={(e) => setSortOrder(e.target.value as typeof sortOrder)}
-              className="rounded-md border border-input bg-card dark:bg-background px-2 py-1 text-sm"
-            >
-              <option value="period-desc">Período (más reciente primero)</option>
-              <option value="period-asc">Período (más antiguo primero)</option>
-              <option value="number-desc">Número (mayor primero)</option>
-            </select>
-          </div>
-        </div>
+        <ListFiltersBar onClear={clearFilters}>
+          <select
+            id="status-filter"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="rounded-md border border-input bg-card px-2 py-1.5 text-sm dark:bg-background w-[130px]"
+          >
+            <option value="">{tCommon('all')}</option>
+            {STATUS_OPTIONS.filter(Boolean).map((s) => (
+              <option key={s} value={s}>
+                {t(`statuses.${s}`)}
+              </option>
+            ))}
+          </select>
+          <select
+            id="period-year"
+            value={periodYearFilter}
+            onChange={(e) => setPeriodYearFilter(e.target.value)}
+            className="rounded-md border border-input bg-card px-2 py-1.5 text-sm dark:bg-background w-[100px]"
+          >
+            <option value="">Todos</option>
+            {years.map((y) => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+          <select
+            id="period-month"
+            value={periodMonthFilter}
+            onChange={(e) => setPeriodMonthFilter(e.target.value)}
+            className="rounded-md border border-input bg-card px-2 py-1.5 text-sm dark:bg-background w-[90px]"
+          >
+            {months.map((m) => (
+              <option key={m.value || 'all'} value={m.value}>{m.label}</option>
+            ))}
+          </select>
+          <select
+            id="sort-order"
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value as typeof sortOrder)}
+            className="rounded-md border border-input bg-card px-2 py-1.5 text-sm dark:bg-background min-w-[180px]"
+          >
+            <option value="period-desc">Período (más reciente primero)</option>
+            <option value="period-asc">Período (más antiguo primero)</option>
+            <option value="number-desc">Número (mayor primero)</option>
+          </select>
+        </ListFiltersBar>
         <div className="flex gap-2">
           <Button type="button" variant="outline" size="sm" onClick={() => setShowExportDialog(true)}>
             <FileDown className="mr-2 h-4 w-4" />
-            Exportar
+            {tCommon('export')}
           </Button>
           <Link href={newHref}>
             <Button type="button">

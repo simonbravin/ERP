@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
+import { ListFiltersBar, SummaryCard } from '@/components/list'
 import { DOCUMENT_TYPE_LABELS } from '@/lib/finance-labels'
 import { ArrowUpCircle } from 'lucide-react'
 
@@ -39,6 +40,7 @@ export function AccountsReceivableListClient({
   title = 'Cuentas por cobrar',
   saldoCobrar,
 }: Props) {
+  const t = useTranslations('finance')
   const [items, setItems] = useState<AccountsReceivableItem[]>(initialItems)
   const [isPending, startTransition] = useTransition()
   const [dueDateFrom, setDueDateFrom] = useState('')
@@ -62,28 +64,40 @@ export function AccountsReceivableListClient({
     })
   }
 
+  function clearFilters() {
+    setDueDateFrom('')
+    setDueDateTo('')
+    setPartyFilter('all')
+    setProjectFilter(projectId ?? 'all')
+    startTransition(async () => {
+      const list = isProjectScope && projectId
+        ? await getProjectAccountsReceivable(projectId, {})
+        : await getCompanyAccountsReceivable({})
+      setItems(list)
+    })
+  }
+
   const totalAmount = items.reduce((sum, tx) => sum + (tx.amountBaseCurrency ?? tx.total ?? 0), 0)
 
   return (
     <div className="space-y-4">
-      {projectId && saldoCobrar !== undefined && (
-        <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-border bg-card px-4 py-3">
-          <div className="flex items-center gap-2">
-            <ArrowUpCircle className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium text-muted-foreground">Saldo a cobrar:</span>
-            <span className="tabular-nums font-semibold text-foreground">
-              {formatCurrency(saldoCobrar, 'ARS')}
-            </span>
-          </div>
-          <Button variant="link" size="sm" className="h-auto p-0" asChild>
-            <Link href={`/projects/${projectId}/finance/cash-projection`}>Ver proyección de caja</Link>
-          </Button>
-        </div>
+      {projectId != null && saldoCobrar !== undefined && (
+        <SummaryCard
+          icon={ArrowUpCircle}
+          label={t('balanceToCollect')}
+          value={formatCurrency(saldoCobrar, 'ARS')}
+          action={
+            <Button variant="link" size="sm" className="h-auto p-0" asChild>
+              <Link href={`/projects/${projectId}/finance/cash-projection`}>
+                {t('viewCashProjection')}
+              </Link>
+            </Button>
+          }
+        />
       )}
       <h2 className="text-lg font-semibold text-foreground">{title}</h2>
 
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-3">
-        <span className="text-sm font-medium text-foreground">Filtros:</span>
+      <ListFiltersBar onApply={applyFilters} onClear={clearFilters} isPending={isPending}>
         {!isProjectScope && (
           <Select
             value={projectFilter}
@@ -93,10 +107,10 @@ export function AccountsReceivableListClient({
             }}
           >
             <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Proyecto" />
+              <SelectValue placeholder={t('project')} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos los proyectos</SelectItem>
+              <SelectItem value="all">{t('allProjects')}</SelectItem>
               {filterOptions.projects.map((p) => (
                 <SelectItem key={p.id} value={p.id}>{p.projectNumber} – {p.name}</SelectItem>
               ))}
@@ -111,10 +125,10 @@ export function AccountsReceivableListClient({
           }}
         >
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Cliente" />
+            <SelectValue placeholder={t('client')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="all">{t('all')}</SelectItem>
             {filterOptions.parties.filter((p) => p.partyType === 'CLIENT').map((p) => (
               <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
             ))}
@@ -124,41 +138,38 @@ export function AccountsReceivableListClient({
           type="date"
           value={dueDateFrom}
           onChange={(e) => setDueDateFrom(e.target.value)}
-          placeholder="Venc. desde"
+          placeholder={t('dueFrom')}
           className="max-w-[140px]"
         />
         <Input
           type="date"
           value={dueDateTo}
           onChange={(e) => setDueDateTo(e.target.value)}
-          placeholder="Venc. hasta"
+          placeholder={t('dueTo')}
           className="max-w-[140px]"
         />
-        <Button type="button" variant="secondary" onClick={applyFilters} disabled={isPending}>
-          {isPending ? 'Filtrando...' : 'Aplicar'}
-        </Button>
-      </div>
+      </ListFiltersBar>
 
       <div className="overflow-hidden rounded-lg border border-border bg-card">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/50">
-              <th className="px-4 py-3 text-left font-medium text-foreground">Número</th>
-              <th className="px-4 py-3 text-left font-medium text-foreground">Emisión</th>
-              <th className="px-4 py-3 text-left font-medium text-foreground">Vencimiento</th>
-              <th className="px-4 py-3 text-left font-medium text-foreground">Tipo doc.</th>
-              {!isProjectScope && <th className="px-4 py-3 text-left font-medium text-foreground">Proyecto</th>}
-              <th className="px-4 py-3 text-left font-medium text-foreground">Cliente</th>
-              <th className="px-4 py-3 text-left font-medium text-foreground">Descripción / Cert.</th>
-              <th className="px-4 py-3 text-right font-medium text-foreground">Monto</th>
-              <th className="px-4 py-3 text-center font-medium text-foreground">Estado</th>
+              <th className="px-4 py-3 text-left font-medium text-foreground">{t('numberShort')}</th>
+              <th className="px-4 py-3 text-left font-medium text-foreground">{t('issueDate')}</th>
+              <th className="px-4 py-3 text-left font-medium text-foreground">{t('dueDateShort')}</th>
+              <th className="px-4 py-3 text-left font-medium text-foreground">{t('docType')}</th>
+              {!isProjectScope && <th className="px-4 py-3 text-left font-medium text-foreground">{t('project')}</th>}
+              <th className="px-4 py-3 text-left font-medium text-foreground">{t('client')}</th>
+              <th className="px-4 py-3 text-left font-medium text-foreground">{t('descriptionCert')}</th>
+              <th className="px-4 py-3 text-right font-medium text-foreground">{t('amount')}</th>
+              <th className="px-4 py-3 text-center font-medium text-foreground">{t('status')}</th>
             </tr>
           </thead>
           <tbody>
             {items.length === 0 ? (
               <tr>
                 <td colSpan={isProjectScope ? 8 : 9} className="px-4 py-8 text-center text-muted-foreground">
-                  No hay cuentas por cobrar con los filtros aplicados.
+                  {t('noReceivableResults')}
                 </td>
               </tr>
             ) : (
@@ -188,7 +199,7 @@ export function AccountsReceivableListClient({
                     <td className="px-4 py-2 text-center">
                       {daysUntilDue != null && (
                         <Badge variant={daysUntilDue <= 0 ? 'destructive' : daysUntilDue <= 7 ? 'secondary' : 'outline'}>
-                          {daysUntilDue <= 0 ? 'Vencido' : `${daysUntilDue} días`}
+                          {daysUntilDue <= 0 ? t('overdue') : t('daysUntilDue', { days: daysUntilDue })}
                         </Badge>
                       )}
                     </td>
@@ -201,7 +212,7 @@ export function AccountsReceivableListClient({
       </div>
       {items.length > 0 && (
         <p className="text-sm text-muted-foreground">
-          Total: {formatCurrency(totalAmount)} ({items.length} ítem(s))
+          {t('totalItems')}: {formatCurrency(totalAmount)} ({t('itemsCount', { count: items.length })})
         </p>
       )}
     </div>

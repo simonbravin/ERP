@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { useMessageBus } from '@/hooks/use-message-bus'
 import { Link } from '@/i18n/navigation'
 import { Button } from '@/components/ui/button'
+import { ListFiltersBar, SummaryCard } from '@/components/list'
 import {
   Table,
   TableBody,
@@ -21,7 +23,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { formatCurrency, formatDateShort, formatDateTime } from '@/lib/format-utils'
 import { PlusIcon, Pencil, Trash2, Paperclip, FileDown, Loader2, History, TrendingUp } from 'lucide-react'
@@ -253,90 +254,87 @@ export function ProjectTransactionsListClient({
     }
   }
 
+  const tCommon = useTranslations('common')
+
+  function clearFilters() {
+    setDateFrom('')
+    setDateTo('')
+    setPartyId('all')
+    setFilter('all')
+  }
+
   return (
     <>
       <div className="space-y-4">
         {projectBalance !== undefined && (
-          <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-border bg-card px-4 py-3">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium text-muted-foreground">
-                Balance del proyecto:
-              </span>
+          <SummaryCard
+            icon={TrendingUp}
+            label="Balance del proyecto:"
+            value={
               <span
-                className={`tabular-nums font-semibold ${
+                className={
                   projectBalance >= 0
                     ? 'text-emerald-600 dark:text-emerald-400'
                     : 'text-red-600 dark:text-red-400'
-                }`}
+                }
               >
                 {formatCurrency(projectBalance, 'ARS')}
               </span>
-            </div>
-            <Button variant="link" size="sm" className="h-auto p-0" asChild>
-              <Link href={`/projects/${projectId}/finance/cashflow`}>
-                Ver Cashflow
-              </Link>
-            </Button>
-          </div>
+            }
+            action={
+              <Button variant="link" size="sm" className="h-auto p-0" asChild>
+                <Link href={`/projects/${projectId}/finance/cashflow`}>Ver Cashflow</Link>
+              </Button>
+            }
+          />
         )}
         <div className="flex flex-wrap items-end justify-between gap-4">
-          <div className="flex flex-wrap items-end gap-4">
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Tipo</Label>
-              <Select value={filter} onValueChange={setFilter}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="Tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas</SelectItem>
-                  <SelectItem value="EXPENSE">Gastos</SelectItem>
-                  <SelectItem value="INCOME">Ingresos</SelectItem>
-                  <SelectItem value="PURCHASE">Compras</SelectItem>
-                  <SelectItem value="SALE">Ventas</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Desde</Label>
-              <Input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className="w-[140px]"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Hasta</Label>
-              <Input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                className="w-[140px]"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Proveedor/Cliente</Label>
-              <Select value={partyId} onValueChange={setPartyId}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Todos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  {parties.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name} ({p.partyType === 'SUPPLIER' ? 'Proveedor' : 'Cliente'})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+          <ListFiltersBar onClear={clearFilters} isPending={isLoadingFilters}>
+            <Select value={filter} onValueChange={setFilter}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Tipo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                <SelectItem value="EXPENSE">Gastos</SelectItem>
+                <SelectItem value="INCOME">Ingresos</SelectItem>
+                <SelectItem value="PURCHASE">Compras</SelectItem>
+                <SelectItem value="SALE">Ventas</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="max-w-[140px]"
+              aria-label="Desde"
+            />
+            <Input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="max-w-[140px]"
+              aria-label="Hasta"
+            />
+            <Select value={partyId} onValueChange={setPartyId}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Proveedor/Cliente" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                {parties.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name} ({p.partyType === 'SUPPLIER' ? 'Proveedor' : 'Cliente'})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </ListFiltersBar>
 
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={() => setShowExportDialog(true)}>
               <FileDown className="mr-2 h-4 w-4" />
-              Exportar
+              {tCommon('export')}
             </Button>
             <Button onClick={() => setIsFormOpen(true)} disabled={isLoadingFilters}>
               <PlusIcon className="mr-2 h-4 w-4" />

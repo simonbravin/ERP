@@ -52,7 +52,7 @@ interface TeamMembersTableProps {
 
 export function TeamMembersTable({ members, currentUserId, canManage }: TeamMembersTableProps) {
   const t = useTranslations('settings')
-  const tExport = useTranslations('export')
+  const tCommon = useTranslations('common')
   const router = useRouter()
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [showExportDialog, setShowExportDialog] = useState(false)
@@ -152,7 +152,7 @@ export function TeamMembersTable({ members, currentUserId, canManage }: TeamMemb
         <h2 className="text-lg font-semibold">{t('teamMembers') ?? 'Miembros del Equipo'}</h2>
         <Button variant="outline" size="sm" onClick={() => setShowExportDialog(true)}>
           <FileDown className="mr-2 h-4 w-4" />
-          {tExport('export')}
+          {tCommon('export')}
         </Button>
       </div>
     <div className="rounded-lg border border-border bg-card">

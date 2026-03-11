@@ -4,7 +4,14 @@ import { useState } from 'react'
 import { Link } from '@/i18n/navigation'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { ListFiltersBar } from '@/components/list'
 import { formatDateShort } from '@/lib/format-utils'
 
 export type RfiRow = {
@@ -58,38 +65,37 @@ export function RfiList({ rfis, projectId }: RfiListProps) {
     )
   }
 
+  function clearFilters() {
+    setStatusFilter('')
+    setPriorityFilter('')
+  }
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-4">
-        <div className="flex items-center gap-2">
-          <Label className="text-sm text-muted-foreground">Status:</Label>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="rounded-md border border-input bg-card px-2 py-1 text-sm"
-          >
-            {STATUS_OPTIONS.map((s) => (
-              <option key={s || 'all'} value={s}>
-                {s === '' ? 'All' : s}
-              </option>
+      <ListFiltersBar onClear={clearFilters}>
+        <Select value={statusFilter || 'all'} onValueChange={(v) => setStatusFilter(v === 'all' ? '' : v)}>
+          <SelectTrigger className="w-[140px]">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All</SelectItem>
+            {STATUS_OPTIONS.filter(Boolean).map((s) => (
+              <SelectItem key={s} value={s}>{s}</SelectItem>
             ))}
-          </select>
-        </div>
-        <div className="flex items-center gap-2">
-          <Label className="text-sm text-muted-foreground">Priority:</Label>
-          <select
-            value={priorityFilter}
-            onChange={(e) => setPriorityFilter(e.target.value)}
-            className="rounded-md border border-input bg-card px-2 py-1 text-sm"
-          >
-            {PRIORITY_OPTIONS.map((p) => (
-              <option key={p || 'all'} value={p}>
-                {p === '' ? 'All' : p}
-              </option>
+          </SelectContent>
+        </Select>
+        <Select value={priorityFilter || 'all'} onValueChange={(v) => setPriorityFilter(v === 'all' ? '' : v)}>
+          <SelectTrigger className="w-[140px]">
+            <SelectValue placeholder="Priority" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All</SelectItem>
+            {PRIORITY_OPTIONS.filter(Boolean).map((p) => (
+              <SelectItem key={p} value={p}>{p}</SelectItem>
             ))}
-          </select>
-        </div>
-      </div>
+          </SelectContent>
+        </Select>
+      </ListFiltersBar>
 
       <div className="erp-card overflow-hidden">
         <table className="erp-table w-full text-sm">

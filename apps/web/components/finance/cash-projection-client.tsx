@@ -4,8 +4,8 @@ import { useState, useTransition } from 'react'
 import { formatCurrency } from '@/lib/format-utils'
 import { getCompanyCashProjection, getProjectCashProjection } from '@/app/actions/finance'
 import type { CashProjectionResult } from '@/app/actions/finance'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { ListFiltersBar } from '@/components/list'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 interface Props {
@@ -33,22 +33,30 @@ export function CashProjectionClient({
     })
   }
 
+  function clearFilters() {
+    const today = new Date().toISOString().slice(0, 10)
+    setAsOfDate(today)
+    startTransition(async () => {
+      const result = projectId
+        ? await getProjectCashProjection(projectId, new Date())
+        : await getCompanyCashProjection(new Date())
+      setProjection(result)
+    })
+  }
+
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-semibold text-foreground">{title}</h2>
 
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-3">
-        <label className="text-sm font-medium text-foreground">Fecha a proyectar:</label>
+      <ListFiltersBar onApply={loadProjection} onClear={clearFilters} isPending={isPending}>
         <Input
           type="date"
           value={asOfDate}
           onChange={(e) => setAsOfDate(e.target.value)}
           className="max-w-[180px]"
+          aria-label="Fecha a proyectar"
         />
-        <Button type="button" onClick={loadProjection} disabled={isPending}>
-          {isPending ? 'Calculando...' : 'Calcular proyección'}
-        </Button>
-      </div>
+      </ListFiltersBar>
 
       {projection && (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
