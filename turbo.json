@@ -12,6 +12,7 @@
         "NEXTAUTH_SECRET",
         "NEXTAUTH_URL",
         "NEXT_PUBLIC_APP_URL",
+        "EMAIL_FROM",
         "RESEND_FROM_EMAIL"
       ]
     },

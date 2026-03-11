@@ -10,7 +10,7 @@ import crypto from 'crypto'
 import bcrypt from 'bcryptjs'
 import type { OrgRole } from '@prisma/client'
 import type { InviteTeamMemberInput } from '@repo/validators'
-import { sendInvitationEmail } from '@/lib/email'
+import { sendInvitationEmail, sendAddedToOrgEmail } from '@/lib/email'
 import { requirePermission } from '@/lib/auth-helpers'
 import { publishOutboxEvent } from '@/lib/events/event-publisher'
 
@@ -66,7 +66,19 @@ export async function inviteTeamMember(data: InviteTeamMemberInput) {
         })
       })
 
-      // TODO: Enviar email de notificación
+      if (existingUser.email) {
+        const org = await prisma.organization.findUnique({
+          where: { id: orgId },
+          select: { name: true },
+        })
+        const emailResult = await sendAddedToOrgEmail({
+          to: existingUser.email,
+          orgName: org?.name ?? 'la organización',
+        })
+        if (!emailResult.success) {
+          console.error('Added-to-org email error:', emailResult.error)
+        }
+      }
 
       revalidatePath('/settings/team')
       return { success: true }

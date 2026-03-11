@@ -65,7 +65,8 @@ No hace falta crear tablas a mano: las migraciones de Prisma las crearán en el 
 | `DIRECT_URL` | PostgreSQL (Neon **direct**) | Pegar desde Neon |
 | `NEXT_PUBLIC_APP_URL` | URL pública (para links en emails, etc.) | Misma que NEXTAUTH_URL |
 | `RESEND_API_KEY` | API key de Resend | Desde [Resend](https://resend.com) (paso 6) |
-| `RESEND_FROM_EMAIL` | Remitente de emails | `Bloqer <notificaciones@tudominio.com>` o el que te den en Resend |
+| `EMAIL_FROM` | Remitente de emails (recomendado) | `Bloqer <noreply@bloqer.app>` o el que tengas verificado en Resend |
+| `RESEND_FROM_EMAIL` | Remitente (alternativa si no usas EMAIL_FROM) | `Bloqer <notificaciones@tudominio.com>` o el que te den en Resend |
 | `INNGEST_EVENT_KEY` | (Opcional) Si usas Inngest Cloud | Dashboard de Inngest |
 | `INNGEST_SIGNING_KEY` | (Opcional) Si usas Inngest Cloud | Dashboard de Inngest |
 
@@ -215,8 +216,19 @@ Con eso ya sabés si el fallo es de cookie/sesión (NEXTAUTH_URL o secret) o de 
 2. Crea una **API Key** y cópiala.
 3. En Vercel añade (o actualiza):
    - `RESEND_API_KEY` = la API key.
-   - `RESEND_FROM_EMAIL` = el remitente permitido (ej. `Bloqer <onboarding@resend.dev>` para pruebas o `Bloqer <notificaciones@tudominio.com>` con dominio verificado).
+   - `EMAIL_FROM` = el remitente permitido (ej. `Bloqer <noreply@bloqer.app>` con dominio verificado en Resend). También puedes usar `RESEND_FROM_EMAIL` como alternativa.
 4. Redespliega para que tome las variables y prueba "Olvidé contraseña" e invitación a organización.
+
+**Probar envío de email (ruta de prueba):** Para validar que `RESEND_API_KEY`, `EMAIL_FROM` y la plantilla con logo funcionan, podés usar la ruta de prueba:
+
+- **En desarrollo:** con la app en marcha (`pnpm dev`), enviá un POST a `http://localhost:3333/api/email/test` con body `{ "to": "tu@email.com" }`. No hace falta secret en dev.
+- **En producción:** definí en Vercel la variable `EMAIL_TEST_SECRET` (valor secreto que elijas). Luego enviá un POST a `https://portal.bloqer.app/api/email/test?secret=TU_SECRET` con body `{ "to": "tu@email.com" }`, o pasá el secret en el header `X-Email-Test-Secret`.
+
+Si todo está bien, recibirás un correo con asunto "Prueba Bloqer" y el logo de Bloqer en la plantilla.
+
+**Notificaciones que se envían por email:** invitación a la organización, restablecer contraseña, y "te han añadido a la organización" (cuando un admin agrega a un usuario ya registrado). El resto de notificaciones (certificaciones, change orders, stock bajo, etc.) son solo in-app por ahora.
+
+**Reporte semanal (viernes):** Si usás Inngest en producción, podés activar el reporte semanal por email que se envía cada viernes a las 9:00 (Argentina) solo a los **OWNER** de cada organización. Incluye resumen de finanzas (balance, proyección de caja, lo que vence y cobra la semana próxima) y tabla por proyecto. Para activarlo: en Vercel definí `WEEKLY_REPORT_ENABLED=true`. Requiere `RESEND_API_KEY`, `EMAIL_FROM` y que Inngest esté configurado (sección 8).
 
 ---
 
