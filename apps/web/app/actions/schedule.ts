@@ -20,6 +20,13 @@ import { calculateCriticalPath } from '@/lib/schedule/critical-path'
 import { addWorkingDays, countWorkingDays } from '@/lib/schedule/working-days'
 import { validateTaskDatesAgainstDependencies } from '@/lib/schedule/validate-dependencies'
 import { wouldCreateCycle } from '@/lib/schedule/dependency-cycle'
+import {
+  parseProjectId,
+  parseTaskId,
+  parseDependencyId,
+  parseScheduleId,
+  addTaskDependencySchema,
+} from '@/lib/schemas/schedule'
 import { createAuditLog } from '@/lib/audit-log'
 import { addDays, differenceInDays } from 'date-fns'
 
@@ -38,6 +45,9 @@ export async function createScheduleFromWBS(
     hoursPerDay: number
   }
 ) {
+  const parsed = parseProjectId(projectId)
+  if (!parsed.success) return { success: false, error: parsed.error }
+
   const session = await getSession()
   if (!session?.user?.id) {
     return { success: false, error: 'Unauthorized' }
@@ -48,7 +58,7 @@ export async function createScheduleFromWBS(
   requireRole(org.role, 'EDITOR')
 
   try {
-    const access = await assertProjectAccess(projectId, org)
+    const access = await assertProjectAccess(parsed.projectId, org)
     if (!canEditSchedule(org, access.projectRole)) {
       return { success: false, error: 'No tenés permiso para editar el cronograma de este proyecto' }
     }
@@ -60,7 +70,7 @@ export async function createScheduleFromWBS(
     // Validación: proyecto debe tener presupuesto aprobado o baseline
     const approvedBudget = await prisma.budgetVersion.findFirst({
       where: {
-        projectId,
+        projectId: parsed.projectId,
         orgId: org.orgId,
         status: { in: ['BASELINE', 'APPROVED'] },
       },
@@ -74,7 +84,7 @@ export async function createScheduleFromWBS(
     }
 
     const wbsNodes = await prisma.wbsNode.findMany({
-      where: { projectId, orgId: org.orgId, active: true },
+      where: { projectId: parsed.projectId, orgId: org.orgId, active: true },
       orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }],
     })
 
@@ -88,7 +98,7 @@ export async function createScheduleFromWBS(
     // Validación: nombre único del cronograma en el proyecto
     const existingSchedule = await prisma.schedule.findFirst({
       where: {
-        projectId,
+        projectId: parsed.projectId,
         orgId: org.orgId,
         name: data.name,
       },
@@ -103,7 +113,7 @@ export async function createScheduleFromWBS(
     const schedule = await prisma.schedule.create({
       data: {
         orgId: org.orgId,
-        projectId,
+        projectId: parsed.projectId,
         name: data.name,
         description: data.description,
         status: 'DRAFT',
@@ -215,11 +225,11 @@ export async function createScheduleFromWBS(
       action: 'CREATE',
       entity: 'Schedule',
       entityId: schedule.id,
-      projectId,
+      projectId: parsed.projectId,
       description: `Cronograma "${data.name}" creado con ${wbsNodes.length} tareas`,
     })
 
-    revalidatePath(`/projects/${projectId}/schedule`)
+    revalidatePath(`/projects/${parsed.projectId}/schedule`)
 
     return {
       success: true,
@@ -247,6 +257,9 @@ export async function updateTaskDates(
     notes?: string | null
   }
 ) {
+  const parsedTask = parseTaskId(taskId)
+  if (!parsedTask.success) return { success: false, error: parsedTask.error }
+
   const session = await getSession()
   if (!session?.user?.id) {
     return { success: false, error: 'Unauthorized' }
@@ -258,7 +271,7 @@ export async function updateTaskDates(
 
   try {
     const task = await prisma.scheduleTask.findFirst({
-      where: { id: taskId },
+      where: { id: parsedTask.taskId },
       include: {
         schedule: {
           select: {
@@ -324,7 +337,7 @@ export async function updateTaskDates(
     const newEnd = new Date(updateData.plannedEndDate ?? task.plannedEndDate)
 
     const taskWithDeps = await prisma.scheduleTask.findFirst({
-      where: { id: taskId },
+      where: { id: parsedTask.taskId },
       include: {
         predecessors: {
           include: {
@@ -385,7 +398,7 @@ export async function updateTaskDates(
     }
 
     await prisma.scheduleTask.update({
-      where: { id: taskId },
+      where: { id: parsedTask.taskId },
       data: updateData,
     })
 
@@ -400,7 +413,7 @@ export async function updateTaskDates(
     await recalculateCriticalPath(task.schedule.id)
 
     const afterTask = await prisma.scheduleTask.findUnique({
-      where: { id: taskId },
+      where: { id: parsedTask.taskId },
       select: {
         plannedStartDate: true,
         plannedEndDate: true,
@@ -413,7 +426,7 @@ export async function updateTaskDates(
       userId: session.user.id,
       action: 'UPDATE_TASK_DATES',
       entity: 'ScheduleTask',
-      entityId: taskId,
+      entityId: parsedTask.taskId,
       projectId: task.schedule.projectId,
       oldValues: beforeDates,
       newValues: afterTask ?? undefined,
@@ -439,6 +452,12 @@ export async function addTaskDependency(data: {
   dependencyType: 'FS' | 'SS' | 'FF' | 'SF'
   lagDays?: number
 }) {
+  const parsed = addTaskDependencySchema.safeParse(data)
+  if (!parsed.success) {
+    const msg = parsed.error.flatten().formErrors[0]
+    return { success: false, error: msg ?? 'Datos inválidos' }
+  }
+
   const session = await getSession()
   if (!session?.user?.id) {
     return { success: false, error: 'Unauthorized' }
@@ -450,7 +469,7 @@ export async function addTaskDependency(data: {
 
   try {
     const schedule = await prisma.schedule.findFirst({
-      where: { id: data.scheduleId, orgId: org.orgId },
+      where: { id: parsed.data.scheduleId, orgId: org.orgId },
     })
 
     if (!schedule) {
@@ -470,9 +489,9 @@ export async function addTaskDependency(data: {
     }
 
     const createsCycle = await checkForCycle(
-      data.scheduleId,
-      data.predecessorId,
-      data.successorId
+      parsed.data.scheduleId,
+      parsed.data.predecessorId,
+      parsed.data.successorId
     )
 
     if (createsCycle) {
@@ -484,15 +503,15 @@ export async function addTaskDependency(data: {
 
     const dependency = await prisma.taskDependency.create({
       data: {
-        scheduleId: data.scheduleId,
-        predecessorId: data.predecessorId,
-        successorId: data.successorId,
-        dependencyType: data.dependencyType,
-        lagDays: data.lagDays ?? 0,
+        scheduleId: parsed.data.scheduleId,
+        predecessorId: parsed.data.predecessorId,
+        successorId: parsed.data.successorId,
+        dependencyType: parsed.data.dependencyType,
+        lagDays: parsed.data.lagDays ?? 0,
       },
     })
 
-    await recalculateCriticalPath(data.scheduleId)
+    await recalculateCriticalPath(parsed.data.scheduleId)
 
     await createAuditLog({
       orgId: org.orgId,
@@ -501,7 +520,7 @@ export async function addTaskDependency(data: {
       entity: 'TaskDependency',
       entityId: dependency.id,
       projectId: schedule.projectId,
-      description: `Dependencia ${data.dependencyType} agregada`,
+      description: `Dependencia ${parsed.data.dependencyType} agregada`,
     })
 
     revalidatePath(`/projects/${schedule.projectId}/schedule`)
@@ -517,6 +536,9 @@ export async function addTaskDependency(data: {
  * Eliminar dependencia
  */
 export async function removeTaskDependency(dependencyId: string) {
+  const parsed = parseDependencyId(dependencyId)
+  if (!parsed.success) return { success: false, error: parsed.error }
+
   const session = await getSession()
   if (!session?.user?.id) {
     return { success: false, error: 'Unauthorized' }
@@ -528,7 +550,7 @@ export async function removeTaskDependency(dependencyId: string) {
 
   try {
     const dependency = await prisma.taskDependency.findFirst({
-      where: { id: dependencyId },
+      where: { id: parsed.dependencyId },
       include: {
         schedule: { select: { id: true, orgId: true, projectId: true, status: true } },
       },
@@ -550,7 +572,7 @@ export async function removeTaskDependency(dependencyId: string) {
       return { success: false, error: 'Solo se puede editar en DRAFT' }
     }
 
-    await prisma.taskDependency.delete({ where: { id: dependencyId } })
+    await prisma.taskDependency.delete({ where: { id: parsed.dependencyId } })
 
     await recalculateCriticalPath(dependency.schedule.id)
 
@@ -574,6 +596,9 @@ export async function updateTaskProgress(
     actualEndDate?: Date
   }
 ) {
+  const parsedTask = parseTaskId(taskId)
+  if (!parsedTask.success) return { success: false, error: parsedTask.error }
+
   const session = await getSession()
   if (!session?.user?.id) {
     return { success: false, error: 'Unauthorized' }
@@ -585,7 +610,7 @@ export async function updateTaskProgress(
 
   try {
     const task = await prisma.scheduleTask.findFirst({
-      where: { id: taskId },
+      where: { id: parsedTask.taskId },
       include: {
         schedule: { select: { orgId: true, projectId: true } },
       },
@@ -625,7 +650,7 @@ export async function updateTaskProgress(
     }
 
     await prisma.scheduleTask.update({
-      where: { id: taskId },
+      where: { id: parsedTask.taskId },
       data: updateData,
     })
 
@@ -809,6 +834,9 @@ async function checkForCycle(
  * Establecer cronograma como BASELINE
  */
 export async function setScheduleAsBaseline(scheduleId: string) {
+  const parsed = parseScheduleId(scheduleId)
+  if (!parsed.success) return { success: false, error: parsed.error }
+
   const session = await getSession()
   if (!session?.user?.id) {
     return { success: false, error: 'Unauthorized' }
@@ -820,7 +848,7 @@ export async function setScheduleAsBaseline(scheduleId: string) {
 
   try {
     const schedule = await prisma.schedule.findFirst({
-      where: { id: scheduleId, orgId: org.orgId },
+      where: { id: parsed.scheduleId, orgId: org.orgId },
       include: { project: { select: { id: true, name: true, startDate: true } } },
     })
 
@@ -845,7 +873,7 @@ export async function setScheduleAsBaseline(scheduleId: string) {
     })
 
     await prisma.schedule.update({
-      where: { id: scheduleId },
+      where: { id: parsed.scheduleId },
       data: {
         status: 'BASELINE',
         isBaseline: true,
@@ -874,7 +902,7 @@ export async function setScheduleAsBaseline(scheduleId: string) {
       userId: session.user.id,
       action: 'UPDATE',
       entity: 'Schedule',
-      entityId: scheduleId,
+      entityId: parsed.scheduleId,
       projectId: schedule.projectId,
       description: `Cronograma establecido como BASELINE en proyecto "${schedule.project.name}"`,
     })
@@ -894,6 +922,9 @@ export async function setScheduleAsBaseline(scheduleId: string) {
  * Solo ADMIN/OWNER. Puede aprobar desde DRAFT o BASELINE.
  */
 export async function approveSchedule(scheduleId: string) {
+  const parsed = parseScheduleId(scheduleId)
+  if (!parsed.success) return { success: false, error: parsed.error }
+
   const session = await getSession()
   if (!session?.user?.id) {
     return { success: false, error: 'Unauthorized' }
@@ -905,7 +936,7 @@ export async function approveSchedule(scheduleId: string) {
 
   try {
     const schedule = await prisma.schedule.findFirst({
-      where: { id: scheduleId, orgId: org.orgId },
+      where: { id: parsed.scheduleId, orgId: org.orgId },
       include: { project: { select: { id: true, name: true } } },
     })
 
@@ -926,7 +957,7 @@ export async function approveSchedule(scheduleId: string) {
     }
 
     await prisma.schedule.update({
-      where: { id: scheduleId },
+      where: { id: parsed.scheduleId },
       data: {
         status: 'APPROVED',
         approvedByOrgMemberId: org.memberId,
@@ -939,7 +970,7 @@ export async function approveSchedule(scheduleId: string) {
       userId: session.user.id,
       action: 'UPDATE',
       entity: 'Schedule',
-      entityId: scheduleId,
+      entityId: parsed.scheduleId,
       projectId: schedule.projectId,
       description: `Cronograma aprobado en proyecto "${schedule.project.name}"`,
     })
@@ -958,6 +989,9 @@ export async function approveSchedule(scheduleId: string) {
  * Obtener cronograma completo para vista (con serialización de fechas para hidratación)
  */
 export async function getScheduleForView(scheduleId: string) {
+  const parsed = parseScheduleId(scheduleId)
+  if (!parsed.success) return null
+
   const session = await getSession()
   if (!session?.user?.id) return null
 
@@ -966,7 +1000,7 @@ export async function getScheduleForView(scheduleId: string) {
 
   try {
     const schedule = await prisma.schedule.findFirst({
-      where: { id: scheduleId, orgId: org.orgId },
+      where: { id: parsed.scheduleId, orgId: org.orgId },
       include: {
         project: {
           select: { id: true, name: true, projectNumber: true },

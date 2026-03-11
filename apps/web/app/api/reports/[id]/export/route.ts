@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getToken } from 'next-auth/jwt'
+import { auth } from '@/lib/auth'
 import { prisma } from '@repo/database'
 import {
   generateReportData,
@@ -10,24 +10,21 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const token = await getToken({
-    req: request,
-    secret: process.env.NEXTAUTH_SECRET,
-  })
-  if (!token?.sub) {
+  const session = await auth()
+  if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { id: reportId } = await params
-  const format = request.nextUrl.searchParams.get('format') || 'EXCEL'
-
   const member = await prisma.orgMember.findFirst({
-    where: { userId: token.sub, active: true },
+    where: { userId: session.user.id, active: true },
     select: { id: true, orgId: true },
   })
   if (!member) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const { id: reportId } = await params
+  const format = request.nextUrl.searchParams.get('format') || 'EXCEL'
 
   const report = await prisma.savedReport.findFirst({
     where: {

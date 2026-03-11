@@ -8,6 +8,7 @@ import { assertProjectAccess, canEditProjectArea, PROJECT_AREAS } from '@/lib/pr
 import { getVisibleProjectIds } from '@/lib/org-context'
 import { uploadToR2, getDownloadUrl, calculateChecksum } from '@/lib/r2-client'
 import { publishOutboxEvent } from '@/lib/events/event-publisher'
+import { parseCreateDocumentForm } from '@/lib/schemas/documents'
 
 /** Use this so we throw a clear error if Prisma client was not regenerated after adding DocumentFolder. */
 function getDocumentFolderModel() {
@@ -43,15 +44,29 @@ export async function createDocument(formData: FormData) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
 
-  const titleRaw = (formData.get('title') as string)?.trim() ?? ''
-  const docType = formData.get('docType') as string
+  const file = formData.get('file') as File
+  if (!file) {
+    throw new Error('Faltan campos obligatorios: tipo de documento y archivo.')
+  }
+
+  const parsed = parseCreateDocumentForm({
+    title: (formData.get('title') as string) ?? undefined,
+    docType: (formData.get('docType') as string) ?? undefined,
+    projectId: (formData.get('projectId') as string) ?? undefined,
+    folderId: (formData.get('folderId') as string) ?? undefined,
+  })
+  if (!parsed.success) {
+    throw new Error(parsed.error)
+  }
+
+  const { title: parsedTitle, docType, projectId, folderId } = parsed.data
   const category = (formData.get('category') as string) || undefined
   const description = (formData.get('description') as string) || undefined
-  const projectIdRaw = formData.get('projectId') as string | null
-  const projectId = projectIdRaw && projectIdRaw.trim() ? projectIdRaw : undefined
-  const folderIdRaw = formData.get('folderId') as string | null
-  const folderId = folderIdRaw && folderIdRaw.trim() ? folderIdRaw : undefined
-  const file = formData.get('file') as File
+
+  const fromFile = file.name
+    ? (file.name.replace(/\.[^.]+$/, '').trim() || file.name)
+    : ''
+  const title = (parsedTitle && parsedTitle.trim()) || fromFile || 'Documento'
 
   if (projectId) {
     try {
@@ -64,15 +79,6 @@ export async function createDocument(formData: FormData) {
       throw new Error(e instanceof Error ? e.message : 'Acceso denegado')
     }
   }
-
-  if (!docType || !file) {
-    throw new Error('Faltan campos obligatorios: tipo de documento y archivo.')
-  }
-
-  const fromFile = file.name
-    ? (file.name.replace(/\.[^.]+$/, '').trim() || file.name)
-    : ''
-  const title = titleRaw || fromFile || 'Documento'
 
   const maxSize = 50 * 1024 * 1024
   if (file.size > maxSize) {

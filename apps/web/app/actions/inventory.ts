@@ -5,6 +5,7 @@ import { prisma, Prisma } from '@repo/database'
 import { requireRole } from '@/lib/rbac'
 import { requirePermission, getAuthContext } from '@/lib/auth-helpers'
 import { assertProjectAccess } from '@/lib/project-permissions'
+import { parseUuid } from '@/lib/schemas/ids'
 import { publishOutboxEvent } from '@/lib/events/event-publisher'
 import { calculateTotalStock, calculateStockBalance } from '@/lib/inventory-utils'
 import { createInAppNotificationsForUsers } from '@/app/actions/notifications'
@@ -65,14 +66,14 @@ export async function createInventorySubcategory(categoryId: string, name: strin
   })
   const created = await prisma.$transaction(async (tx) => {
     const sub = await tx.inventorySubcategory.create({
-      data: { categoryId, name: name.trim(), sortOrder: (maxOrder?.sortOrder ?? -1) + 1 },
+      data: { categoryId: parsedCat.value, name: name.trim(), sortOrder: (maxOrder?.sortOrder ?? -1) + 1 },
     })
     await publishOutboxEvent(tx, {
       orgId: org.orgId,
       eventType: 'INVENTORY_SUBCATEGORY.CREATED',
       entityType: 'InventorySubcategory',
       entityId: sub.id,
-      payload: { categoryId, name: sub.name },
+      payload: { categoryId: parsedCat.value, name: sub.name },
     })
     return sub
   })
@@ -143,25 +144,28 @@ export async function updateInventoryItem(
     reorderQty?: number
   }
 ) {
+  const parsedItem = parseUuid(itemId, 'ID de ítem')
+  if (!parsedItem.success) return { success: false as const, error: parsedItem.error }
+
   await requirePermission('INVENTORY', 'edit')
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
 
   const item = await prisma.inventoryItem.findFirst({
-    where: { id: itemId, orgId: org.orgId },
+    where: { id: parsedItem.value, orgId: org.orgId },
   })
   if (!item) return { success: false as const, error: 'Item no encontrado' }
 
   const existingSku = await prisma.inventoryItem.findUnique({
     where: { orgId_sku: { orgId: org.orgId, sku: data.sku } },
   })
-  if (existingSku && existingSku.id !== itemId) {
+  if (existingSku && existingSku.id !== parsedItem.value) {
     return { success: false as const, error: 'SKU ya existe' }
   }
 
   await prisma.$transaction(async (tx) => {
     await tx.inventoryItem.update({
-      where: { id: itemId },
+      where: { id: parsedItem.value },
       data: {
         sku: data.sku,
         name: data.name,
@@ -177,38 +181,41 @@ export async function updateInventoryItem(
       orgId: org.orgId,
       eventType: 'INVENTORY_ITEM.UPDATED',
       entityType: 'InventoryItem',
-      entityId: itemId,
+      entityId: parsedItem.value,
       payload: { sku: data.sku, name: data.name },
     })
   })
 
   revalidatePath('/inventory')
   revalidatePath('/inventory/items')
-  revalidatePath(`/inventory/items/${itemId}`)
+  revalidatePath(`/inventory/items/${parsedItem.value}`)
   return { success: true as const }
 }
 
 export async function deleteInventoryItem(itemId: string) {
+  const parsedItem = parseUuid(itemId, 'ID de ítem')
+  if (!parsedItem.success) return { success: false as const, error: parsedItem.error }
+
   await requirePermission('INVENTORY', 'delete')
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
 
   const item = await prisma.inventoryItem.findFirst({
-    where: { id: itemId, orgId: org.orgId },
+    where: { id: parsedItem.value, orgId: org.orgId },
     select: { id: true },
   })
   if (!item) return { success: false as const, error: 'Item no encontrado' }
 
   await prisma.$transaction(async (tx) => {
     await tx.inventoryItem.update({
-      where: { id: itemId },
+      where: { id: parsedItem.value },
       data: { active: false },
     })
     await publishOutboxEvent(tx, {
       orgId: org.orgId,
       eventType: 'INVENTORY_ITEM.DELETED',
       entityType: 'InventoryItem',
-      entityId: itemId,
+      entityId: parsedItem.value,
       payload: {},
     })
   })
@@ -576,19 +583,24 @@ async function notifyLowStockIfNeeded(
 }
 
 export async function getItemStockByLocation(itemId: string, locationId: string) {
+  const parsedItem = parseUuid(itemId, 'ID de ítem')
+  const parsedLocation = parseUuid(locationId, 'ID de ubicación')
+  if (!parsedItem.success) return { success: false as const, error: parsedItem.error }
+  if (!parsedLocation.success) return { success: false as const, error: parsedLocation.error }
+
   try {
     const { org } = await getAuthContext()
     const item = await prisma.inventoryItem.findFirst({
-      where: { id: itemId, orgId: org.orgId },
+      where: { id: parsedItem.value, orgId: org.orgId },
       select: { id: true },
     })
     if (!item) return { success: false as const, error: 'Item no encontrado' }
     const location = await prisma.inventoryLocation.findFirst({
-      where: { id: locationId, orgId: org.orgId },
+      where: { id: parsedLocation.value, orgId: org.orgId },
       select: { id: true },
     })
     if (!location) return { success: false as const, error: 'Ubicación no encontrada' }
-    const balance = await calculateStockBalance(itemId, locationId, org.orgId)
+    const balance = await calculateStockBalance(parsedItem.value, parsedLocation.value, org.orgId)
     return { success: true as const, stock: Number(balance.toString()) }
   } catch {
     return { success: false as const, error: 'Error al obtener stock' }
@@ -596,16 +608,19 @@ export async function getItemStockByLocation(itemId: string, locationId: string)
 }
 
 export async function getProjectWBSNodes(projectId: string) {
+  const parsedProject = parseUuid(projectId, 'ID de proyecto')
+  if (!parsedProject.success) return { success: false as const, error: parsedProject.error, nodes: [] }
+
   try {
     const { org } = await getAuthContext()
-    await assertProjectAccess(projectId, org)
+    await assertProjectAccess(parsedProject.value, org)
     const project = await prisma.project.findFirst({
-      where: { id: projectId, orgId: org.orgId },
+      where: { id: parsedProject.value, orgId: org.orgId },
       select: { id: true },
     })
     if (!project) return { success: false as const, error: 'Proyecto no encontrado', nodes: [] }
     const nodes = await prisma.wbsNode.findMany({
-      where: { projectId, orgId: org.orgId, active: true },
+      where: { projectId: parsedProject.value, orgId: org.orgId, active: true },
       select: { id: true, code: true, name: true, category: true },
       orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }],
     })

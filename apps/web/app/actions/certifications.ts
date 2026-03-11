@@ -5,6 +5,7 @@ import { prisma, Prisma } from '@repo/database'
 import { requireRole } from '@/lib/rbac'
 import { requirePermission, getAuthContext } from '@/lib/auth-helpers'
 import { assertProjectAccess, canEditProjectArea, PROJECT_AREAS } from '@/lib/project-permissions'
+import { parseUuid } from '@/lib/schemas/ids'
 import crypto from 'crypto'
 import { publishOutboxEvent } from '@/lib/events/event-publisher'
 
@@ -61,16 +62,19 @@ export async function createCertification(
     issuedDate?: string
   }
 ) {
+  const parsedProject = parseUuid(projectId, 'ID de proyecto')
+  if (!parsedProject.success) throw new Error(parsedProject.error)
+
   await requirePermission('CERTIFICATIONS', 'create')
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
 
   const project = await prisma.project.findFirst({
-    where: { id: projectId, orgId: org.orgId },
+    where: { id: parsedProject.value, orgId: org.orgId },
   })
   if (!project) throw new Error('Project not found')
   try {
-    const access = await assertProjectAccess(projectId, org)
+    const access = await assertProjectAccess(parsedProject.value, org)
     if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.REPORTS)) {
       throw new Error('No tenés permiso para editar certificaciones de este proyecto')
     }
@@ -79,14 +83,14 @@ export async function createCertification(
     throw new Error(e instanceof Error ? e.message : 'Acceso denegado')
   }
 
-  const number = await generateCertNumber(projectId)
+  const number = await generateCertNumber(parsedProject.value)
   const issuedDateValue = data.issuedDate ? new Date(data.issuedDate) : undefined
 
   const cert = await prisma.$transaction(async (tx) => {
     const created = await tx.certification.create({
       data: {
         orgId: org.orgId,
-        projectId,
+        projectId: parsedProject.value,
         budgetVersionId: data.budgetVersionId,
         number,
         periodMonth: data.periodMonth,
@@ -101,13 +105,13 @@ export async function createCertification(
       eventType: 'CERTIFICATION.CREATED',
       entityType: 'Certification',
       entityId: created.id,
-      payload: { projectId, number: created.number },
+      payload: { projectId: parsedProject.value, number: created.number },
     })
     return created
   })
 
-  revalidatePath(`/projects/${projectId}/certifications`)
-  revalidatePath(`/projects/${projectId}/finance/certifications`)
+  revalidatePath(`/projects/${parsedProject.value}/certifications`)
+  revalidatePath(`/projects/${parsedProject.value}/finance/certifications`)
   return { success: true, certId: cert.id }
 }
 
@@ -119,10 +123,13 @@ export async function addCertificationLine(
     periodProgressPct: number
   }
 ) {
+  const parsedCert = parseUuid(certId, 'ID de certificación')
+  if (!parsedCert.success) throw new Error(parsedCert.error)
+
   const { org } = await getAuthContext()
 
   const cert = await prisma.certification.findFirst({
-    where: { id: certId, orgId: org.orgId, status: 'DRAFT' },
+    where: { id: parsedCert.value, orgId: org.orgId, status: 'DRAFT' },
   })
   if (!cert) throw new Error('Certification not found or not editable')
   try {
@@ -170,7 +177,7 @@ export async function addCertificationLine(
   await prisma.certificationLine.create({
     data: {
       orgId: org.orgId,
-      certificationId: certId,
+      certificationId: parsedCert.value,
       wbsNodeId: data.wbsNodeId,
       budgetLineId: data.budgetLineId,
       prevProgressPct: prevPct,
@@ -189,17 +196,20 @@ export async function addCertificationLine(
   })
 
   revalidatePath(`/projects/${cert.projectId}/certifications`)
-  revalidatePath(`/projects/${cert.projectId}/certifications/${certId}`)
+  revalidatePath(`/projects/${cert.projectId}/certifications/${parsedCert.value}`)
   revalidatePath(`/projects/${cert.projectId}/finance/certifications`)
-  revalidatePath(`/projects/${cert.projectId}/finance/certifications/${certId}`)
+  revalidatePath(`/projects/${cert.projectId}/finance/certifications/${parsedCert.value}`)
   return { success: true }
 }
 
 export async function deleteCertificationLine(lineId: string) {
+  const parsedLine = parseUuid(lineId, 'ID de línea')
+  if (!parsedLine.success) throw new Error(parsedLine.error)
+
   const { org } = await getAuthContext()
 
   const line = await prisma.certificationLine.findFirst({
-    where: { id: lineId, orgId: org.orgId },
+    where: { id: parsedLine.value, orgId: org.orgId },
     include: {
       certification: { select: { projectId: true, status: true } },
     },
@@ -220,7 +230,7 @@ export async function deleteCertificationLine(lineId: string) {
 
   await prisma.$transaction(async (tx) => {
     await tx.certificationLine.delete({
-      where: { id: lineId },
+      where: { id: parsedLine.value },
     })
     await publishOutboxEvent(tx, {
       orgId: org.orgId,
