@@ -108,3 +108,4 @@ Marcar cada flujo cuando se haya verificado tras un cambio.
 1. Completar la tabla de **Inventario por página** y la **Matriz de regresión** (Fase 0).
 2. Tras cada fase de implementación, ir marcando los checkboxes de los pasos correspondientes y de la matriz.
 3. Si algún flujo falla, corregir antes de seguir; no marcar hasta que pase.
+4. Repo público: CI/Vercel pueden redeployar sin bloqueos de branch protection.
