@@ -55,16 +55,38 @@ export async function renderHtmlToPdf(
     }
     args = ['--no-sandbox', '--disable-setuid-sandbox', '--headless=new']
   } else {
-    const chromium = await import('@sparticuz/chromium')
-    executablePath = await chromium.executablePath()
-    args = chromium.args ?? []
+    const chromiumModule = await import('@sparticuz/chromium')
+    const chromium =
+      (chromiumModule as { default?: typeof chromiumModule }).default ?? chromiumModule
+    if (typeof (chromium as { graphicsMode?: boolean }).graphicsMode === 'boolean') {
+      (chromium as { graphicsMode: boolean }).graphicsMode = false
+    }
+    const execPath = chromium.executablePath
+    const execArgs = chromium.args
+    if (typeof execPath !== 'function') {
+      throw new Error(
+        `Chromium (PDF): executablePath no es una función (typeof=${typeof execPath}). ` +
+          'Puede ser un problema de bundling en este entorno.'
+      )
+    }
+    try {
+      executablePath = await execPath()
+      args = Array.isArray(execArgs) ? execArgs : []
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      throw new Error(`Chromium (PDF) no disponible en este entorno: ${msg}`)
+    }
   }
 
+  const launchArgs = [...args, '--no-sandbox', '--disable-setuid-sandbox']
+  if (!useLocal) {
+    launchArgs.push('--disable-gpu', '--disable-dev-shm-usage', '--disable-software-rasterizer', '--no-zygote', '--single-process')
+  }
   let browser: Browser | null = null
   try {
     browser = await puppeteer.default.launch({
       executablePath,
-      args: [...args, '--no-sandbox', '--disable-setuid-sandbox'],
+      args: launchArgs,
       headless: true,
     })
     const page = await browser.newPage()

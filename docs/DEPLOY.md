@@ -230,6 +230,8 @@ Si todo está bien, recibirás un correo con asunto "Prueba Bloqer" y el logo de
 
 **Reporte semanal (viernes):** Si usás Inngest en producción, podés activar el reporte semanal por email que se envía cada viernes a las 9:00 (Argentina) solo a los **OWNER** de cada organización. Incluye resumen de finanzas (balance, proyección de caja, lo que vence y cobra la semana próxima) y tabla por proyecto. Para activarlo: en Vercel definí `WEEKLY_REPORT_ENABLED=true`. Requiere `RESEND_API_KEY`, `EMAIL_FROM` y que Inngest esté configurado (sección 8).
 
+**PDF en producción:** La ruta `/api/pdf` (presupuesto, certificaciones, cronograma, etc.) usa Chromium en el servidor. En Vercel la función tiene `maxDuration: 60` para evitar timeouts. Si recibís 500 al exportar PDF: (1) En Vercel → Logs de la función, revisá el error que se imprime con `[api/pdf]`. (2) Opcional: definí en Vercel `PDF_ERROR_DETAIL=true` (solo para depurar) y volvé a intentar; la respuesta JSON incluirá el mensaje de error en `detail`. (3) En planes Vercel gratuitos el tamaño del deployment puede afectar a Chromium; si el error es por binario no encontrado o memoria, considerá pasar a un plan de pago o usar una alternativa (ej. `@sparticuz/chromium-min`). Las vistas "Transacciones" y "Flujo de caja" del proyecto exportan solo a Excel por diseño; el PDF está disponible en Presupuesto, Certificaciones, Cronograma y otras plantillas.
+
 ---
 
 ## 8. (Opcional) Inngest

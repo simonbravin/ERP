@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
+
+/** PDF generation can be slow (Chromium); allow up to 60s on Vercel Pro. */
+export const maxDuration = 60
+export const dynamic = 'force-dynamic'
 import { prisma } from '@repo/database'
 import { getOrgContext } from '@/lib/org-context'
 import { getBudgetExportData } from '@/app/actions/budget'
@@ -445,11 +449,16 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (err) {
-    console.error('[api/pdf]', err)
     const message = err instanceof Error ? err.message : 'Error al generar el PDF'
-    const detail = process.env.NODE_ENV === 'development' ? message : undefined
+    const stack = err instanceof Error ? err.stack : undefined
+    console.error('[api/pdf]', message, stack ?? '')
+    const includeDetail =
+      process.env.NODE_ENV === 'development' || process.env.PDF_ERROR_DETAIL === 'true'
     return NextResponse.json(
-      { error: 'Error al generar el PDF', ...(detail && { detail }) },
+      {
+        error: 'Error al generar el PDF',
+        ...(includeDetail && { detail: message }),
+      },
       { status: 500 }
     )
   }
