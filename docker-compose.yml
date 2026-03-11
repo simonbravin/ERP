@@ -1,0 +1,16 @@
+# Postgres local para desarrollo. No se usa en producción.
+# Uso: docker compose up -d
+# Conecta: localhost:5432, base bloqer, user postgres, password postgres
+services:
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: bloqer
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+volumes:
+  postgres_data:

@@ -24,6 +24,7 @@
     "db:studio": "turbo run db:studio",
     "db:migrate": "turbo run db:migrate",
     "db:migrate:deploy": "pnpm --filter @repo/database db:migrate:deploy",
+    "db:seed": "pnpm --filter @repo/database db:seed",
     "db:migrate:deploy:prod": "pnpm --filter @repo/database db:migrate:deploy:prod",
     "db:create-superadmin": "pnpm --filter @repo/database set-superadmin-password",
     "db:create-superadmin:prod": "pnpm --filter @repo/database db:create-superadmin:prod",

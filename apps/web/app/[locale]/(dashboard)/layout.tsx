@@ -11,17 +11,20 @@ export const dynamic = 'force-dynamic'
 /** Logo is not fetched here to keep layout fast; can be loaded client-side later if needed. */
 
 function DashboardError({ message }: { message: string }) {
+  const isEnvError = /DATABASE_URL|Environment variable|env\s*\(/.test(message)
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="w-full max-w-2xl rounded-lg border border-red-200 bg-red-50 p-6 dark:border-red-800 dark:bg-red-950/30">
+      <div className="erp-error-panel rounded-lg border border-red-200 bg-red-50 p-6 dark:border-red-800 dark:bg-red-950/30">
         <h1 className="text-lg font-semibold text-red-800 dark:text-red-200">
           Error al cargar el panel
         </h1>
-        <p className="mt-2 text-sm text-red-700 dark:text-red-300 font-mono break-words">
+        <p className="erp-error-panel-message mt-2 text-sm text-red-700 dark:text-red-300 font-mono">
           {message}
         </p>
         <p className="mt-4 text-xs text-red-600 dark:text-red-400">
-          Comprueba DATABASE_URL en .env y que la base de datos esté en ejecución.
+          {isEnvError
+            ? 'Configura DATABASE_URL en .env (o .env.local) en la raíz del monorepo o en packages/database y reinicia el servidor.'
+            : 'Comprueba DATABASE_URL en .env y que la base de datos esté en ejecución.'}
         </p>
         <SignOutConfirmButton
           className="mt-4 inline-block rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"

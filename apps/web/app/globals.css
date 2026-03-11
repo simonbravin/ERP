@@ -436,12 +436,28 @@
     background: hsl(var(--sidebar-ring) / 0.75);
   }
 
-  /* Sidebar: sangría reducida para subítems (aplica en project-sidebar y global-sidebar) */
+  /* Sidebar: sangría y línea vertical a la izquierda de subítems (desplegables) */
   .sidebar-children {
-    margin-left: 1.25rem; /* antes ml-11 (2.75rem) */
+    margin-left: 1.25rem;
+    border-left: 2px solid hsl(var(--sidebar-muted) / 0.5);
+    padding-left: 0.5rem;
   }
   .sidebar-children-nested {
-    margin-left: 0.5rem; /* antes ml-3 (0.75rem) */
+    margin-left: 0.5rem;
+    border-left: 2px solid hsl(var(--sidebar-muted) / 0.5);
+    padding-left: 0.5rem;
+  }
+
+  /* Panel de error ancho y legible (dashboard y otros errores de carga) */
+  .erp-error-panel {
+    min-width: min(100%, 32rem);
+    width: 100%;
+    max-width: 42rem;
+  }
+  .erp-error-panel .erp-error-panel-message {
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
   }
 
   .erp-wizard-step-separator {
