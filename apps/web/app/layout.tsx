@@ -37,7 +37,7 @@ export default function RootLayout({
       <body className="erp-shell antialiased font-sans">
         <ThemeProvider
           attribute="class"
-          defaultTheme="light"
+          defaultTheme="system"
           enableSystem
           disableTransitionOnChange
         >
