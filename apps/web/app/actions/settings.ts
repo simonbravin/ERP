@@ -5,12 +5,34 @@ import { prisma, Prisma } from '@repo/database'
 import { getSession } from '@/lib/session'
 import { getOrgContext } from '@/lib/org-context'
 import { requireRole } from '@/lib/rbac'
-import { uploadToR2, getDownloadUrl } from '@/lib/r2-client'
-import { r2Client } from '@/lib/r2-client'
+import {
+  uploadToR2,
+  getDownloadUrl,
+  r2Client,
+  StorageNotConfiguredError,
+} from '@/lib/r2-client'
 import type { UpdateUserProfileInput, UpdateOrganizationInput } from '@repo/validators'
 
 const IMAGE_MAX_BYTES = 5 * 1024 * 1024 // 5MB
-const IMAGE_ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp']
+const IMAGE_ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'] as const
+
+const EXT_TO_MIME: Record<string, (typeof IMAGE_ALLOWED_TYPES)[number]> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+}
+
+/** Some OS/browsers omit `File.type`; infer from extension when possible. */
+function resolveImageContentType(file: File): string | null {
+  if (file.type && IMAGE_ALLOWED_TYPES.includes(file.type as (typeof IMAGE_ALLOWED_TYPES)[number])) {
+    return file.type
+  }
+  const ext = file.name.split('.').pop()?.toLowerCase()
+  const fromExt = ext ? EXT_TO_MIME[ext] : undefined
+  return fromExt ?? null
+}
 
 export async function updateUserProfile(data: UpdateUserProfileInput) {
   const session = await getSession()
@@ -108,7 +130,8 @@ export async function uploadOrgLogo(formData: FormData) {
   const file = formData.get('logo') as File | null
   if (!file || !file.size) return { success: false, error: 'Selecciona una imagen' }
   if (file.size > IMAGE_MAX_BYTES) return { success: false, error: 'La imagen no debe superar 5 MB' }
-  if (!IMAGE_ALLOWED_TYPES.includes(file.type)) {
+  const contentType = resolveImageContentType(file)
+  if (!contentType) {
     return { success: false, error: 'Formato no válido. Usa PNG, JPG, GIF o WebP' }
   }
 
@@ -116,24 +139,45 @@ export async function uploadOrgLogo(formData: FormData) {
   const key = `orgs/${orgContext.orgId}/logo.${ext}`
 
   try {
-    await uploadToR2(file, key)
+    await uploadToR2(file, key, contentType)
 
     const org = await prisma.organization.findUnique({
       where: { id: orgContext.orgId },
       select: { name: true },
     })
 
-    await prisma.orgProfile.upsert({
+    const existingProfile = await prisma.orgProfile.findUnique({
       where: { orgId: orgContext.orgId },
-      create: {
-        orgId: orgContext.orgId,
-        legalName: org?.name ?? 'Organization',
-        baseCurrency: 'ARS',
-        defaultTaxPct: new Prisma.Decimal(21),
-        logoStorageKey: key,
-      },
-      update: { logoStorageKey: key },
+      select: { id: true },
     })
+
+    if (existingProfile) {
+      await prisma.orgProfile.update({
+        where: { orgId: orgContext.orgId },
+        data: { logoStorageKey: key },
+      })
+    } else {
+      await prisma.currency.upsert({
+        where: { code: 'ARS' },
+        create: {
+          code: 'ARS',
+          name: 'Peso argentino',
+          symbol: '$',
+          decimalPlaces: 2,
+          active: true,
+        },
+        update: {},
+      })
+      await prisma.orgProfile.create({
+        data: {
+          orgId: orgContext.orgId,
+          legalName: org?.name ?? 'Organization',
+          baseCurrency: 'ARS',
+          defaultTaxPct: new Prisma.Decimal(21),
+          logoStorageKey: key,
+        },
+      })
+    }
 
     revalidatePath('/settings/organization')
     revalidatePath('/dashboard')
@@ -141,6 +185,16 @@ export async function uploadOrgLogo(formData: FormData) {
     return { success: true }
   } catch (error) {
     console.error('Error uploading logo:', error)
+    if (error instanceof StorageNotConfiguredError) {
+      return { success: false, error: error.message }
+    }
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
+      return {
+        success: false,
+        error:
+          'No se pudo guardar el logo por un dato relacionado en la base de datos. Revisá monedas (currency) y perfil de organización.',
+      }
+    }
     return { success: false, error: 'Error al subir el logo' }
   }
 }
@@ -182,7 +236,8 @@ export async function uploadUserAvatar(formData: FormData) {
   const file = formData.get('avatar') as File | null
   if (!file || !file.size) return { success: false, error: 'Selecciona una imagen' }
   if (file.size > IMAGE_MAX_BYTES) return { success: false, error: 'La imagen no debe superar 5 MB' }
-  if (!IMAGE_ALLOWED_TYPES.includes(file.type)) {
+  const contentType = resolveImageContentType(file)
+  if (!contentType) {
     return { success: false, error: 'Formato no válido. Usa PNG, JPG, GIF o WebP' }
   }
 
@@ -191,7 +246,7 @@ export async function uploadUserAvatar(formData: FormData) {
   const key = `users/${userId}/avatar.${ext}`
 
   try {
-    await uploadToR2(file, key)
+    await uploadToR2(file, key, contentType)
 
     const displayUrl = r2Client && process.env.R2_BUCKET_NAME
       ? `r2:${key}`
@@ -206,6 +261,9 @@ export async function uploadUserAvatar(formData: FormData) {
     return { success: true }
   } catch (error) {
     console.error('Error uploading avatar:', error)
+    if (error instanceof StorageNotConfiguredError) {
+      return { success: false, error: error.message }
+    }
     return { success: false, error: 'Error al subir la foto' }
   }
 }
