@@ -241,16 +241,15 @@ export function ScheduleViewClient({
   const nonWorkingKey = (scheduleData.nonWorkingDates ?? []).join('|')
 
   const calendarOptions = useMemo((): WorkingDayOptions | undefined => {
-    const d = scheduleData.nonWorkingDates ?? []
-    if (d.length === 0) return undefined
-    return { nonWorkingDates: d }
+    if (!nonWorkingKey) return undefined
+    return { nonWorkingDates: nonWorkingKey.split('|') }
   }, [nonWorkingKey])
 
   const [exceptionsText, setExceptionsText] = useState(() =>
     (scheduleData.nonWorkingDates ?? []).join('\n')
   )
   useEffect(() => {
-    setExceptionsText((scheduleData.nonWorkingDates ?? []).join('\n'))
+    setExceptionsText(nonWorkingKey ? nonWorkingKey.split('|').join('\n') : '')
   }, [scheduleData.id, nonWorkingKey])
 
   // Stable across router.refresh(): parent often passes a new `tasks` array reference with the same ids.
