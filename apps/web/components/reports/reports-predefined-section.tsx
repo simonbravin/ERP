@@ -127,11 +127,11 @@ export function ReportsPredefinedSection({ predefinedReports, projects }: Props)
             key={report.id}
             href={`/reports/predefined/${report.id}${projectIdsQuery}`}
             className={cn(
-              'group rounded-lg border border-border bg-card p-4 transition-all hover:border-accent hover:shadow-md'
+              'group rounded-xl border border-border/60 bg-card p-5 shadow-sm transition-shadow hover:shadow-md'
             )}
           >
             <div className="mb-3 text-3xl">{report.icon}</div>
-            <h3 className="font-semibold text-foreground group-hover:text-accent">
+            <h3 className="font-semibold text-foreground group-hover:text-primary">
               {report.name}
             </h3>
             <p className="mt-1 text-sm text-muted-foreground">

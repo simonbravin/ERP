@@ -20,8 +20,9 @@ export default async function BudgetVsActualPage({ params }: PageProps) {
   const data = await getBudgetVsActualReport()
 
   return (
-    <div className="h-full">
+    <div className="erp-view-container space-y-6 bg-background">
       <PageHeader
+        variant="embedded"
         title="Presupuesto vs Real"
         subtitle="Control de costos por proyecto"
         breadcrumbs={[
@@ -30,9 +31,7 @@ export default async function BudgetVsActualPage({ params }: PageProps) {
           { label: 'Presupuesto vs Real' },
         ]}
       />
-      <div className="mx-auto max-w-6xl w-full space-y-6 p-6">
-        <BudgetVsActualReportClient data={data} />
-      </div>
+      <BudgetVsActualReportClient data={data} />
     </div>
   )
 }

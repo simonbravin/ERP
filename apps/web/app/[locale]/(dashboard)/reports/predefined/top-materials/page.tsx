@@ -20,8 +20,9 @@ export default async function TopMaterialsPage({ params }: PageProps) {
   const data = await getTopMaterialsReport(10)
 
   return (
-    <div className="h-full">
+    <div className="erp-view-container space-y-6 bg-background">
       <PageHeader
+        variant="embedded"
         title="Top 10 Materiales más Caros"
         subtitle="Análisis de materiales por costo total en presupuestos aprobados"
         breadcrumbs={[
@@ -30,9 +31,7 @@ export default async function TopMaterialsPage({ params }: PageProps) {
           { label: 'Top 10 Materiales' },
         ]}
       />
-      <div className="mx-auto max-w-6xl w-full space-y-6 p-6">
-        <TopMaterialsReportClient data={data} />
-      </div>
+      <TopMaterialsReportClient data={data} />
     </div>
   )
 }

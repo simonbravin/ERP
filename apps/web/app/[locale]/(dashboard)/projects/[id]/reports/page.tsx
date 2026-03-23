@@ -59,8 +59,9 @@ export default async function ProjectReportsPage({ params }: PageProps) {
   ]
 
   return (
-    <div className="mx-auto max-w-6xl w-full space-y-6 p-6">
+    <div className="erp-view-container space-y-6 bg-background">
       <PageHeader
+        variant="embedded"
         title="Reportes del Proyecto"
         subtitle={`${project.name} • ${project.projectNumber}`}
         breadcrumbs={[

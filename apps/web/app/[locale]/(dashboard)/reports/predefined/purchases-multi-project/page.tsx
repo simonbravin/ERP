@@ -20,8 +20,9 @@ export default async function PurchasesMultiProjectPage({ params }: PageProps) {
   const t = await getTranslations('reports')
 
   return (
-    <div className="h-full">
+    <div className="erp-view-container space-y-6 bg-background">
       <PageHeader
+        variant="embedded"
         title={t('purchasesMultiProject')}
         subtitle={t('purchasesMultiProjectDesc')}
         breadcrumbs={[
@@ -30,9 +31,7 @@ export default async function PurchasesMultiProjectPage({ params }: PageProps) {
           { label: t('purchasesMultiProject') },
         ]}
       />
-      <div className="mx-auto max-w-6xl w-full space-y-6 p-6">
-        <PurchasesBySupplierReport orgId={org.orgId} />
-      </div>
+      <PurchasesBySupplierReport orgId={org.orgId} />
     </div>
   )
 }

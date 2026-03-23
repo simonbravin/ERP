@@ -19,7 +19,7 @@ export default async function NewReportPage() {
   })
 
   return (
-    <div className="mx-auto w-full max-w-[90rem] p-6">
+    <div className="mx-auto w-full max-w-[min(90rem,calc(100vw-2rem))] space-y-6 bg-background px-4 py-6 sm:px-6 lg:px-8">
       <div className="mb-6">
         <Link
           href="/reports"

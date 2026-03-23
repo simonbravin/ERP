@@ -32,7 +32,7 @@ export default async function ReportRunPage({ params }: PageProps) {
   if (!report) notFound()
 
   return (
-    <div className="p-6">
+    <div className="erp-view-container space-y-6 bg-background">
       <div className="mb-6">
         <Link
           href={`/reports/${id}`}

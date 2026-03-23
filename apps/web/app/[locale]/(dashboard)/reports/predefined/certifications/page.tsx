@@ -20,8 +20,9 @@ export default async function CertificationsPage({ params }: PageProps) {
   const data = await getCertificationsByProjectReport()
 
   return (
-    <div className="h-full">
+    <div className="erp-view-container space-y-6 bg-background">
       <PageHeader
+        variant="embedded"
         title="Evolución de Certificaciones"
         subtitle="Ingresos cobrados por proyecto (por estado)"
         breadcrumbs={[
@@ -30,9 +31,7 @@ export default async function CertificationsPage({ params }: PageProps) {
           { label: 'Certificaciones' },
         ]}
       />
-      <div className="mx-auto max-w-6xl w-full space-y-6 p-6">
-        <CertificationsReportClient data={data} />
-      </div>
+      <CertificationsReportClient data={data} />
     </div>
   )
 }

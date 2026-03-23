@@ -83,7 +83,7 @@ export default async function ReportDetailPage({ params }: PageProps) {
   )
 
   return (
-    <div className="p-6">
+    <div className="erp-view-container space-y-6 bg-background">
       <div className="mb-6 flex items-center justify-between">
         <div>
           <Link

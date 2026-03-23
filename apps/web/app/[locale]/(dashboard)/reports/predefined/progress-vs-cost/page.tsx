@@ -20,8 +20,9 @@ export default async function ProgressVsCostPage({ params }: PageProps) {
   const data = await getProgressVsCostReport()
 
   return (
-    <div className="h-full">
+    <div className="erp-view-container space-y-6 bg-background">
       <PageHeader
+        variant="embedded"
         title="Avance vs Costo"
         subtitle="Consumido vs avance de obra por proyecto"
         breadcrumbs={[
@@ -30,9 +31,7 @@ export default async function ProgressVsCostPage({ params }: PageProps) {
           { label: 'Avance vs Costo' },
         ]}
       />
-      <div className="mx-auto max-w-6xl w-full space-y-6 p-6">
-        <ProgressVsCostReportClient data={data} />
-      </div>
+      <ProgressVsCostReportClient data={data} />
     </div>
   )
 }

@@ -98,13 +98,11 @@ export default async function ReportsPage() {
   ]
 
   return (
-    <div className="mx-auto max-w-6xl w-full space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-foreground">
-            Reportes y Exportaciones
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+    <div className="erp-view-container space-y-6 bg-background">
+      <div className="erp-header-row flex flex-wrap items-center justify-between gap-4">
+        <div className="erp-section-header">
+          <h1 className="erp-page-title">Reportes y Exportaciones</h1>
+          <p className="erp-section-desc">
             Genera reportes personalizados y exporta datos
           </p>
         </div>
@@ -120,7 +118,7 @@ export default async function ReportsPage() {
       </div>
 
       <div>
-        <h2 className="mb-4 text-lg font-semibold text-foreground">
+        <h2 className="erp-section-title mb-4">
           Reportes Predefinidos
         </h2>
         <ReportsPredefinedSection
@@ -130,17 +128,17 @@ export default async function ReportsPage() {
       </div>
 
       <div>
-        <h2 className="mb-4 text-lg font-semibold text-foreground">
+        <h2 className="erp-section-title mb-4">
           Query Builder
         </h2>
-        <p className="mb-4 text-sm text-muted-foreground">
+        <p className="erp-section-desc mb-4">
           Construí consultas sin SQL: elegí tabla, campos y filtros para previsualizar datos.
         </p>
         <QueryBuilder />
       </div>
 
       <div>
-        <h2 className="mb-4 text-lg font-semibold text-foreground">
+        <h2 className="erp-section-title mb-4">
           Reportes Personalizados
         </h2>
         {reports.length === 0 ? (

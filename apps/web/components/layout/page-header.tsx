@@ -1,8 +1,11 @@
 'use client'
 
 import { Link } from '@/i18n/navigation'
+import { cn } from '@/lib/utils'
 
 interface PageHeaderProps {
+  /** `embedded`: sin franja tipo card; mismo patrón que Tablero / Proveedores dentro de `erp-view-container`. */
+  variant?: 'default' | 'embedded'
   title: string
   subtitle?: string
   breadcrumbs?: Array<{ label: string; href?: string }>
@@ -11,14 +14,22 @@ interface PageHeaderProps {
 }
 
 export function PageHeader({
+  variant = 'default',
   title,
   subtitle,
   breadcrumbs,
   actions,
   filters,
 }: PageHeaderProps) {
+  const embedded = variant === 'embedded'
   return (
-    <div className="border-b border-border bg-card px-6 py-4">
+    <div
+      className={cn(
+        embedded
+          ? 'flex flex-col gap-2'
+          : 'border-b border-border bg-card px-6 py-4'
+      )}
+    >
       {breadcrumbs && breadcrumbs.length > 0 && (
         <nav className="mb-2 text-sm text-muted-foreground">
           {breadcrumbs.map((crumb, i) => (

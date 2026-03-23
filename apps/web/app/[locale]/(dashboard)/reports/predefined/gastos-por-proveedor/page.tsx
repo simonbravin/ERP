@@ -28,8 +28,9 @@ export default async function GastosPorProveedorPage({ params, searchParams }: P
   if (projectIds?.length) pdfQueryParams.projectIds = projectIds.join(',')
 
   return (
-    <div className="h-full">
+    <div className="erp-view-container space-y-6 bg-background">
       <PageHeader
+        variant="embedded"
         title="Gastos por Proveedor"
         subtitle="Análisis de compras consolidado por proveedor"
         breadcrumbs={[
@@ -38,10 +39,7 @@ export default async function GastosPorProveedorPage({ params, searchParams }: P
           { label: 'Gastos por Proveedor' },
         ]}
       />
-
-      <div className="mx-auto max-w-6xl w-full space-y-6 p-6">
-        <ExpensesBySupplierReportClient data={data} pdfQueryParams={pdfQueryParams} />
-      </div>
+      <ExpensesBySupplierReportClient data={data} pdfQueryParams={pdfQueryParams} />
     </div>
   )
 }

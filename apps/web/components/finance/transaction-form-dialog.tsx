@@ -392,7 +392,8 @@ export function TransactionFormDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="max-h-[70vh] overflow-y-auto pr-1">
+        {/* px insets focus rings (ring + ring-offset) so overflow-y-auto does not clip them */}
+        <div className="max-h-[70vh] overflow-y-auto px-2 sm:px-3">
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
