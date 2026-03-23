@@ -5,6 +5,7 @@ import { hasMinimumRole } from '@/lib/rbac'
 import { getProject } from '@/app/actions/projects'
 import { serializeForClient } from '@/lib/utils/serialization'
 import { ProjectLayoutInner } from '@/components/projects/project-layout-inner'
+import { assertProjectAccess, canViewProjectSchedule } from '@/lib/project-permissions'
 
 type ProjectLayoutProps = {
   children: React.ReactNode
@@ -33,12 +34,24 @@ export default async function ProjectLayout({
     const project = await getProject(id)
     if (!project) return notFound()
 
+    let showScheduleTab = true
+    try {
+      const { projectRole } = await assertProjectAccess(id, org)
+      showScheduleTab = canViewProjectSchedule(projectRole)
+    } catch {
+      return notFound()
+    }
+
     const canEdit = hasMinimumRole(org.role, 'EDITOR')
     const projectPlain = serializeForClient(project)
 
     return (
       <div className="erp-view-container space-y-6 py-6">
-        <ProjectLayoutInner project={projectPlain} canEdit={canEdit}>
+        <ProjectLayoutInner
+          project={projectPlain}
+          canEdit={canEdit}
+          showScheduleTab={showScheduleTab}
+        >
           {children}
         </ProjectLayoutInner>
       </div>

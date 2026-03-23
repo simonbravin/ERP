@@ -22,10 +22,12 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { formatCurrency } from '@/lib/format-utils'
-import { TrendingUp, TrendingDown, AlertTriangle, Download } from 'lucide-react'
+import { TrendingUp, TrendingDown, AlertTriangle, Download, CalendarClock } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
+import { Link } from '@/i18n/navigation'
 import type { ProjectDashboardData } from '@/app/actions/project-dashboard'
+import type { ProjectDashboardCrossAlert } from '@/app/actions/project-dashboard'
 
 interface ProjectInfo {
   id: string
@@ -45,6 +47,35 @@ const COLORS = {
 interface Props {
   project: ProjectInfo
   data: ProjectDashboardData
+}
+
+function formatRatio(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n)) return '—'
+  return n.toFixed(2)
+}
+
+function alertMessage(
+  t: (key: string, values?: Record<string, string>) => string,
+  a: ProjectDashboardCrossAlert
+) {
+  if (a.kind === 'delay_and_cost' && a.overspendPct != null) {
+    return t('projectDashboardAlertDelayAndCost', {
+      code: a.wbsCode,
+      name: a.wbsName,
+      pct: a.overspendPct.toFixed(1),
+    })
+  }
+  if (a.kind === 'schedule_delay') {
+    return t('projectDashboardAlertScheduleDelay', { code: a.wbsCode, name: a.wbsName })
+  }
+  if (a.kind === 'wbs_cost_overrun' && a.overspendPct != null) {
+    return t('projectDashboardAlertCostOverrun', {
+      code: a.wbsCode,
+      name: a.wbsName,
+      pct: a.overspendPct.toFixed(1),
+    })
+  }
+  return `${a.wbsCode} — ${a.wbsName}`
 }
 
 export function ProjectDashboardClient({ project, data }: Props) {
@@ -193,6 +224,110 @@ export function ProjectDashboardClient({ project, data }: Props) {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">{tProjects('projectDashboardEvmTitle')}</CardTitle>
+          <p className="text-sm text-muted-foreground">{tProjects('projectDashboardEvmSubtitle')}</p>
+          {!data.evm.hasSchedule && (
+            <p className="text-sm text-amber-700 dark:text-amber-500">
+              {tProjects('projectDashboardEvmNoSchedule')}
+            </p>
+          )}
+          {data.evm.hasSchedule && data.evm.scheduleName && (
+            <p className="text-sm text-muted-foreground">
+              {tProjects('projectDashboardEvmScheduleLabel', { name: data.evm.scheduleName })}
+            </p>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-md border border-border/60 p-3">
+              <p className="text-xs text-muted-foreground">{tProjects('projectDashboardEvmBac')}</p>
+              <p className="text-lg font-semibold tabular-nums">{formatCurrency(data.evm.bac)}</p>
+            </div>
+            <div className="rounded-md border border-border/60 p-3">
+              <p className="text-xs text-muted-foreground">{tProjects('projectDashboardEvmEv')}</p>
+              <p className="text-lg font-semibold tabular-nums">{formatCurrency(data.evm.ev)}</p>
+            </div>
+            <div className="rounded-md border border-border/60 p-3">
+              <p className="text-xs text-muted-foreground">{tProjects('projectDashboardEvmAc')}</p>
+              <p className="text-lg font-semibold tabular-nums">{formatCurrency(data.evm.ac)}</p>
+            </div>
+            <div className="rounded-md border border-border/60 p-3">
+              <p className="text-xs text-muted-foreground">{tProjects('projectDashboardEvmPv')}</p>
+              <p className="text-lg font-semibold tabular-nums">
+                {data.evm.pv != null ? formatCurrency(data.evm.pv) : tProjects('projectDashboardEvmNa')}
+              </p>
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-md border border-border/60 p-3">
+              <p className="text-xs text-muted-foreground">{tProjects('projectDashboardEvmPhysicalPct')}</p>
+              <p className="text-lg font-semibold tabular-nums">
+                {data.evm.taskCount === 0
+                  ? tProjects('projectDashboardEvmNa')
+                  : `${data.evm.physicalProgressPct.toFixed(1)}%`}
+              </p>
+            </div>
+            <div className="rounded-md border border-border/60 p-3">
+              <p className="text-xs text-muted-foreground">{tProjects('projectDashboardEvmCpi')}</p>
+              <p className="text-lg font-semibold tabular-nums">{formatRatio(data.evm.cpi)}</p>
+            </div>
+            <div className="rounded-md border border-border/60 p-3">
+              <p className="text-xs text-muted-foreground">{tProjects('projectDashboardEvmSpi')}</p>
+              <p className="text-lg font-semibold tabular-nums">{formatRatio(data.evm.spi)}</p>
+            </div>
+            <div className="rounded-md border border-border/60 p-3">
+              <p className="text-xs text-muted-foreground">{tProjects('projectDashboardEvmCv')}</p>
+              <p
+                className={`text-lg font-semibold tabular-nums ${data.evm.cv >= 0 ? 'text-green-600' : 'text-red-600'}`}
+              >
+                {formatCurrency(data.evm.cv)}
+              </p>
+            </div>
+          </div>
+          {data.evm.sv != null && (
+            <div className="rounded-md border border-border/60 p-3">
+              <p className="text-xs text-muted-foreground">{tProjects('projectDashboardEvmSv')}</p>
+              <p
+                className={`text-lg font-semibold tabular-nums ${data.evm.sv >= 0 ? 'text-green-600' : 'text-red-600'}`}
+              >
+                {formatCurrency(data.evm.sv)}
+              </p>
+            </div>
+          )}
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/projects/${project.id}/schedule`} className="inline-flex items-center gap-2">
+              <CalendarClock className="h-4 w-4" />
+              {tProjects('projectDashboardOpenSchedule')}
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
+
+      {data.crossAlerts.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-sm font-medium text-muted-foreground">
+            {tProjects('projectDashboardAlertsTitle')}
+          </h3>
+          {data.crossAlerts.map((a, i) => (
+            <Alert
+              key={`${a.kind}-${a.wbsCode}-${i}`}
+              variant={a.kind === 'delay_and_cost' ? 'destructive' : 'default'}
+              className={
+                a.kind === 'wbs_cost_overrun'
+                  ? 'border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30'
+                  : undefined
+              }
+            >
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle className="text-sm">{a.wbsCode}</AlertTitle>
+              <AlertDescription>{alertMessage(tProjects, a)}</AlertDescription>
+            </Alert>
+          ))}
+        </div>
+      )}
 
       {isOverBudget && (
         <Alert

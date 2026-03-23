@@ -5,6 +5,7 @@ import { redirect } from '@/i18n/navigation'
 import { notFound } from 'next/navigation'
 import { getTranslations } from 'next-intl/server'
 import { prisma } from '@repo/database'
+import { assertProjectAccess, canViewProjectSchedule } from '@/lib/project-permissions'
 import { listWbsTemplatesForLibrary } from '@/app/actions/wbs'
 import { BudgetVersionStatusDropdown } from '@/components/budget/budget-version-status-dropdown'
 import { BudgetVersionTabsDynamic } from '@/components/budget/budget-version-tabs-dynamic'
@@ -68,6 +69,14 @@ async function BudgetVersionContent({ params }: PageProps) {
   const org = await getOrgContext(userId)
   if (!org) redirect({ href: '/login', locale: locale ?? 'es' })
   const { orgId, role } = org as NonNullable<typeof org>
+
+  let showScheduleTab = true
+  try {
+    const { projectRole } = await assertProjectAccess(projectId, org)
+    showScheduleTab = canViewProjectSchedule(projectRole)
+  } catch {
+    notFound()
+  }
 
   const versionRaw = await prisma.budgetVersion.findFirst({
     where: {
@@ -344,7 +353,7 @@ async function BudgetVersionContent({ params }: PageProps) {
         )}
       </div>
 
-      <ProjectTabsWrapper projectId={projectId} />
+      <ProjectTabsWrapper projectId={projectId} showScheduleTab={showScheduleTab} />
 
       <BudgetVersionTabsDynamic
         treeData={treeData}

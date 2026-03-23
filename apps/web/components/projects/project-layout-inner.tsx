@@ -11,6 +11,7 @@ import { Pencil } from 'lucide-react'
 type ProjectLayoutInnerProps = {
   project: { id: string; name: string; projectNumber: string; status: string }
   canEdit: boolean
+  showScheduleTab?: boolean
   children: React.ReactNode
 }
 
@@ -20,7 +21,12 @@ type ProjectLayoutInnerProps = {
  * and the project tabs are rendered inside the page below "Creado por...".
  * On other project pages we show the project header + tabs + children.
  */
-export function ProjectLayoutInner({ project, canEdit, children }: ProjectLayoutInnerProps) {
+export function ProjectLayoutInner({
+  project,
+  canEdit,
+  showScheduleTab = true,
+  children,
+}: ProjectLayoutInnerProps) {
   const pathname = usePathname() ?? ''
   const isBudgetVersionPage = /\/projects\/[^/]+\/budget\/[^/]+/.test(pathname)
   const isDocumentsPage = /\/projects\/[^/]+\/documents/.test(pathname)
@@ -51,7 +57,7 @@ export function ProjectLayoutInner({ project, canEdit, children }: ProjectLayout
           )}
         </div>
       </div>
-      <ProjectTabsWrapper projectId={project.id} />
+      <ProjectTabsWrapper projectId={project.id} showScheduleTab={showScheduleTab} />
       {children}
     </>
   )

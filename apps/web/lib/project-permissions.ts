@@ -89,6 +89,14 @@ export function canAccessProjectArea(
   return perms?.includes('view') ?? false
 }
 
+/**
+ * Ver cronograma del proyecto: coincide con el sidebar (rol null = sin membresía explícita → acceso completo).
+ */
+export function canViewProjectSchedule(projectRole: string | null | undefined): boolean {
+  if (projectRole == null) return true
+  return canAccessProjectArea(projectRole, PROJECT_AREAS.SCHEDULE)
+}
+
 /** Check if project role can edit in this area (for buttons and mutations) */
 export function canEditProjectArea(
   projectRole: string | null | undefined,

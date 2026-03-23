@@ -2,6 +2,7 @@
 
 import type { RefObject } from 'react'
 import { cn } from '@/lib/utils'
+import type { WorkingDayOptions } from '@/lib/schedule/working-days'
 import { GanttDataTable } from './gantt-data-table'
 import { GanttTimelineDynamic } from './gantt-timeline-dynamic'
 import { ScheduleCalendarView } from './schedule-calendar-view'
@@ -10,6 +11,7 @@ export interface GanttDataTableTask {
   id: string
   code: string
   name: string
+  assignedTo?: string | null
   taskType: 'TASK' | 'SUMMARY' | 'MILESTONE'
   startDate: Date
   endDate: Date
@@ -24,6 +26,7 @@ export interface GanttDataTableTask {
 
 export interface GanttTask {
   id: string
+  wbsNodeId: string
   name: string
   startDate: Date
   endDate: Date
@@ -52,6 +55,8 @@ export interface ScheduleGanttBlockProps {
   onHighlightTask: (taskId: string | null) => void
   searchQuery?: string
   workingDaysPerWeek: number
+  /** Feriados / excepciones al calendario laborable del cronograma. */
+  calendarOptions?: WorkingDayOptions
   groupBy: 'none' | 'phase' | 'assigned'
   visibleStartDate: Date
   visibleEndDate: Date
@@ -68,6 +73,11 @@ export interface ScheduleGanttBlockProps {
   scrollContainerRef?: RefObject<HTMLDivElement | null>
   showWbsDetailColumns?: boolean
   wbsMinimalStrip?: boolean
+  showBaseline?: boolean
+  baselinePlanByWbsNodeId?: Record<
+    string,
+    { plannedStartDate: string; plannedEndDate: string }
+  > | null
 }
 
 export function ScheduleGanttBlock({
@@ -84,6 +94,7 @@ export function ScheduleGanttBlock({
   onHighlightTask,
   searchQuery = '',
   workingDaysPerWeek,
+  calendarOptions,
   groupBy,
   visibleStartDate,
   visibleEndDate,
@@ -100,12 +111,15 @@ export function ScheduleGanttBlock({
   scrollContainerRef,
   showWbsDetailColumns = true,
   wbsMinimalStrip = false,
+  showBaseline = false,
+  baselinePlanByWbsNodeId = null,
 }: ScheduleGanttBlockProps) {
+  /* Anchos alineados con columnas fijas de GanttDataTable (code+task+detail cols = 520px). */
   const wbsMinClass = wbsMinimalStrip
     ? 'w-[72px] min-w-[72px] max-w-[72px]'
     : showWbsDetailColumns
-      ? 'min-w-[420px]'
-      : 'min-w-[260px]'
+      ? 'w-[520px] min-w-[520px] max-w-[520px]'
+      : 'w-[260px] min-w-[260px] max-w-[260px]'
 
   return (
     <div
@@ -125,9 +139,11 @@ export function ScheduleGanttBlock({
           highlightedTask={highlightedTask}
           searchQuery={searchQuery}
           workingDaysPerWeek={workingDaysPerWeek}
+          calendarOptions={calendarOptions}
           groupBy={groupBy}
           showDetailColumns={showWbsDetailColumns}
           minimalWbsOnly={wbsMinimalStrip}
+          showFooter={false}
         />
       </div>
       <div className="min-h-0 min-w-0 flex-1">
@@ -160,7 +176,10 @@ export function ScheduleGanttBlock({
             showDependencies={showDependencies}
             showTodayLine={showTodayLine}
             showProgress={showProgress}
+            showBaseline={showBaseline}
+            baselinePlanByWbsNodeId={baselinePlanByWbsNodeId}
             workingDaysPerWeek={workingDaysPerWeek}
+            calendarOptions={calendarOptions}
             onTaskClick={onTaskClick}
             onTaskDragEnd={onTaskDragEnd}
             highlightedTask={highlightedTask}

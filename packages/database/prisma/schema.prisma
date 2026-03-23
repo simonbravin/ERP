@@ -2051,6 +2051,9 @@ model Schedule {
   workingDaysPerWeek   Int       @default(6) @map("working_days_per_week")
   hoursPerDay          Int       @default(8) @map("hours_per_day")
 
+  /// Feriados / días no laborables (strings `YYYY-MM-DD`, calendario local del cliente al guardar).
+  nonWorkingDates      Json?     @map("non_working_dates")
+
   isBaseline           Boolean   @default(false) @map("is_baseline")
   baselineDate         DateTime? @map("baseline_date")
 

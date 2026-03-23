@@ -18,6 +18,7 @@ import {
   Download,
   Eye,
   Filter,
+  FileSpreadsheet,
 } from 'lucide-react'
 
 interface GanttControlPanelProps {
@@ -25,6 +26,7 @@ interface GanttControlPanelProps {
   onShowCriticalPathChange: (show: boolean) => void
   showBaseline: boolean
   onShowBaselineChange: (show: boolean) => void
+  baselineOverlayAvailable: boolean
   showProgress: boolean
   onShowProgressChange: (show: boolean) => void
   showDependencies: boolean
@@ -34,6 +36,10 @@ interface GanttControlPanelProps {
   weekStartsOn?: 0 | 1
   onWeekStartsOnChange?: (value: 0 | 1) => void
   onExportPDF: () => void
+  onExportPDFView: () => void
+  exportingPDFView?: boolean
+  onExportExcel: () => void
+  exportingExcel?: boolean
 }
 
 export function GanttControlPanel({
@@ -41,6 +47,7 @@ export function GanttControlPanel({
   onShowCriticalPathChange,
   showBaseline,
   onShowBaselineChange,
+  baselineOverlayAvailable,
   showProgress,
   onShowProgressChange,
   showDependencies,
@@ -50,6 +57,10 @@ export function GanttControlPanel({
   weekStartsOn = 1,
   onWeekStartsOnChange,
   onExportPDF,
+  onExportPDFView,
+  exportingPDFView = false,
+  onExportExcel,
+  exportingExcel = false,
 }: GanttControlPanelProps) {
   const t = useTranslations('schedule')
 
@@ -100,7 +111,12 @@ export function GanttControlPanel({
 
           <div className="space-y-3">
             <Label className="text-sm font-medium">{t('tracking')}</Label>
-            <div className="flex items-center justify-between" title={t('baselineComingSoon')}>
+            <div
+              className="flex items-center justify-between"
+              title={
+                baselineOverlayAvailable ? undefined : t('baselineUnavailableHint')
+              }
+            >
               <div className="flex items-center gap-2">
                 <Eye className="h-4 w-4 text-blue-600" />
                 <span className="text-sm">{t('baseline')}</span>
@@ -108,7 +124,7 @@ export function GanttControlPanel({
               <Switch
                 checked={showBaseline}
                 onCheckedChange={onShowBaselineChange}
-                disabled
+                disabled={!baselineOverlayAvailable}
               />
             </div>
             <div className="flex items-center justify-between">
@@ -145,7 +161,7 @@ export function GanttControlPanel({
                 <SelectContent>
                   <SelectItem value="none">{t('noGrouping')}</SelectItem>
                   <SelectItem value="phase">{t('groupByPhase')}</SelectItem>
-                  <SelectItem value="assigned" disabled title={t('groupByAssignedComingSoon')}>
+                  <SelectItem value="assigned">
                     {t('groupByAssigned')}
                   </SelectItem>
                 </SelectContent>
@@ -158,6 +174,26 @@ export function GanttControlPanel({
               >
                 <Download className="mr-2 h-4 w-4" />
                 {t('exportPDF')}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onExportPDFView}
+                disabled={exportingPDFView}
+                className="w-full"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                {exportingPDFView ? t('exporting') : t('exportPDFView')}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onExportExcel}
+                disabled={exportingExcel}
+                className="w-full"
+              >
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                {exportingExcel ? t('exportingExcel') : t('exportExcel')}
               </Button>
             </div>
           </div>

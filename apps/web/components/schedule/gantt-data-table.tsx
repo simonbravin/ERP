@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { addWorkingDays } from '@/lib/schedule/working-days'
+import { addWorkingDays, type WorkingDayOptions } from '@/lib/schedule/working-days'
 import {
   Table,
   TableBody,
@@ -29,6 +29,7 @@ interface GanttDataTableTask {
   id: string
   code: string
   name: string
+  assignedTo?: string | null
   taskType: 'TASK' | 'SUMMARY' | 'MILESTONE'
   startDate: Date
   endDate: Date
@@ -53,9 +54,12 @@ interface GanttDataTableProps {
   highlightedTask: string | null
   searchQuery?: string
   workingDaysPerWeek?: number
+  calendarOptions?: WorkingDayOptions
   groupBy?: 'none' | 'phase' | 'assigned'
   showDetailColumns?: boolean
   minimalWbsOnly?: boolean
+  /** Falso en vista Gantt embebida: el pie extra desalineaba filas respecto al lienzo. */
+  showFooter?: boolean
 }
 
 export function GanttDataTable({
@@ -70,9 +74,11 @@ export function GanttDataTable({
   highlightedTask,
   searchQuery: _searchQuery = '',
   workingDaysPerWeek = 5,
+  calendarOptions,
   groupBy: _groupBy = 'none',
   showDetailColumns = true,
   minimalWbsOnly = false,
+  showFooter = true,
 }: GanttDataTableProps) {
   const allTasks = allTasksProp ?? tasks
   const t = useTranslations('schedule')
@@ -86,7 +92,15 @@ export function GanttDataTable({
   return (
     <div className="flex h-full flex-col bg-card">
       <div className="shrink-0 overflow-visible">
-        <Table>
+        <Table
+          className={
+            minimalWbsOnly
+              ? 'table-fixed w-full'
+              : showDetailColumns
+                ? 'table-fixed w-[520px]'
+                : 'table-fixed w-[260px]'
+          }
+        >
           <TableHeader className="sticky top-0 z-10 bg-muted [&_tr]:border-0">
             <TableRow
               style={{ height: GANTT_HEADER_HEIGHT }}
@@ -108,7 +122,11 @@ export function GanttDataTable({
                     {t('code')}
                   </TableHead>
                   <TableHead
-                    className="min-w-[140px] px-1 text-[10px] text-muted-foreground"
+                    className={
+                      showDetailColumns
+                        ? 'w-[140px] px-1 text-[10px] text-muted-foreground'
+                        : 'w-[188px] px-1 text-[10px] text-muted-foreground'
+                    }
                     style={{ height: GANTT_HEADER_HEIGHT }}
                   >
                     {t('task')}
@@ -271,7 +289,8 @@ export function GanttDataTable({
                                   const end = addWorkingDays(
                                     start,
                                     task.duration,
-                                    workingDaysPerWeek
+                                    workingDaysPerWeek,
+                                    calendarOptions
                                   )
                                   onTaskDatesChange(task.id, start, end)
                                   setEditingCell(null)
@@ -292,7 +311,7 @@ export function GanttDataTable({
                                   setEditingCell({ taskId: task.id, field: 'start' })
                                 }
                               >
-                                {format(task.startDate, 'dd/MM/yy')}
+                                {format(task.startDate, 'dd/MM/yyyy')}
                               </span>
                             )}
                           </TableCell>
@@ -324,7 +343,7 @@ export function GanttDataTable({
                                   setEditingCell({ taskId: task.id, field: 'end' })
                                 }
                               >
-                                {format(task.endDate, 'dd/MM/yy')}
+                                {format(task.endDate, 'dd/MM/yyyy')}
                               </span>
                             )}
                           </TableCell>
@@ -338,7 +357,12 @@ export function GanttDataTable({
                                 onBlur={(e) => {
                                   const dur = Math.max(1, parseInt(e.target.value, 10) || 1)
                                   const start = new Date(task.startDate)
-                                  const end = addWorkingDays(start, dur, workingDaysPerWeek)
+                                  const end = addWorkingDays(
+                                    start,
+                                    dur,
+                                    workingDaysPerWeek,
+                                    calendarOptions
+                                  )
                                   onTaskDatesChange(task.id, start, end)
                                   setEditingCell(null)
                                 }}
@@ -387,7 +411,6 @@ export function GanttDataTable({
                               variant="ghost"
                               size="sm"
                               onClick={() => onDependenciesClick(task.id)}
-                              disabled={!canEdit}
                               className="h-6 w-6 p-0"
                               title={
                                 task.predecessorCount + task.successorCount > 0
@@ -424,7 +447,7 @@ export function GanttDataTable({
         </Table>
       </div>
 
-      {!minimalWbsOnly ? (
+      {showFooter && !minimalWbsOnly ? (
         <div className="border-t border-border bg-muted px-2 py-1">
           <div className="flex items-center justify-between text-[10px] text-muted-foreground">
             <span>

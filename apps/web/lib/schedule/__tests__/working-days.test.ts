@@ -35,6 +35,13 @@ describe('working-days', () => {
       expect(isWorkingDay(sat, sixDays)).toBe(true)
       expect(isWorkingDay(sun, sixDays)).toBe(false)
     })
+
+    it('respects explicit non-working exception dates', () => {
+      const mon = new Date(2025, 0, 6)
+      expect(
+        isWorkingDay(mon, sevenDays, { nonWorkingDates: ['2025-01-06'] })
+      ).toBe(false)
+    })
   })
 
   describe('addWorkingDays', () => {
@@ -63,6 +70,14 @@ describe('working-days', () => {
       expect(r.getDate()).toBe(10)
       expect(r.getDay()).toBe(5) // Friday
     })
+
+    it('skips custom non-working days when adding', () => {
+      const mon = new Date(2025, 0, 6)
+      const r = addWorkingDays(mon, 2, sevenDays, {
+        nonWorkingDates: ['2025-01-07'],
+      })
+      expect(r.getDate()).toBe(9)
+    })
   })
 
   describe('countWorkingDays', () => {
@@ -88,6 +103,15 @@ describe('working-days', () => {
       const fri = new Date(2025, 0, 10)
       expect(countWorkingDays(fri, mon, fiveDays)).toBe(-5)
     })
+
+    it('excludes custom non-working days from count', () => {
+      const mon = new Date(2025, 0, 6)
+      const fri = new Date(2025, 0, 10)
+      const count = countWorkingDays(mon, fri, fiveDays, {
+        nonWorkingDates: ['2025-01-08'],
+      })
+      expect(count).toBe(4)
+    })
   })
 
   describe('getNextWorkingDay', () => {
@@ -97,6 +121,14 @@ describe('working-days', () => {
       expect(next.getDay()).toBe(1)
       expect(next.getDate()).toBe(13)
     })
+
+    it('skips explicit non-working date', () => {
+      const mon = new Date(2025, 0, 6)
+      const next = getNextWorkingDay(mon, sevenDays, {
+        nonWorkingDates: ['2025-01-07'],
+      })
+      expect(next.getDate()).toBe(8)
+    })
   })
 
   describe('getPreviousWorkingDay', () => {
@@ -105,6 +137,14 @@ describe('working-days', () => {
       const prev = getPreviousWorkingDay(mon, fiveDays)
       expect(prev.getDay()).toBe(5)
       expect(prev.getDate()).toBe(10)
+    })
+
+    it('skips explicit non-working date backwards', () => {
+      const thu = new Date(2025, 0, 9)
+      const prev = getPreviousWorkingDay(thu, sevenDays, {
+        nonWorkingDates: ['2025-01-08'],
+      })
+      expect(prev.getDate()).toBe(7)
     })
   })
 })

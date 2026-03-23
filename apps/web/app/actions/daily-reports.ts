@@ -560,6 +560,8 @@ export async function approveDailyReport(reportId: string, _adminNotes?: string)
   await updateBudgetLineActuals(reportId)
   await generateAlertsForReport(reportId)
 
+  revalidatePath(`/projects/${existing.projectId}/schedule`)
+
   await auditDailyReport({
     orgId: org.orgId,
     projectId: existing.projectId,

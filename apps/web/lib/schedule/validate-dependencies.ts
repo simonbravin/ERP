@@ -1,4 +1,4 @@
-import { addWorkingDays } from './working-days'
+import { addWorkingDays, type WorkingDayOptions } from './working-days'
 
 type DepType = 'FS' | 'SS' | 'FF' | 'SF'
 
@@ -36,14 +36,15 @@ export function validateTaskDatesAgainstDependencies(
   newEnd: Date,
   predecessors: PredecessorDep[],
   successors: SuccessorDep[],
-  workingDaysPerWeek: number
+  workingDaysPerWeek: number,
+  calendarOptions?: WorkingDayOptions
 ): { valid: true } | { valid: false; message: string } {
   for (const p of predecessors) {
     const pStart = new Date(p.plannedStartDate)
     const pEnd = new Date(p.plannedEndDate)
     const lag = p.lagDays
     const refDate = p.dependencyType === 'FS' || p.dependencyType === 'FF' ? pEnd : pStart
-    const minDate = addWorkingDays(refDate, lag, workingDaysPerWeek)
+    const minDate = addWorkingDays(refDate, lag, workingDaysPerWeek, calendarOptions)
 
     if (p.dependencyType === 'FS' || p.dependencyType === 'SS') {
       if (toDayStart(newStart) < toDayStart(minDate)) {
@@ -71,7 +72,8 @@ export function validateTaskDatesAgainstDependencies(
     const minDate = addWorkingDays(
       refDate,
       lag,
-      workingDaysPerWeek
+      workingDaysPerWeek,
+      calendarOptions
     )
 
     if (s.dependencyType === 'FS' || s.dependencyType === 'SS') {

@@ -6,18 +6,10 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Calendar } from 'lucide-react'
-import { format, addDays, startOfDay } from 'date-fns'
-import { es } from 'date-fns/locale'
-
-/** Parse yyyy-MM-dd as local calendar day (avoids UTC shift from `new Date('yyyy-MM-dd')`). */
-function parseLocalDateInput(ymd: string): Date {
-  const parts = ymd.split('-').map((x) => parseInt(x, 10))
-  const y = parts[0]
-  const m = parts[1]
-  const d = parts[2]
-  if (!y || !m || !d) return startOfDay(new Date())
-  return startOfDay(new Date(y, m - 1, d))
-}
+import { useLocale } from 'next-intl'
+import { format, addDays } from 'date-fns'
+import { enUS, es } from 'date-fns/locale'
+import { parseLocalYmd } from '@/lib/parse-local-ymd'
 
 interface DateRangeSliderProps {
   projectStartDate: Date
@@ -35,6 +27,8 @@ export function DateRangeSlider({
   onRangeChange,
 }: DateRangeSliderProps) {
   const t = useTranslations('schedule')
+  const intlLocale = useLocale()
+  const dateLocale = intlLocale.startsWith('en') ? enUS : es
 
   const [rangeStart, setRangeStart] = useState(
     format(currentStartDate, 'yyyy-MM-dd')
@@ -64,7 +58,7 @@ export function DateRangeSlider({
     const newDays = Math.max(5, Math.min(365, days))
     setDaysToShow(newDays)
 
-    const start = new Date(rangeStart)
+    const start = parseLocalYmd(rangeStart)
     const end = addDays(start, newDays)
 
     setRangeEnd(format(end, 'yyyy-MM-dd'))
@@ -74,7 +68,7 @@ export function DateRangeSlider({
   function handleStartChange(newStart: string) {
     setRangeStart(newStart)
 
-    const start = new Date(newStart)
+    const start = parseLocalYmd(newStart)
     const end = addDays(start, daysToShow)
 
     setRangeEnd(format(end, 'yyyy-MM-dd'))
@@ -84,8 +78,8 @@ export function DateRangeSlider({
   function handleEndChange(newEnd: string) {
     setRangeEnd(newEnd)
 
-    const start = new Date(rangeStart)
-    const end = new Date(newEnd)
+    const start = parseLocalYmd(rangeStart)
+    const end = parseLocalYmd(newEnd)
     const days = Math.ceil(
       (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)
     )
@@ -168,8 +162,8 @@ export function DateRangeSlider({
 
       <p className="text-[10px] text-slate-500">
         {t('showingDaysInfo', {
-          start: format(parseLocalDateInput(rangeStart), 'dd MMM', { locale: es }),
-          end: format(parseLocalDateInput(rangeEnd), 'dd MMM', { locale: es }),
+          start: format(parseLocalYmd(rangeStart), 'dd/MM/yyyy', { locale: dateLocale }),
+          end: format(parseLocalYmd(rangeEnd), 'dd/MM/yyyy', { locale: dateLocale }),
         })}
       </p>
     </div>

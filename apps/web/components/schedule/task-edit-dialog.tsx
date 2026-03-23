@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useTransition } from 'react'
-import { useTranslations } from 'next-intl'
+import { useState, useEffect, useTransition, useMemo } from 'react'
+import { useLocale, useTranslations } from 'next-intl'
 import { useRouter } from '@/i18n/navigation'
 import {
   Dialog,
@@ -15,13 +15,26 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { toast } from 'sonner'
 import { updateTaskDates, updateTaskProgress } from '@/app/actions/schedule'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Loader2, Calendar, Clock, GitBranch } from 'lucide-react'
 import { format } from 'date-fns'
-import { es } from 'date-fns/locale'
-import { addWorkingDays, countWorkingDays } from '@/lib/schedule/working-days'
+import { enUS, es } from 'date-fns/locale'
+import {
+  addWorkingDays,
+  countWorkingDays,
+  type WorkingDayOptions,
+} from '@/lib/schedule/working-days'
+import { parseLocalYmd } from '@/lib/parse-local-ymd'
+import type { ScheduleAssignmentOption } from './schedule-view'
 
 interface TaskEditDialogProps {
   open: boolean
@@ -36,9 +49,13 @@ interface TaskEditDialogProps {
     duration: number
     progress: number
     notes?: string | null
+    assignedTo?: string | null
   }
   workingDaysPerWeek: number
+  calendarOptions?: WorkingDayOptions
   canEdit: boolean
+  /** Estado del cronograma (p. ej. DRAFT). El avance y el resto de ediciones solo aplican en DRAFT. */
+  scheduleStatus: string
   dependencies?: Array<{
     id: string
     predecessorName: string
@@ -46,6 +63,8 @@ interface TaskEditDialogProps {
     type: string
   }>
   onOpenDependencies?: () => void
+  /** Miembros del proyecto; el valor elegido se guarda en `assigned_to` (texto). */
+  assignmentOptions?: ScheduleAssignmentOption[]
 }
 
 export function TaskEditDialog({
@@ -53,19 +72,27 @@ export function TaskEditDialog({
   onOpenChange,
   task,
   workingDaysPerWeek,
+  calendarOptions,
   canEdit,
+  scheduleStatus,
   dependencies = [],
   onOpenDependencies,
+  assignmentOptions = [],
 }: TaskEditDialogProps) {
   const t = useTranslations('schedule')
+  const intlLocale = useLocale()
+  const dateLocale = intlLocale.startsWith('en') ? enUS : es
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
+
+  const mayEdit = canEdit && scheduleStatus === 'DRAFT'
 
   const [startDate, setStartDate] = useState(format(task.startDate, 'yyyy-MM-dd'))
   const [endDate, setEndDate] = useState(format(task.endDate, 'yyyy-MM-dd'))
   const [duration, setDuration] = useState(task.duration)
   const [progress, setProgress] = useState(task.progress)
   const [notes, setNotes] = useState(task.notes || '')
+  const [assignedTo, setAssignedTo] = useState(task.assignedTo || '')
 
   useEffect(() => {
     setStartDate(format(task.startDate, 'yyyy-MM-dd'))
@@ -73,34 +100,52 @@ export function TaskEditDialog({
     setDuration(task.duration)
     setProgress(task.progress)
     setNotes(task.notes || '')
-  }, [task.id, task.startDate, task.endDate, task.duration, task.progress, task.notes])
+    setAssignedTo(task.assignedTo || '')
+  }, [
+    task.id,
+    task.startDate,
+    task.endDate,
+    task.duration,
+    task.progress,
+    task.notes,
+    task.assignedTo,
+  ])
+
+  const assigneeSelectValue = useMemo(() => {
+    const trimmed = assignedTo.trim()
+    if (!trimmed) return '_none'
+    if (assignmentOptions.some((o) => o.value === trimmed)) return trimmed
+    return '_custom'
+  }, [assignedTo, assignmentOptions])
 
   function handleStartDateChange(newStart: string) {
     setStartDate(newStart)
-    const start = new Date(newStart)
-    const end = addWorkingDays(start, duration, workingDaysPerWeek)
+    const start = parseLocalYmd(newStart)
+    const end = addWorkingDays(start, duration, workingDaysPerWeek, calendarOptions)
     setEndDate(format(end, 'yyyy-MM-dd'))
   }
 
   function handleEndDateChange(newEnd: string) {
     setEndDate(newEnd)
-    const start = new Date(startDate)
-    const end = new Date(newEnd)
-    const newDuration = countWorkingDays(start, end, workingDaysPerWeek)
+    const start = parseLocalYmd(startDate)
+    const end = parseLocalYmd(newEnd)
+    const newDuration = countWorkingDays(start, end, workingDaysPerWeek, calendarOptions)
     setDuration(Math.max(1, newDuration))
   }
 
   function handleDurationChange(newDuration: number) {
     const durValue = Math.max(1, newDuration)
     setDuration(durValue)
-    const start = new Date(startDate)
-    const end = addWorkingDays(start, durValue, workingDaysPerWeek)
+    const start = parseLocalYmd(startDate)
+    const end = addWorkingDays(start, durValue, workingDaysPerWeek, calendarOptions)
     setEndDate(format(end, 'yyyy-MM-dd'))
   }
 
   function handleSave() {
-    if (!canEdit) {
-      toast.error(t('cannotEditTask'))
+    if (!mayEdit) {
+      toast.error(
+        scheduleStatus !== 'DRAFT' ? t('editOnlyInDraft') : t('cannotEditTask')
+      )
       return
     }
 
@@ -112,10 +157,11 @@ export function TaskEditDialog({
     startTransition(async () => {
       try {
         const dateResult = await updateTaskDates(task.id, {
-          plannedStartDate: new Date(startDate),
-          plannedEndDate: new Date(endDate),
+          plannedStartDate: parseLocalYmd(startDate),
+          plannedEndDate: parseLocalYmd(endDate),
           plannedDuration: duration,
           notes: notes || null,
+          assignedTo: assignedTo.trim() || null,
         })
 
         if (!dateResult.success) {
@@ -153,9 +199,13 @@ export function TaskEditDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {!canEdit && (
+        {!mayEdit && (
           <Alert variant="default" className="border-amber-200 bg-amber-50 text-amber-900">
-            <AlertDescription>{t('cannotEditTask')}</AlertDescription>
+            <AlertDescription>
+              {scheduleStatus !== 'DRAFT'
+                ? t('editOnlyInDraft')
+                : t('cannotEditTask')}
+            </AlertDescription>
           </Alert>
         )}
 
@@ -176,7 +226,7 @@ export function TaskEditDialog({
                   type="date"
                   value={startDate}
                   onChange={(e) => handleStartDateChange(e.target.value)}
-                  disabled={!canEdit || isSummary || isPending}
+                  disabled={!mayEdit || isSummary || isPending}
                   className="pl-10"
                 />
               </div>
@@ -191,7 +241,7 @@ export function TaskEditDialog({
                   type="date"
                   value={endDate}
                   onChange={(e) => handleEndDateChange(e.target.value)}
-                  disabled={!canEdit || isSummary || isPending}
+                  disabled={!mayEdit || isSummary || isPending}
                   className="pl-10"
                 />
               </div>
@@ -213,7 +263,7 @@ export function TaskEditDialog({
                   onChange={(e) =>
                     handleDurationChange(parseInt(e.target.value, 10) || 1)
                   }
-                  disabled={!canEdit || isSummary || isPending}
+                  disabled={!mayEdit || isSummary || isPending}
                   className="pl-10"
                 />
               </div>
@@ -233,7 +283,7 @@ export function TaskEditDialog({
                       Math.min(100, Math.max(0, parseInt(e.target.value, 10) || 0))
                     )
                   }
-                  disabled={!canEdit || isPending}
+                  disabled={!mayEdit || isPending}
                 />
                 <input
                   type="range"
@@ -241,11 +291,50 @@ export function TaskEditDialog({
                   max={100}
                   value={progress}
                   onChange={(e) => setProgress(parseInt(e.target.value, 10))}
-                  disabled={!canEdit || isPending}
+                  disabled={!mayEdit || isPending}
                   className="w-full"
                 />
               </div>
             </div>
+          </div>
+
+          <div>
+            <Label htmlFor="assignedTo">{t('taskAssignedTo')}</Label>
+            {assignmentOptions.length > 0 && (
+              <Select
+                value={assigneeSelectValue}
+                onValueChange={(v) => {
+                  if (v === '_none') setAssignedTo('')
+                  else if (v === '_custom') {
+                    /* keep current text for free edit */
+                  } else setAssignedTo(v)
+                }}
+                disabled={!mayEdit || isSummary || isPending}
+              >
+                <SelectTrigger id="assignee-pick" className="mt-1 h-9">
+                  <SelectValue placeholder={t('taskAssignPickFromTeam')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_none">{t('taskAssignNone')}</SelectItem>
+                  {assignmentOptions.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="_custom">{t('taskAssignCustom')}</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+            <Input
+              id="assignedTo"
+              value={assignedTo}
+              onChange={(e) => setAssignedTo(e.target.value)}
+              placeholder={t('taskAssignedToPlaceholder')}
+              disabled={!mayEdit || isSummary || isPending}
+              className="mt-1"
+              maxLength={500}
+            />
+            <p className="mt-1 text-xs text-muted-foreground">{t('taskAssignedToHint')}</p>
           </div>
 
           <div>
@@ -255,7 +344,7 @@ export function TaskEditDialog({
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder={t('notesPlaceholder')}
-              disabled={!canEdit || isPending}
+              disabled={!mayEdit || isPending}
               rows={3}
               className="mt-1"
             />
@@ -268,11 +357,9 @@ export function TaskEditDialog({
                   {t('calculatedStart')}:
                 </span>
                 <p className="text-foreground">
-                  {format(
-                    new Date(startDate),
-                    "EEEE, dd 'de' MMMM yyyy",
-                    { locale: es }
-                  )}
+                  {format(parseLocalYmd(startDate), 'EEEE dd/MM/yyyy', {
+                    locale: dateLocale,
+                  })}
                 </p>
               </div>
               <div>
@@ -280,11 +367,9 @@ export function TaskEditDialog({
                   {t('calculatedEnd')}:
                 </span>
                 <p className="text-foreground">
-                  {format(
-                    new Date(endDate),
-                    "EEEE, dd 'de' MMMM yyyy",
-                    { locale: es }
-                  )}
+                  {format(parseLocalYmd(endDate), 'EEEE dd/MM/yyyy', {
+                    locale: dateLocale,
+                  })}
                 </p>
               </div>
             </div>
@@ -305,7 +390,7 @@ export function TaskEditDialog({
                     onOpenDependencies()
                     onOpenChange(false)
                   }}
-                  disabled={!canEdit}
+                  disabled={!mayEdit}
                 >
                   {t('manageDependencies')}
                 </Button>
@@ -340,7 +425,7 @@ export function TaskEditDialog({
           </Button>
           <Button
             onClick={handleSave}
-            disabled={isPending || !canEdit || isSummary}
+            disabled={isPending || !mayEdit || isSummary}
           >
             {isPending ? (
               <>

@@ -6,6 +6,12 @@ import { prisma } from '@repo/database'
 import { exportToExcel } from '@/lib/export/excel-exporter'
 import type { ExcelConfig } from '@/lib/types/export'
 import { getProject } from '@/app/actions/projects'
+import { getScheduleForView } from '@/app/actions/schedule'
+import {
+  buildMsProjectXml,
+  type MsProjectExportDep,
+  type MsProjectExportTask,
+} from '@/lib/schedule/ms-project-xml'
 
 type OrgData = {
   name: string
@@ -1101,5 +1107,304 @@ export async function exportCertificationsToExcel(
   } catch (error) {
     console.error('Error exporting certifications:', error)
     return { success: false, error: 'Error al exportar certificaciones' }
+  }
+}
+
+// ==================== Cronograma (schedule) ====================
+
+type ScheduleExcelLocale = 'es' | 'en'
+
+const SCHEDULE_EXCEL_LABELS: Record<
+  ScheduleExcelLocale,
+  {
+    title: string
+    sheet: string
+    status: Record<string, string>
+    colCode: string
+    colName: string
+    colType: string
+    colStart: string
+    colEnd: string
+    colDuration: string
+    colProgress: string
+    colCritical: string
+    colAssignedTo: string
+    colPredecessors: string
+    typeTask: string
+    typeSummary: string
+    typeMilestone: string
+    yes: string
+    no: string
+    notFound: string
+    exportError: string
+  }
+> = {
+  es: {
+    title: 'CRONOGRAMA',
+    sheet: 'Cronograma',
+    status: {
+      DRAFT: 'Borrador',
+      BASELINE: 'Línea base',
+      APPROVED: 'Aprobado',
+    },
+    colCode: 'Código WBS',
+    colName: 'Tarea',
+    colType: 'Tipo',
+    colStart: 'Inicio planificado',
+    colEnd: 'Fin planificado',
+    colDuration: 'Duración (días laborables)',
+    colProgress: 'Avance (%)',
+    colCritical: 'Crítica',
+    colAssignedTo: 'Asignado a',
+    colPredecessors: 'Predecesoras',
+    typeTask: 'Tarea',
+    typeSummary: 'Resumen',
+    typeMilestone: 'Hito',
+    yes: 'Sí',
+    no: 'No',
+    notFound: 'Cronograma no encontrado',
+    exportError: 'Error al exportar el cronograma',
+  },
+  en: {
+    title: 'SCHEDULE',
+    sheet: 'Schedule',
+    status: {
+      DRAFT: 'Draft',
+      BASELINE: 'Baseline',
+      APPROVED: 'Approved',
+    },
+    colCode: 'WBS code',
+    colName: 'Task',
+    colType: 'Type',
+    colStart: 'Planned start',
+    colEnd: 'Planned end',
+    colDuration: 'Duration (working days)',
+    colProgress: 'Progress (%)',
+    colCritical: 'Critical',
+    colAssignedTo: 'Assigned to',
+    colPredecessors: 'Predecessors',
+    typeTask: 'Task',
+    typeSummary: 'Summary',
+    typeMilestone: 'Milestone',
+    yes: 'Yes',
+    no: 'No',
+    notFound: 'Schedule not found',
+    exportError: 'Error exporting schedule',
+  },
+}
+
+function scheduleExcelLocale(locale: string | undefined): ScheduleExcelLocale {
+  return locale?.toLowerCase().startsWith('en') ? 'en' : 'es'
+}
+
+function formatSchedulePredecessors(
+  predecessors:
+    | Array<{
+        dependencyType: string
+        lagDays: number
+        predecessor?: { wbsNode?: { code: string } }
+      }>
+    | undefined
+): string {
+  if (!predecessors?.length) return ''
+  return predecessors
+    .map((p) => {
+      const code = p.predecessor?.wbsNode?.code ?? ''
+      if (!code) return ''
+      if (p.lagDays === 0) return `${code} ${p.dependencyType}`
+      const sign = p.lagDays > 0 ? '+' : ''
+      return `${code} ${p.dependencyType}${sign}${p.lagDays}d`
+    })
+    .filter(Boolean)
+    .join('; ')
+}
+
+function scheduleTaskTypeLabel(
+  taskType: string,
+  labels: (typeof SCHEDULE_EXCEL_LABELS)['es']
+): string {
+  if (taskType === 'SUMMARY') return labels.typeSummary
+  if (taskType === 'MILESTONE') return labels.typeMilestone
+  return labels.typeTask
+}
+
+function safeScheduleExportFilenamePart(s: string): string {
+  return s.replace(/[^\w.-]+/g, '_').replace(/_+/g, '_').slice(0, 60)
+}
+
+/**
+ * Exporta todas las tareas del cronograma (mismo orden que la vista: código WBS ascendente).
+ */
+export async function exportScheduleToExcel(
+  scheduleId: string,
+  locale: string = 'es'
+) {
+  const session = await getSession()
+  if (!session?.user?.id) return { success: false, error: 'Unauthorized' }
+  const org = await getOrgContext(session.user.id)
+  if (!org?.orgId) return { success: false, error: 'Unauthorized' }
+
+  const lang = scheduleExcelLocale(locale)
+  const labels = SCHEDULE_EXCEL_LABELS[lang]
+  const orgData = await getOrganizationData(org.orgId)
+
+  try {
+    const schedule = await getScheduleForView(scheduleId)
+    if (!schedule) {
+      return { success: false, error: labels.notFound }
+    }
+
+    const dateLocale = lang === 'en' ? 'en-GB' : 'es-AR'
+    const fmtDate = (iso: string) =>
+      new Date(iso).toLocaleDateString(dateLocale, {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      })
+
+    const statusLabel =
+      labels.status[schedule.status] ?? String(schedule.status)
+
+    const columns: ExcelConfig['columns'] = [
+      { field: 'wbsCode', label: labels.colCode, type: 'text', width: 12 },
+      { field: 'name', label: labels.colName, type: 'text', width: 36 },
+      { field: 'taskType', label: labels.colType, type: 'text', width: 14 },
+      { field: 'plannedStart', label: labels.colStart, type: 'text', width: 14 },
+      { field: 'plannedEnd', label: labels.colEnd, type: 'text', width: 14 },
+      { field: 'duration', label: labels.colDuration, type: 'number', width: 12 },
+      { field: 'progress', label: labels.colProgress, type: 'number', width: 10 },
+      { field: 'critical', label: labels.colCritical, type: 'text', width: 10 },
+      { field: 'assignedTo', label: labels.colAssignedTo, type: 'text', width: 24 },
+      { field: 'predecessors', label: labels.colPredecessors, type: 'text', width: 40 },
+    ]
+
+    const tasks = schedule.tasks as Array<{
+      taskType: string
+      plannedStartDate: string
+      plannedEndDate: string
+      plannedDuration: number
+      progressPercent: number
+      isCritical: boolean
+      assignedTo?: string | null
+      predecessors?: Array<{
+        dependencyType: string
+        lagDays: number
+        predecessor?: { wbsNode?: { code: string } }
+      }>
+      wbsNode: { code: string; name: string }
+    }>
+
+    const data = tasks.map((task) => ({
+      wbsCode: task.wbsNode.code,
+      name: task.wbsNode.name,
+      taskType: scheduleTaskTypeLabel(task.taskType, labels),
+      plannedStart: fmtDate(task.plannedStartDate),
+      plannedEnd: fmtDate(task.plannedEndDate),
+      duration: task.plannedDuration,
+      progress: Number(task.progressPercent),
+      critical: task.isCritical ? labels.yes : labels.no,
+      assignedTo: task.assignedTo ?? '',
+      predecessors: formatSchedulePredecessors(task.predecessors),
+    }))
+
+    const config: ExcelConfig = {
+      title: labels.title,
+      subtitle: `${schedule.project.name} — ${schedule.name} (${statusLabel})`,
+      includeCompanyHeader: true,
+      project: {
+        name: schedule.project.name,
+        number: schedule.project.projectNumber,
+      },
+      metadata: {
+        date: new Date(),
+        generatedBy: orgData?.legalName ?? orgData?.name ?? 'Bloqer',
+        version: `${schedule.name} · ${statusLabel}`,
+      },
+      columns,
+      data,
+      sheetName: labels.sheet,
+      freezeHeader: true,
+      autoFilter: true,
+    }
+
+    const buffer = await exportToExcel(config)
+    const ymd = new Date().toISOString().split('T')[0]
+    const namePart = safeScheduleExportFilenamePart(schedule.name)
+    const numPart = safeScheduleExportFilenamePart(schedule.project.projectNumber)
+
+    return {
+      success: true,
+      data: buffer.toString('base64'),
+      filename: `cronograma_${numPart}_${namePart}_${ymd}.xlsx`,
+    }
+  } catch (error) {
+    console.error('Error exporting schedule:', error)
+    return { success: false, error: labels.exportError }
+  }
+}
+
+/**
+ * Exporta el cronograma como XML compatible con MS Project (MSPDI).
+ */
+export async function exportScheduleToMsProjectXml(scheduleId: string) {
+  const session = await getSession()
+  if (!session?.user?.id) return { success: false, error: 'Unauthorized' }
+  const org = await getOrgContext(session.user.id)
+  if (!org?.orgId) return { success: false, error: 'Unauthorized' }
+
+  try {
+    const schedule = await getScheduleForView(scheduleId)
+    if (!schedule) {
+      return { success: false, error: 'Cronograma no encontrado' }
+    }
+
+    type TaskRow = (typeof schedule.tasks)[number]
+    const tasks: MsProjectExportTask[] = (schedule.tasks as TaskRow[]).map((task) => ({
+      id: task.id,
+      wbsCode: task.wbsNode.code,
+      wbsName: task.wbsNode.name,
+      taskType: task.taskType,
+      plannedStartDate: new Date(task.plannedStartDate),
+      plannedEndDate: new Date(task.plannedEndDate),
+      plannedDuration: task.plannedDuration,
+      progressPercent: Number(task.progressPercent),
+    }))
+
+    const dependencies: MsProjectExportDep[] = []
+    for (const task of schedule.tasks as TaskRow[]) {
+      type Pred = { predecessorId: string; dependencyType: string; lagDays: number }
+      for (const p of (task.predecessors ?? []) as Pred[]) {
+        dependencies.push({
+          predecessorId: p.predecessorId,
+          successorId: task.id,
+          dependencyType: p.dependencyType,
+          lagDays: p.lagDays ?? 0,
+        })
+      }
+    }
+
+    const xml = buildMsProjectXml({
+      projectTitle: schedule.project.name,
+      scheduleTitle: schedule.name,
+      hoursPerDay: Number(schedule.hoursPerDay) || 8,
+      workingDaysPerWeek: schedule.workingDaysPerWeek,
+      projectStartDate: new Date(schedule.projectStartDate),
+      tasks,
+      dependencies,
+    })
+
+    const buffer = Buffer.from(xml, 'utf-8')
+    const ymd = new Date().toISOString().split('T')[0]
+    const namePart = safeScheduleExportFilenamePart(schedule.name)
+    const numPart = safeScheduleExportFilenamePart(schedule.project.projectNumber)
+
+    return {
+      success: true,
+      data: buffer.toString('base64'),
+      filename: `cronograma_${numPart}_${namePart}_${ymd}.xml`,
+    }
+  } catch (error) {
+    console.error('Error exporting schedule XML:', error)
+    return { success: false, error: 'Error al exportar XML' }
   }
 }

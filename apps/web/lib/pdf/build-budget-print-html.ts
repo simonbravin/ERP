@@ -3,8 +3,8 @@
  * fetching the print route (which can 500 when session context is lost in internal fetch).
  */
 
-import { getLegalIdDisplay } from '@/lib/print/legal-id'
 import { formatCurrency } from '@/lib/format-utils'
+import { buildPrintDocumentHeaderHtml } from '@/lib/pdf/build-print-document-header-html'
 
 function esc(s: string): string {
   return s
@@ -68,6 +68,8 @@ export type BudgetPrintOptions = {
   showEmitidoPor?: boolean
   showFullCompanyData?: boolean
   includeIncidenciaColumn?: boolean
+  /** Para fecha en cabecera (es-AR vs en-GB) */
+  locale?: string
 }
 
 export function buildBudgetPrintHtml(
@@ -75,46 +77,24 @@ export function buildBudgetPrintHtml(
   page: BudgetPrintPageData,
   options: BudgetPrintOptions = {}
 ): string {
-  const { showEmitidoPor = true, showFullCompanyData = true, includeIncidenciaColumn = false } = options
-  const displayName = (layout.orgLegalName || layout.orgName).trim() || '—'
-  const dateStr = new Date().toLocaleDateString('es-AR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  })
-  const legalId = getLegalIdDisplay({
-    taxId: layout.taxId ?? null,
-    country: layout.country ?? null,
-  })
-  const legalLine = legalId ? `${legalId.label}: ${legalId.value}` : null
-  const hasLegal = showFullCompanyData && [legalLine, layout.address, layout.email, layout.phone].some(
-    (v) => v != null && String(v).trim() !== ''
-  )
+  const {
+    showEmitidoPor = true,
+    showFullCompanyData = true,
+    includeIncidenciaColumn = false,
+    locale = 'es',
+  } = options
   const projectLine =
     layout.orgName && page.projectName
       ? page.projectName + (page.projectNumber ? ` (${page.projectNumber})` : '')
       : null
-  const folioLine = `Versión: ${esc(page.versionCode)}`
-  const issuedLine = showEmitidoPor && layout.userNameOrEmail != null && layout.userNameOrEmail.trim() !== ''
-    ? `Emitido por: ${esc(layout.userNameOrEmail.trim())}`
-    : null
 
-  const headerHtml = `
-<header style="padding:0.75rem 1rem;margin-bottom:1rem;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;background:#e2e8f0;">
-  <div style="display:flex;align-items:center;gap:0.75rem;min-width:0;max-width:65%;">
-    ${showFullCompanyData && layout.logoUrl ? `<img src="${esc(layout.logoUrl)}" alt="" style="height:2.5rem;width:auto;object-fit:contain;" />` : ''}
-    <div>
-      <h1 style="font-size:1rem;font-weight:700;margin:0;text-transform:uppercase;letter-spacing:0.02em;color:#0f172a;">${esc(displayName)}</h1>
-      ${hasLegal ? `<div style="font-size:0.6875rem;line-height:1.3;color:#64748b;margin-top:0.2rem;">${[legalLine, layout.address, layout.email, layout.phone].filter(Boolean).map((t) => `<span style="display:block;">${esc(String(t!))}</span>`).join('')}</div>` : ''}
-      ${projectLine ? `<p style="font-size:0.8125rem;color:#64748b;margin:0.25rem 0 0;">${esc(projectLine)}</p>` : ''}
-    </div>
-  </div>
-  <div style="display:flex;flex-direction:column;align-items:flex-end;font-size:0.75rem;color:#64748b;max-width:35%;">
-    <span>Fecha: ${esc(dateStr)}</span>
-    <span>${esc(folioLine)}</span>
-    ${issuedLine ? `<span>${esc(issuedLine)}</span>` : ''}
-  </div>
-</header>`
+  const headerHtml = buildPrintDocumentHeaderHtml(layout, {
+    showFullCompanyData,
+    showEmitidoPor,
+    projectLine,
+    folioLines: [`Versión: ${page.versionCode}`],
+    locale,
+  })
 
   const info = page.projectInfo
   const projectInfoRows: string[] = []

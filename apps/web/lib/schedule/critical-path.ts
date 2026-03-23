@@ -1,4 +1,4 @@
-import { addWorkingDays, countWorkingDays } from './working-days'
+import { addWorkingDays, countWorkingDays, type WorkingDayOptions } from './working-days'
 
 export interface TaskNode {
   id: string
@@ -55,7 +55,8 @@ function topologicalSort(tasks: TaskNode[]): TaskNode[] {
 export function calculateCriticalPath(
   tasks: TaskNode[],
   projectStartDate: Date,
-  workingDaysPerWeek: number = 6
+  workingDaysPerWeek: number = 6,
+  calendarOptions?: WorkingDayOptions
 ): CalculatedTask[] {
   const calculated = new Map<string, CalculatedTask>()
   const sorted = topologicalSort(tasks)
@@ -83,14 +84,16 @@ export function calculateCriticalPath(
             dependentDate = addWorkingDays(
               predCalc.earlyFinish,
               -task.duration,
-              workingDaysPerWeek
+              workingDaysPerWeek,
+              calendarOptions
             )
             break
           case 'SF':
             dependentDate = addWorkingDays(
               predCalc.earlyStart,
               -task.duration,
-              workingDaysPerWeek
+              workingDaysPerWeek,
+              calendarOptions
             )
             break
           default:
@@ -100,7 +103,8 @@ export function calculateCriticalPath(
         dependentDate = addWorkingDays(
           dependentDate,
           pred.lag,
-          workingDaysPerWeek
+          workingDaysPerWeek,
+          calendarOptions
         )
         if (dependentDate > maxFinish) maxFinish = dependentDate
       }
@@ -110,7 +114,8 @@ export function calculateCriticalPath(
     const earlyFinish = addWorkingDays(
       earlyStart,
       task.duration,
-      workingDaysPerWeek
+      workingDaysPerWeek,
+      calendarOptions
     )
 
     calculated.set(task.id, {
@@ -152,7 +157,8 @@ export function calculateCriticalPath(
             dependentDate = addWorkingDays(
               succCalc.lateStart,
               task.duration,
-              workingDaysPerWeek
+              workingDaysPerWeek,
+              calendarOptions
             )
             break
           case 'FF':
@@ -162,7 +168,8 @@ export function calculateCriticalPath(
             dependentDate = addWorkingDays(
               succCalc.lateFinish,
               task.duration,
-              workingDaysPerWeek
+              workingDaysPerWeek,
+              calendarOptions
             )
             break
           default:
@@ -172,7 +179,8 @@ export function calculateCriticalPath(
         dependentDate = addWorkingDays(
           dependentDate,
           -succ.lag,
-          workingDaysPerWeek
+          workingDaysPerWeek,
+          calendarOptions
         )
         if (dependentDate < minStart) minStart = dependentDate
       }
@@ -182,13 +190,15 @@ export function calculateCriticalPath(
     const lateStart = addWorkingDays(
       lateFinish,
       -task.duration,
-      workingDaysPerWeek
+      workingDaysPerWeek,
+      calendarOptions
     )
 
     const totalFloat = countWorkingDays(
       calc.earlyStart,
       lateStart,
-      workingDaysPerWeek
+      workingDaysPerWeek,
+      calendarOptions
     )
 
     let freeFloat = totalFloat
@@ -201,7 +211,8 @@ export function calculateCriticalPath(
       freeFloat = countWorkingDays(
         calc.earlyFinish,
         earliestSuccessorES,
-        workingDaysPerWeek
+        workingDaysPerWeek,
+        calendarOptions
       )
     }
 

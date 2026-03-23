@@ -15,6 +15,7 @@ build/
 *.tsbuildinfo
 
 # IDE and OS
+.cursor/
 .idea/
 .vscode/
 .claude/

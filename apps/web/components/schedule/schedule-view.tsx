@@ -1,5 +1,31 @@
 import { getScheduleForView } from '@/app/actions/schedule'
+import { getProjectMembers } from '@/app/actions/team'
 import { ScheduleViewClient } from './schedule-view-client'
+
+export type ScheduleAssignmentOption = { value: string; label: string }
+
+function buildScheduleAssignmentOptions(
+  members: Awaited<ReturnType<typeof getProjectMembers>>
+): ScheduleAssignmentOption[] {
+  const byValue = new Map<string, string>()
+  for (const pm of members) {
+    const u = pm.orgMember?.user
+    if (!u) continue
+    const name = (u.fullName ?? '').trim()
+    const email = (u.email ?? '').trim()
+    const value = name || email
+    if (!value) continue
+    const label = name
+      ? email && email.toLowerCase() !== name.toLowerCase()
+        ? `${name} (${email})`
+        : name
+      : email
+    if (!byValue.has(value)) byValue.set(value, label)
+  }
+  return [...byValue.entries()]
+    .map(([value, label]) => ({ value, label }))
+    .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }))
+}
 
 interface ScheduleViewProps {
   scheduleId: string
@@ -32,12 +58,21 @@ export async function ScheduleView({
     )
   }
 
+  let assignmentOptions: ScheduleAssignmentOption[] = []
+  try {
+    const members = await getProjectMembers(scheduleData.project.id)
+    assignmentOptions = buildScheduleAssignmentOptions(members)
+  } catch {
+    assignmentOptions = []
+  }
+
   return (
     <ScheduleViewClient
       scheduleData={scheduleData}
       canEdit={canEdit}
       canSetBaseline={canSetBaseline}
       canCreateVersion={canCreateVersion}
+      assignmentOptions={assignmentOptions}
     />
   )
 }

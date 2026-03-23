@@ -16,6 +16,68 @@ import {
 } from '@repo/validators'
 
 /** Determines WBS health from progress, dates and hours. */
+/**
+ * Tras aprobar un parte: alinea el % de tareas TASK del cronograma en **DRAFT** más reciente
+ * con el avance calculado en WBS (misma fuente que `WbsProgressUpdate`).
+ * Si no hay borrador o no hay tarea TASK para ese WBS, no hace nada.
+ */
+async function syncDraftScheduleTaskProgressFromWbs(params: {
+  orgId: string
+  projectId: string
+  wbsNodeId: string
+  progressPct: number
+  report: {
+    id: string
+    reportDate: Date
+    createdByOrgMemberId: string
+    approvedByOrgMemberId: string | null
+  }
+}): Promise<void> {
+  const draft = await prisma.schedule.findFirst({
+    where: {
+      projectId: params.projectId,
+      orgId: params.orgId,
+      status: 'DRAFT',
+    },
+    orderBy: { updatedAt: 'desc' },
+    select: { id: true },
+  })
+  if (!draft) return
+
+  const task = await prisma.scheduleTask.findFirst({
+    where: {
+      scheduleId: draft.id,
+      wbsNodeId: params.wbsNodeId,
+      taskType: 'TASK',
+    },
+    select: { id: true },
+  })
+  if (!task) return
+
+  const pct = Math.min(100, Math.max(0, params.progressPct))
+  const createdBy =
+    params.report.approvedByOrgMemberId ?? params.report.createdByOrgMemberId
+
+  await prisma.$transaction([
+    prisma.scheduleTask.update({
+      where: { id: task.id },
+      data: { progressPercent: new Prisma.Decimal(pct) },
+    }),
+    prisma.progressUpdate.create({
+      data: {
+        orgId: params.orgId,
+        projectId: params.projectId,
+        wbsNodeId: params.wbsNodeId,
+        scheduleTaskId: task.id,
+        asOfDate: params.report.reportDate,
+        progressPct: new Prisma.Decimal(pct),
+        notes: `daily_report:${params.report.id}`,
+        createdByOrgMemberId: createdBy,
+      },
+    }),
+  ])
+}
+
 function calculateWbsHealthStatus(
   progressPct: number,
   plannedEndDate: Date | null,
@@ -220,6 +282,19 @@ export async function updateWbsProgressOnSubmit(reportId: string): Promise<void>
         },
       }),
     ])
+
+    await syncDraftScheduleTaskProgressFromWbs({
+      orgId: report.orgId,
+      projectId: report.projectId,
+      wbsNodeId,
+      progressPct: progressAfter,
+      report: {
+        id: report.id,
+        reportDate: report.reportDate,
+        createdByOrgMemberId: report.createdByOrgMemberId,
+        approvedByOrgMemberId: report.approvedByOrgMemberId,
+      },
+    })
   }
 }
 

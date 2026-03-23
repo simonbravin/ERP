@@ -12,6 +12,7 @@ import { getDownloadUrl } from '@/lib/r2-client'
 import { buildBudgetPrintHtml } from '@/lib/pdf/build-budget-print-html'
 import { buildPurchaseOrderPrintHtml } from '@/lib/pdf/build-purchase-order-print-html'
 import { buildSchedulePrintHtml } from '@/lib/pdf/build-schedule-print-html'
+import { buildScheduleVisualPrintHtml } from '@/lib/pdf/build-schedule-visual-print-html'
 import { renderUrlToPdf, renderHtmlToPdf } from '@/lib/pdf/render-pdf'
 import { getDocumentTemplate } from '@/lib/pdf/templates'
 
@@ -121,6 +122,7 @@ export async function GET(request: NextRequest) {
     format: 'A4',
     printBackground: true,
   }
+  /** Cronograma: tabla ancha → A4 apaisado (mismo pie/numeración que otros PDF HTML en `render-pdf.ts`). */
   if (template.id === 'schedule') {
     pdfOptions.landscape = true
   }
@@ -214,6 +216,7 @@ export async function GET(request: NextRequest) {
         showEmitidoPor: pdfShowEmitidoPor,
         showFullCompanyData: pdfShowFullCompanyData,
         includeIncidenciaColumn,
+        locale,
       }
       const html = buildBudgetPrintHtml(layout, page, printOptions)
       const headerTemplate = `<div style="font-size:9px;color:#666;text-align:right;padding:0 20px;">${escapePdfHeader(project.name)}</div>`
@@ -320,6 +323,7 @@ export async function GET(request: NextRequest) {
         },
       })
     } else if (template.id === 'schedule' && id) {
+      const scheduleMode = request.nextUrl.searchParams.get('mode') === 'view' ? 'view' : 'table'
       const org = await getOrgContext(session.user.id)
       if (!org) {
         return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
@@ -339,6 +343,7 @@ export async function GET(request: NextRequest) {
       if (!schedule) {
         return NextResponse.json({ error: 'Cronograma no encontrado' }, { status: 404 })
       }
+      const dateLocalePdf = locale.toLowerCase().startsWith('en') ? 'en-GB' : 'es-AR'
       const fromParam = request.nextUrl.searchParams.get('from')
       const toParam = request.nextUrl.searchParams.get('to')
       const fromDate = fromParam ? new Date(fromParam) : null
@@ -363,9 +368,10 @@ export async function GET(request: NextRequest) {
       }
       const dateRangeSubtitle =
         filterByRange && fromDate && toDate
-          ? ` (${fromDate.toLocaleDateString('es-AR', { dateStyle: 'short' })} – ${toDate.toLocaleDateString('es-AR', { dateStyle: 'short' })})`
+          ? ` (${fromDate.toLocaleDateString(dateLocalePdf, { dateStyle: 'short' })} – ${toDate.toLocaleDateString(dateLocalePdf, { dateStyle: 'short' })})`
           : ''
-      const formatShort = (d: Date) => d.toLocaleDateString('es-AR', { dateStyle: 'short' })
+      const formatShort = (d: Date) =>
+        d.toLocaleDateString(dateLocalePdf, { dateStyle: 'short' })
       const rows = tasks.map((t) => ({
         code: t.wbsNode?.code ?? '—',
         name: t.wbsNode?.name ?? '—',
@@ -374,20 +380,45 @@ export async function GET(request: NextRequest) {
         duration: t.plannedDuration,
         progress: `${Number(t.progressPercent)}%`,
       }))
-      let orgProfile: { legalName: string | null; logoStorageKey: string | null } | null = null
+      let orgProfile: {
+        legalName: string | null
+        taxId: string | null
+        country: string | null
+        address: string | null
+        email: string | null
+        phone: string | null
+        logoStorageKey: string | null
+      } | null = null
       try {
         const profile = await prisma.orgProfile.findUnique({
           where: { orgId: org.orgId },
-          select: { legalName: true, logoStorageKey: true },
+          select: {
+            legalName: true,
+            taxId: true,
+            country: true,
+            address: true,
+            email: true,
+            phone: true,
+            logoStorageKey: true,
+          },
         })
-        if (profile) orgProfile = { legalName: profile.legalName, logoStorageKey: profile.logoStorageKey }
+        if (profile) {
+          orgProfile = {
+            legalName: profile.legalName,
+            taxId: profile.taxId,
+            country: profile.country,
+            address: profile.address,
+            email: profile.email,
+            phone: profile.phone,
+            logoStorageKey: profile.logoStorageKey,
+          }
+        }
       } catch {
         // optional
       }
       let logoUrl: string | null = null
       if (orgProfile?.logoStorageKey) {
         try {
-          const { getDownloadUrl } = await import('@/lib/r2-client')
           const url = await getDownloadUrl(orgProfile.logoStorageKey)
           if (url.startsWith('http') || url.startsWith('/')) logoUrl = url
         } catch {
@@ -399,24 +430,67 @@ export async function GET(request: NextRequest) {
         orgName: org.orgName ?? 'Organización',
         orgLegalName: orgProfile?.legalName ?? null,
         logoUrl,
+        taxId: orgProfile?.taxId ?? null,
+        country: orgProfile?.country ?? null,
+        address: orgProfile?.address ?? null,
+        email: orgProfile?.email ?? null,
+        phone: orgProfile?.phone ?? null,
         userNameOrEmail: userName || null,
       }
       const page = {
         projectName: schedule.project.name,
         projectNumber: schedule.project.projectNumber ?? null,
+        scheduleName: schedule.name,
+        scheduleStatus: schedule.status,
         dateRangeSubtitle: dateRangeSubtitle || undefined,
         rows,
       }
       const pdfShowEmitidoPor = showEmitidoParam !== '0' && showEmitidoParam !== 'false'
       const pdfShowFullCompanyData = showFullCompanyParam !== '0' && showFullCompanyParam !== 'false'
-      const html = buildSchedulePrintHtml(layout, page, {
-        showEmitidoPor: pdfShowEmitidoPor,
-        showFullCompanyData: pdfShowFullCompanyData,
-      })
-      const headerTemplate = `<div style="font-size:9px;color:#666;text-align:right;padding:0 20px;">${escapePdfHeader(schedule.project.name)} · Cronograma</div>`
+      const html =
+        scheduleMode === 'view'
+          ? buildScheduleVisualPrintHtml(
+              layout,
+              {
+                projectName: schedule.project.name,
+                projectNumber: schedule.project.projectNumber ?? null,
+                scheduleName: schedule.name,
+                scheduleStatus: schedule.status,
+                fromDate:
+                  filterByRange && fromDate
+                    ? fromDate
+                    : new Date(schedule.projectStartDate),
+                toDate:
+                  filterByRange && toDate
+                    ? toDate
+                    : new Date(schedule.projectEndDate),
+                tasks: tasks.map((t) => ({
+                  code: t.wbsNode?.code ?? '—',
+                  name: t.wbsNode?.name ?? '—',
+                  startDate: t.plannedStartDate,
+                  endDate: t.plannedEndDate,
+                  progressPercent: Number(t.progressPercent),
+                  taskType:
+                    (t.taskType as 'TASK' | 'SUMMARY' | 'MILESTONE') ?? 'TASK',
+                  isCritical: t.isCritical,
+                })),
+              },
+              {
+                showEmitidoPor: pdfShowEmitidoPor,
+                showFullCompanyData: pdfShowFullCompanyData,
+                locale,
+              }
+            )
+          : buildSchedulePrintHtml(layout, page, {
+              showEmitidoPor: pdfShowEmitidoPor,
+              showFullCompanyData: pdfShowFullCompanyData,
+              locale,
+            })
+      const scheduleHeaderDoc =
+        locale.toLowerCase().startsWith('en') ? 'Schedule' : 'Cronograma'
+      const headerTemplate = `<div style="font-size:9px;color:#666;text-align:right;padding:0 20px;">${escapePdfHeader(schedule.project.name)} · ${escapePdfHeader(schedule.name)} · ${escapePdfHeader(scheduleHeaderDoc)}</div>`
       const schedulePdfOptions = {
         ...pdfOptions,
-        landscape: true,
         margin: { top: '60px', right: '10px', bottom: '58px', left: '10px' },
         headerTemplate,
       }
@@ -432,13 +506,14 @@ export async function GET(request: NextRequest) {
 
     let filename = template.getFileName({ id: id ?? undefined })
     if (template.id === 'schedule' && id) {
+      const mode = request.nextUrl.searchParams.get('mode') === 'view' ? 'vista' : 'tabla'
       const from = request.nextUrl.searchParams.get('from')
       const to = request.nextUrl.searchParams.get('to')
       const isoYmd = /^\d{4}-\d{2}-\d{2}$/
       if (from && to && isoYmd.test(from) && isoYmd.test(to)) {
         const safeFrom = from.replace(/-/g, '')
         const safeTo = to.replace(/-/g, '')
-        filename = `cronograma-${id.slice(0, 8)}-${safeFrom}-a-${safeTo}.pdf`
+        filename = `cronograma-${mode}-${id.slice(0, 8)}-${safeFrom}-a-${safeTo}.pdf`
       }
     }
     return new NextResponse(new Uint8Array(pdfBuffer), {

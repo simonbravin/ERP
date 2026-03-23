@@ -1,14 +1,20 @@
 'use client'
 
 import { useRef, useEffect, useState } from 'react'
+import { useLocale } from 'next-intl'
 import { format, eachDayOfInterval, startOfDay } from 'date-fns'
-import { es } from 'date-fns/locale'
-import { addWorkingDays, countWorkingDays } from '@/lib/schedule/working-days'
+import { enUS, es } from 'date-fns/locale'
+import {
+  addWorkingDays,
+  countWorkingDays,
+  type WorkingDayOptions,
+} from '@/lib/schedule/working-days'
 import { getDayIndex } from '@/lib/schedule/gantt-position'
 import { GANTT_HEADER_HEIGHT, GANTT_ROW_HEIGHT } from '@/lib/schedule/gantt-constants'
 
 interface GanttTask {
   id: string
+  wbsNodeId: string
   name: string
   startDate: Date
   endDate: Date
@@ -32,7 +38,13 @@ interface GanttTimelineDynamicProps {
   showDependencies: boolean
   showTodayLine: boolean
   showProgress?: boolean
+  showBaseline?: boolean
+  baselinePlanByWbsNodeId?: Record<
+    string,
+    { plannedStartDate: string; plannedEndDate: string }
+  > | null
   workingDaysPerWeek: number
+  calendarOptions?: WorkingDayOptions
   weekStartsOn?: 0 | 1
   onTaskClick?: (taskId: string) => void
   onTaskDragEnd?: (taskId: string, newStartDate: Date, newEndDate: Date) => void
@@ -50,7 +62,10 @@ export function GanttTimelineDynamic({
   showDependencies,
   showTodayLine,
   showProgress = true,
+  showBaseline = false,
+  baselinePlanByWbsNodeId = null,
   workingDaysPerWeek,
+  calendarOptions,
   weekStartsOn = 1,
   onTaskClick,
   onTaskDragEnd,
@@ -58,6 +73,9 @@ export function GanttTimelineDynamic({
   onTaskHover,
   ariaLabel,
 }: GanttTimelineDynamicProps) {
+  const intlLocale = useLocale()
+  const dateLocale = intlLocale.startsWith('en') ? enUS : es
+
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [hoveredTask, setHoveredTask] = useState<string | null>(null)
@@ -137,10 +155,13 @@ export function GanttTimelineDynamic({
     showDependencies,
     showTodayLine,
     showProgress,
+    showBaseline,
+    baselinePlanByWbsNodeId,
     weekStartsOn,
     hoveredTask,
     highlightedTask,
     dragState,
+    intlLocale,
   ])
   /* eslint-enable react-hooks/exhaustive-deps */
 
@@ -163,15 +184,15 @@ export function GanttTimelineDynamic({
         const x = idx * DAY_WIDTH
 
         ctx.fillText(
-          format(day, 'd'),
-          x + DAY_WIDTH / 2 - 6,
+          format(day, 'dd/MM', { locale: dateLocale }),
+          x + 2,
           yDay
         )
 
         if (day.getDate() === 1 || idx === 0) {
           ctx.font = 'bold 10px Inter, sans-serif'
           ctx.fillText(
-            format(day, 'MMM yyyy', { locale: es }),
+            format(day, 'MMM yyyy', { locale: dateLocale }),
             x + 2,
             yMonth
           )
@@ -192,7 +213,7 @@ export function GanttTimelineDynamic({
         if (day.getDay() === weekStartsOn) {
           const x = idx * DAY_WIDTH
           ctx.fillText(
-            format(day, 'dd/MM', { locale: es }),
+            format(day, 'dd/MM', { locale: dateLocale }),
             x + 2,
             GANTT_HEADER_HEIGHT - 15
           )
@@ -202,7 +223,7 @@ export function GanttTimelineDynamic({
           const x = idx * DAY_WIDTH
           ctx.font = 'bold 11px Inter, sans-serif'
           ctx.fillText(
-            format(day, 'MMM yyyy', { locale: es }),
+            format(day, 'MMM yyyy', { locale: dateLocale }),
             x + 2,
             GANTT_HEADER_HEIGHT - 35
           )
@@ -220,7 +241,7 @@ export function GanttTimelineDynamic({
 
           ctx.font = 'bold 10px Inter, sans-serif'
           ctx.fillText(
-            format(day, 'MMMM yyyy', { locale: es }),
+            format(day, 'MMMM yyyy', { locale: dateLocale }),
             x + 4,
             GANTT_HEADER_HEIGHT / 2 + 4
           )
@@ -282,10 +303,89 @@ export function GanttTimelineDynamic({
     }
   }
 
+  function drawBaselineBehindTask(
+    ctx: CanvasRenderingContext2D,
+    task: GanttTask,
+    idx: number,
+    bStart: Date,
+    bEnd: Date
+  ) {
+    const y = GANTT_HEADER_HEIGHT + idx * GANTT_ROW_HEIGHT
+    const startDay = getDayIndex(bStart, days)
+    const endDay = getDayIndex(bEnd, days)
+    if (startDay === -1 || endDay === -1) return
+
+    if (
+      task.taskType !== 'MILESTONE' &&
+      bStart.getTime() === bEnd.getTime()
+    ) {
+      return
+    }
+
+    const barX = startDay * DAY_WIDTH
+    const barWidth = Math.max(
+      (endDay - startDay + 1) * DAY_WIDTH,
+      DAY_WIDTH * 0.5
+    )
+    const barY = y + 8
+    const barHeight = task.taskType === 'SUMMARY' ? 24 : 20
+
+    ctx.save()
+    ctx.strokeStyle = '#94a3b8'
+    ctx.fillStyle = 'rgba(203, 213, 225, 0.5)'
+    ctx.lineWidth = 1
+    ctx.setLineDash([4, 3])
+
+    if (task.taskType === 'SUMMARY') {
+      ctx.beginPath()
+      ctx.moveTo(barX, barY + barHeight / 2)
+      ctx.lineTo(barX + 6, barY)
+      ctx.lineTo(barX + barWidth - 6, barY)
+      ctx.lineTo(barX + barWidth, barY + barHeight / 2)
+      ctx.lineTo(barX + barWidth - 6, barY + barHeight)
+      ctx.lineTo(barX + 6, barY + barHeight)
+      ctx.closePath()
+      ctx.fill()
+      ctx.stroke()
+    } else if (task.taskType === 'MILESTONE') {
+      const centerX = barX + DAY_WIDTH / 2
+      const centerY = barY + barHeight / 2
+      const size = 11
+
+      ctx.beginPath()
+      ctx.moveTo(centerX, centerY - size)
+      ctx.lineTo(centerX + size, centerY)
+      ctx.lineTo(centerX, centerY + size)
+      ctx.lineTo(centerX - size, centerY)
+      ctx.closePath()
+      ctx.fill()
+      ctx.stroke()
+    } else {
+      ctx.fillRect(barX, barY, barWidth, barHeight)
+      ctx.strokeRect(barX, barY, barWidth, barHeight)
+    }
+
+    ctx.restore()
+  }
+
   function drawTasks(ctx: CanvasRenderingContext2D) {
     tasks.forEach((task, idx) => {
       const y = GANTT_HEADER_HEIGHT + idx * GANTT_ROW_HEIGHT
       const isDragging = dragState?.taskId === task.id
+
+      const baselinePlan =
+        showBaseline && baselinePlanByWbsNodeId && task.wbsNodeId
+          ? baselinePlanByWbsNodeId[task.wbsNodeId]
+          : undefined
+      if (baselinePlan) {
+        drawBaselineBehindTask(
+          ctx,
+          task,
+          idx,
+          new Date(baselinePlan.plannedStartDate),
+          new Date(baselinePlan.plannedEndDate)
+        )
+      }
 
       if (isDragging && dragState) {
         const ghostStartDay = getDayIndex(dragState.initialStartDate, days)
@@ -566,17 +666,20 @@ export function GanttTimelineDynamic({
         const newStart = addWorkingDays(
           initialStartDate,
           totalDaysDelta,
-          workingDaysPerWeek
+          workingDaysPerWeek,
+          calendarOptions
         )
         const duration = countWorkingDays(
           initialStartDate,
           initialEndDate,
-          workingDaysPerWeek
+          workingDaysPerWeek,
+          calendarOptions
         )
         const newEnd = addWorkingDays(
           newStart,
           duration,
-          workingDaysPerWeek
+          workingDaysPerWeek,
+          calendarOptions
         )
         setDragState({
           ...dragState,
@@ -587,7 +690,8 @@ export function GanttTimelineDynamic({
         const newStart = addWorkingDays(
           initialStartDate,
           totalDaysDelta,
-          workingDaysPerWeek
+          workingDaysPerWeek,
+          calendarOptions
         )
         if (newStart < initialEndDate) {
           setDragState({
@@ -599,7 +703,8 @@ export function GanttTimelineDynamic({
         const newEnd = addWorkingDays(
           initialEndDate,
           totalDaysDelta,
-          workingDaysPerWeek
+          workingDaysPerWeek,
+          calendarOptions
         )
         if (newEnd > initialStartDate) {
           setDragState({

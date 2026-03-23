@@ -3,22 +3,24 @@
 import { getSession } from '@/lib/session'
 import { getOrgContext } from '@/lib/org-context'
 import { requireRole } from '@/lib/rbac'
-import { assertProjectAccess, canEditProjectArea, PROJECT_AREAS } from '@/lib/project-permissions'
-import type { OrgContext } from '@/lib/org-context'
+import { assertProjectAccess } from '@/lib/project-permissions'
 import { prisma, Prisma } from '@repo/database'
-
-/** Admin, Owner and Editor at org level can edit schedule; otherwise project role must allow it. */
-function canEditSchedule(org: OrgContext, projectRole: string | null): boolean {
-  return (
-    ['EDITOR', 'ADMIN', 'OWNER'].includes(org.role) ||
-    canEditProjectArea(projectRole, PROJECT_AREAS.SCHEDULE)
-  )
-}
+import { canEditSchedule } from '@/lib/schedule-permissions'
 import { revalidatePath } from 'next/cache'
 import { calculateCriticalPath } from '@/lib/schedule/critical-path'
-import { addWorkingDays, countWorkingDays } from '@/lib/schedule/working-days'
+import {
+  addWorkingDays,
+  countWorkingDays,
+  type WorkingDayOptions,
+} from '@/lib/schedule/working-days'
+import {
+  parseNonWorkingDatesFromJson,
+  parseNonWorkingDatesFromUserInput,
+  workingDayOptionsFromStrings,
+} from '@/lib/schedule/schedule-non-working'
 import { validateTaskDatesAgainstDependencies } from '@/lib/schedule/validate-dependencies'
 import { wouldCreateCycle } from '@/lib/schedule/dependency-cycle'
+import { parseMsProjectXml } from '@/lib/schedule/ms-project-xml'
 import {
   parseProjectId,
   parseTaskId,
@@ -242,6 +244,170 @@ export async function createScheduleFromWBS(
 }
 
 /**
+ * Duplica un cronograma (cualquier status) en un nuevo DRAFT.
+ *
+ * Copia: fechas planificadas y reales, duración, tipo, % avance, notas, asignación, restricciones,
+ * dependencias (FS/SS/FF/SF + lag). No copia baseline/aprobación ni float/ruta crítica (se recalcula).
+ */
+export async function duplicateScheduleAsDraft(
+  sourceScheduleId: string,
+  data: { name: string; description?: string }
+) {
+  const parsed = parseScheduleId(sourceScheduleId)
+  if (parsed.success === false) return { success: false, error: parsed.error }
+
+  const session = await getSession()
+  if (!session?.user?.id) {
+    return { success: false, error: 'Unauthorized' }
+  }
+
+  const org = await getOrgContext(session.user.id)
+  if (!org) return { success: false, error: 'Unauthorized' }
+  requireRole(org.role, 'EDITOR')
+
+  if (!data.name?.trim()) {
+    return { success: false, error: 'El nombre es obligatorio' }
+  }
+
+  try {
+    const source = await prisma.schedule.findFirst({
+      where: { id: parsed.scheduleId, orgId: org.orgId },
+      include: { tasks: true },
+    })
+
+    if (!source) {
+      return { success: false, error: 'Cronograma no encontrado' }
+    }
+
+    try {
+      const access = await assertProjectAccess(source.projectId, org)
+      if (!canEditSchedule(org, access.projectRole)) {
+        return {
+          success: false,
+          error: 'No tenés permiso para crear cronogramas en este proyecto',
+        }
+      }
+    } catch (e) {
+      return { success: false, error: e instanceof Error ? e.message : 'Acceso denegado' }
+    }
+
+    const nameTaken = await prisma.schedule.findFirst({
+      where: {
+        projectId: source.projectId,
+        orgId: org.orgId,
+        name: data.name.trim(),
+      },
+    })
+    if (nameTaken) {
+      return {
+        success: false,
+        error: 'Ya existe un cronograma con ese nombre. Usa un nombre diferente.',
+      }
+    }
+
+    const deps = await prisma.taskDependency.findMany({
+      where: { scheduleId: source.id },
+    })
+
+    const newSchedule = await prisma.$transaction(async (tx) => {
+      const created = await tx.schedule.create({
+        data: {
+          orgId: org.orgId,
+          projectId: source.projectId,
+          name: data.name.trim(),
+          description: data.description?.trim() || source.description,
+          status: 'DRAFT',
+          projectStartDate: source.projectStartDate,
+          projectEndDate: source.projectEndDate,
+          workingDaysPerWeek: source.workingDaysPerWeek,
+          hoursPerDay: source.hoursPerDay,
+          nonWorkingDates:
+            source.nonWorkingDates === null || source.nonWorkingDates === undefined
+              ? Prisma.DbNull
+              : source.nonWorkingDates,
+          isBaseline: false,
+          baselineDate: null,
+          createdByOrgMemberId: org.memberId,
+          approvedByOrgMemberId: null,
+          approvedAt: null,
+        },
+      })
+
+      const idMap = new Map<string, string>()
+
+      for (const t of source.tasks) {
+        const nt = await tx.scheduleTask.create({
+          data: {
+            scheduleId: created.id,
+            wbsNodeId: t.wbsNodeId,
+            taskType: t.taskType,
+            plannedStartDate: t.plannedStartDate,
+            plannedEndDate: t.plannedEndDate,
+            plannedDuration: t.plannedDuration,
+            actualStartDate: t.actualStartDate,
+            actualEndDate: t.actualEndDate,
+            actualDuration: t.actualDuration,
+            progressPercent: t.progressPercent,
+            earlyStart: null,
+            earlyFinish: null,
+            lateStart: null,
+            lateFinish: null,
+            totalFloat: null,
+            freeFloat: null,
+            isCritical: false,
+            constraintType: t.constraintType,
+            constraintDate: t.constraintDate,
+            assignedTo: t.assignedTo,
+            notes: t.notes,
+          },
+        })
+        idMap.set(t.id, nt.id)
+      }
+
+      for (const d of deps) {
+        const pred = idMap.get(d.predecessorId)
+        const succ = idMap.get(d.successorId)
+        if (!pred || !succ) continue
+        await tx.taskDependency.create({
+          data: {
+            scheduleId: created.id,
+            predecessorId: pred,
+            successorId: succ,
+            dependencyType: d.dependencyType,
+            lagDays: d.lagDays,
+          },
+        })
+      }
+
+      return created
+    })
+
+    await recalculateCriticalPath(newSchedule.id)
+
+    await createAuditLog({
+      orgId: org.orgId,
+      userId: session.user.id,
+      action: 'CREATE',
+      entity: 'Schedule',
+      entityId: newSchedule.id,
+      projectId: source.projectId,
+      description: `Cronograma duplicado como borrador desde "${source.name}" → "${data.name.trim()}"`,
+    })
+
+    revalidatePath(`/projects/${source.projectId}/schedule`)
+
+    return {
+      success: true,
+      scheduleId: newSchedule.id,
+      tasksCreated: source.tasks.length,
+    }
+  } catch (error) {
+    console.error('Error duplicating schedule:', error)
+    return { success: false, error: 'Error al duplicar el cronograma' }
+  }
+}
+
+/**
  * Actualizar fechas/duración de una tarea.
  * Aquí se setea la duración de cada tarea (plannedStartDate, plannedEndDate, plannedDuration).
  * Las tareas SUMMARY se calculan automáticamente desde sus subtareas al crear el cronograma;
@@ -254,6 +420,8 @@ export async function updateTaskDates(
     plannedEndDate?: Date
     plannedDuration?: number
     notes?: string | null
+    /** Recurso / responsable (texto libre; v1 SCH-D3). */
+    assignedTo?: string | null
   }
 ) {
   const parsedTask = parseTaskId(taskId)
@@ -279,6 +447,7 @@ export async function updateTaskDates(
             projectId: true,
             orgId: true,
             workingDaysPerWeek: true,
+            nonWorkingDates: true,
           },
         },
         wbsNode: {
@@ -303,6 +472,10 @@ export async function updateTaskDates(
       return { success: false, error: 'Solo se puede editar cronogramas en DRAFT' }
     }
 
+    const calendarOptions = workingDayOptionsFromStrings(
+      parseNonWorkingDatesFromJson(task.schedule.nonWorkingDates)
+    )
+
     if (task.taskType === 'SUMMARY') {
       return {
         success: false,
@@ -315,10 +488,15 @@ export async function updateTaskDates(
       plannedEndDate?: Date
       plannedDuration?: number
       notes?: string | null
+      assignedTo?: string | null
     } = {}
     if (data.plannedStartDate != null) updateData.plannedStartDate = data.plannedStartDate
     if (data.plannedEndDate != null) updateData.plannedEndDate = data.plannedEndDate
     if (data.notes !== undefined) updateData.notes = data.notes
+    if (data.assignedTo !== undefined) {
+      const trimmed = data.assignedTo?.trim()
+      updateData.assignedTo = trimmed && trimmed.length > 0 ? trimmed : null
+    }
     if (data.plannedDuration != null) {
       updateData.plannedDuration = data.plannedDuration
       // Si solo envían duración, recalcular fin = inicio + duración (días laborables)
@@ -327,7 +505,8 @@ export async function updateTaskDates(
         updateData.plannedEndDate = addWorkingDays(
           start,
           data.plannedDuration,
-          task.schedule.workingDaysPerWeek
+          task.schedule.workingDaysPerWeek,
+          calendarOptions
         )
       }
     }
@@ -383,7 +562,8 @@ export async function updateTaskDates(
         newEnd,
         predecessors,
         successors,
-        task.schedule.workingDaysPerWeek
+        task.schedule.workingDaysPerWeek,
+        calendarOptions
       )
       if (validation.valid === false) {
         return { success: false, error: validation.message }
@@ -405,7 +585,8 @@ export async function updateTaskDates(
       await recalculateParentSummaryTasks(
         task.schedule.id,
         task.wbsNode.parentId,
-        task.schedule.workingDaysPerWeek
+        task.schedule.workingDaysPerWeek,
+        calendarOptions
       )
     }
 
@@ -585,7 +766,7 @@ export async function removeTaskDependency(dependencyId: string) {
 }
 
 /**
- * Actualizar progreso de tarea
+ * Actualizar progreso de tarea. Solo cronogramas en DRAFT (misma regla que fechas plan y dependencias).
  */
 export async function updateTaskProgress(
   taskId: string,
@@ -611,7 +792,7 @@ export async function updateTaskProgress(
     const task = await prisma.scheduleTask.findFirst({
       where: { id: parsedTask.taskId },
       include: {
-        schedule: { select: { orgId: true, projectId: true } },
+        schedule: { select: { orgId: true, projectId: true, status: true } },
       },
     })
 
@@ -625,6 +806,10 @@ export async function updateTaskProgress(
       }
     } catch (e) {
       return { success: false, error: e instanceof Error ? e.message : 'Acceso denegado' }
+    }
+
+    if (task.schedule.status !== 'DRAFT') {
+      return { success: false, error: 'Solo se puede editar cronogramas en DRAFT' }
     }
 
     if (data.progressPercent < 0 || data.progressPercent > 100) {
@@ -681,6 +866,10 @@ async function recalculateCriticalPath(scheduleId: string) {
 
     if (!schedule || schedule.tasks.length === 0) return
 
+    const calendarOptions = workingDayOptionsFromStrings(
+      parseNonWorkingDatesFromJson(schedule.nonWorkingDates)
+    )
+
     const taskNodes = schedule.tasks.map((task) => ({
       id: task.id,
       duration: task.plannedDuration,
@@ -699,7 +888,8 @@ async function recalculateCriticalPath(scheduleId: string) {
     const calculated = calculateCriticalPath(
       taskNodes,
       new Date(schedule.projectStartDate),
-      schedule.workingDaysPerWeek
+      schedule.workingDaysPerWeek,
+      calendarOptions
     )
 
     for (const calc of calculated) {
@@ -737,7 +927,8 @@ async function recalculateCriticalPath(scheduleId: string) {
 async function recalculateParentSummaryTasks(
   scheduleId: string,
   parentWbsId: string,
-  workingDaysPerWeek: number
+  workingDaysPerWeek: number,
+  calendarOptions?: WorkingDayOptions
 ) {
   try {
     const parentTask = await prisma.scheduleTask.findFirst({
@@ -789,7 +980,8 @@ async function recalculateParentSummaryTasks(
     const duration = countWorkingDays(
       minStart,
       maxEnd,
-      workingDaysPerWeek
+      workingDaysPerWeek,
+      calendarOptions
     )
 
     await prisma.scheduleTask.update({
@@ -805,11 +997,36 @@ async function recalculateParentSummaryTasks(
       await recalculateParentSummaryTasks(
         scheduleId,
         parentTask.wbsNode.parentId,
-        workingDaysPerWeek
+        workingDaysPerWeek,
+        calendarOptions
       )
     }
   } catch (error) {
     console.error('Error recalculating parent summary:', error)
+  }
+}
+
+async function rollupAllSummaryTasksForSchedule(
+  scheduleId: string,
+  workingDaysPerWeek: number,
+  calendarOptions?: WorkingDayOptions
+) {
+  const summaries = await prisma.scheduleTask.findMany({
+    where: { scheduleId, taskType: 'SUMMARY' },
+    include: { wbsNode: { select: { code: true } } },
+  })
+  const sorted = [...summaries].sort((a, b) => {
+    const da = a.wbsNode.code.split('.').length
+    const db = b.wbsNode.code.split('.').length
+    return db - da
+  })
+  for (const s of sorted) {
+    await recalculateParentSummaryTasks(
+      scheduleId,
+      s.wbsNodeId,
+      workingDaysPerWeek,
+      calendarOptions
+    )
   }
 }
 
@@ -985,6 +1202,291 @@ export async function approveSchedule(scheduleId: string) {
 }
 
 /**
+ * Guardar feriados / días no laborables del cronograma (solo DRAFT).
+ * Recalcula ruta crítica y fechas de resumen para reflejar el calendario.
+ */
+export async function updateScheduleNonWorkingDates(scheduleId: string, text: string) {
+  const parsed = parseScheduleId(scheduleId)
+  if (parsed.success === false) return { success: false, error: parsed.error }
+
+  const session = await getSession()
+  if (!session?.user?.id) {
+    return { success: false, error: 'Unauthorized' }
+  }
+
+  const org = await getOrgContext(session.user.id)
+  if (!org) return { success: false, error: 'Unauthorized' }
+  requireRole(org.role, 'EDITOR')
+
+  try {
+    const schedule = await prisma.schedule.findFirst({
+      where: { id: parsed.scheduleId, orgId: org.orgId },
+      select: { id: true, projectId: true, status: true },
+    })
+
+    if (!schedule) {
+      return { success: false, error: 'Cronograma no encontrado' }
+    }
+    try {
+      const access = await assertProjectAccess(schedule.projectId, org)
+      if (!canEditSchedule(org, access.projectRole)) {
+        return {
+          success: false,
+          error: 'No tenés permiso para editar el cronograma de este proyecto',
+        }
+      }
+    } catch (e) {
+      return { success: false, error: e instanceof Error ? e.message : 'Acceso denegado' }
+    }
+
+    if (schedule.status !== 'DRAFT') {
+      return {
+        success: false,
+        error: 'Solo se pueden editar excepciones de calendario en cronogramas en borrador.',
+      }
+    }
+
+    const dates = parseNonWorkingDatesFromUserInput(text)
+
+    await prisma.schedule.update({
+      where: { id: parsed.scheduleId },
+      data: {
+        nonWorkingDates: dates.length > 0 ? dates : Prisma.DbNull,
+      },
+    })
+
+    await recalculateCriticalPath(parsed.scheduleId)
+
+    revalidatePath(`/projects/${schedule.projectId}/schedule`)
+
+    return { success: true, count: dates.length }
+  } catch (error) {
+    console.error('Error updating schedule non-working dates:', error)
+    return { success: false, error: 'Error al guardar el calendario' }
+  }
+}
+
+/**
+ * Importar tareas y dependencias desde XML de MS Project (MSPDI), solo en DRAFT.
+ * Empareja por `OutlineNumber` del XML con el código WBS de cada tarea del cronograma.
+ * Reemplaza todas las dependencias del cronograma por las del archivo (omite enlaces que generarían ciclo).
+ */
+export async function importScheduleFromMsProjectXml(scheduleId: string, xml: string) {
+  const parsed = parseScheduleId(scheduleId)
+  if (parsed.success === false) return { success: false, error: parsed.error }
+
+  const session = await getSession()
+  if (!session?.user?.id) {
+    return { success: false, error: 'Unauthorized' }
+  }
+
+  const org = await getOrgContext(session.user.id)
+  if (!org) return { success: false, error: 'Unauthorized' }
+  requireRole(org.role, 'EDITOR')
+
+  if (xml.length > 6_000_000) {
+    return { success: false, error: 'El archivo XML es demasiado grande.' }
+  }
+
+  try {
+    const schedule = await prisma.schedule.findFirst({
+      where: { id: parsed.scheduleId, orgId: org.orgId },
+      include: {
+        tasks: {
+          include: {
+            wbsNode: { select: { id: true, code: true, name: true } },
+          },
+          orderBy: [{ wbsNode: { code: 'asc' } }],
+        },
+      },
+    })
+
+    if (!schedule) {
+      return { success: false, error: 'Cronograma no encontrado' }
+    }
+    try {
+      const access = await assertProjectAccess(schedule.projectId, org)
+      if (!canEditSchedule(org, access.projectRole)) {
+        return {
+          success: false,
+          error: 'No tenés permiso para editar el cronograma de este proyecto',
+        }
+      }
+    } catch (e) {
+      return { success: false, error: e instanceof Error ? e.message : 'Acceso denegado' }
+    }
+
+    if (schedule.status !== 'DRAFT') {
+      return {
+        success: false,
+        error: 'Solo se puede importar XML en un cronograma en borrador (DRAFT).',
+      }
+    }
+
+    const hoursPerDay = Number(schedule.hoursPerDay) || 8
+    let parsedXml: ReturnType<typeof parseMsProjectXml>
+    try {
+      parsedXml = parseMsProjectXml(xml, hoursPerDay)
+    } catch (e) {
+      const code = e instanceof Error ? e.message : ''
+      if (code === 'INVALID_XML_NO_PROJECT') {
+        return {
+          success: false,
+          error: 'El XML no contiene un elemento Project válido (formato MS Project).',
+        }
+      }
+      return { success: false, error: 'No se pudo leer el XML.' }
+    }
+
+    if (parsedXml.tasks.length === 0) {
+      return { success: false, error: 'No se encontraron tareas en el XML.' }
+    }
+
+    const calendarOptions = workingDayOptionsFromStrings(
+      parseNonWorkingDatesFromJson(schedule.nonWorkingDates)
+    )
+    const workingDaysPerWeek = schedule.workingDaysPerWeek
+
+    const outlineToTask = new Map<string, (typeof schedule.tasks)[number]>()
+    for (const t of schedule.tasks) {
+      outlineToTask.set(t.wbsNode.code.trim(), t)
+    }
+
+    const uidToTaskId = new Map<number, string>()
+    for (const row of parsedXml.tasks) {
+      const ours = outlineToTask.get(row.outlineNumber.trim())
+      if (ours) uidToTaskId.set(row.uid, ours.id)
+    }
+
+    const updates: Array<{
+      id: string
+      start: Date
+      end: Date
+      duration: number
+    }> = []
+
+    for (const row of parsedXml.tasks) {
+      if (row.isSummary) continue
+      const ours = outlineToTask.get(row.outlineNumber.trim())
+      if (!ours || ours.taskType === 'SUMMARY') continue
+
+      let start = row.start ? new Date(row.start) : null
+      let finish = row.finish ? new Date(row.finish) : null
+      if (row.isMilestone) {
+        if (start && !finish) finish = new Date(start)
+        if (finish && !start) start = new Date(finish)
+      }
+      if (!start || !finish) continue
+
+      const duration =
+        ours.taskType === 'MILESTONE'
+          ? 0
+          : Math.max(
+              1,
+              countWorkingDays(
+                start,
+                finish,
+                workingDaysPerWeek,
+                calendarOptions
+              )
+            )
+
+      updates.push({ id: ours.id, start, end: finish, duration })
+    }
+
+    const depMap = new Map<
+      string,
+      { pred: string; succ: string; type: string; lag: number }
+    >()
+    for (const row of parsedXml.tasks) {
+      const succId = uidToTaskId.get(row.uid)
+      if (!succId) continue
+      for (const p of row.predecessors) {
+        const predId = uidToTaskId.get(p.predecessorUid)
+        if (!predId || predId === succId) continue
+        const key = `${predId}\0${succId}`
+        if (!depMap.has(key)) {
+          depMap.set(key, {
+            pred: predId,
+            succ: succId,
+            type: p.type,
+            lag: Math.round(p.lagDays),
+          })
+        }
+      }
+    }
+    const depList = Array.from(depMap.values())
+
+    const { createdDeps, skippedDeps } = await prisma.$transaction(async (tx) => {
+      for (const u of updates) {
+        await tx.scheduleTask.update({
+          where: { id: u.id },
+          data: {
+            plannedStartDate: u.start,
+            plannedEndDate: u.end,
+            plannedDuration: u.duration,
+          },
+        })
+      }
+      await tx.taskDependency.deleteMany({
+        where: { scheduleId: parsed.scheduleId },
+      })
+
+      const created: Array<{ predecessorId: string; successorId: string }> = []
+      let createdDeps = 0
+      let skippedDeps = 0
+      for (const d of depList) {
+        if (wouldCreateCycle(created, d.pred, d.succ)) {
+          skippedDeps++
+          continue
+        }
+        await tx.taskDependency.create({
+          data: {
+            scheduleId: parsed.scheduleId,
+            predecessorId: d.pred,
+            successorId: d.succ,
+            dependencyType: d.type,
+            lagDays: d.lag,
+          },
+        })
+        created.push({ predecessorId: d.pred, successorId: d.succ })
+        createdDeps++
+      }
+      return { createdDeps, skippedDeps }
+    })
+
+    await rollupAllSummaryTasksForSchedule(
+      parsed.scheduleId,
+      workingDaysPerWeek,
+      calendarOptions
+    )
+    await recalculateCriticalPath(parsed.scheduleId)
+
+    await createAuditLog({
+      orgId: org.orgId,
+      userId: session.user.id,
+      action: 'UPDATE',
+      entity: 'Schedule',
+      entityId: parsed.scheduleId,
+      projectId: schedule.projectId,
+      description: `Importación MS Project XML: ${updates.length} tareas actualizadas, ${createdDeps} dependencias (${skippedDeps} omitidas por ciclo)`,
+    })
+
+    revalidatePath(`/projects/${schedule.projectId}/schedule`)
+
+    return {
+      success: true,
+      updatedTasks: updates.length,
+      createdDependencies: createdDeps,
+      skippedDependencies: skippedDeps,
+    }
+  } catch (error) {
+    console.error('Error importing MS Project XML:', error)
+    return { success: false, error: 'Error al importar el XML' }
+  }
+}
+
+/**
  * Obtener cronograma completo para vista (con serialización de fechas para hidratación)
  */
 export async function getScheduleForView(scheduleId: string) {
@@ -1054,9 +1556,49 @@ export async function getScheduleForView(scheduleId: string) {
       return null
     }
 
+    const baselineSchedule = await prisma.schedule.findFirst({
+      where: {
+        projectId: schedule.projectId,
+        orgId: org.orgId,
+        isBaseline: true,
+      },
+      select: { id: true },
+    })
+
+    let baselinePlanByWbsNodeId: Record<
+      string,
+      { plannedStartDate: string; plannedEndDate: string }
+    > | null = null
+
+    if (baselineSchedule && baselineSchedule.id !== schedule.id) {
+      const baselineTasks = await prisma.scheduleTask.findMany({
+        where: { scheduleId: baselineSchedule.id },
+        select: {
+          wbsNodeId: true,
+          plannedStartDate: true,
+          plannedEndDate: true,
+        },
+      })
+      if (baselineTasks.length > 0) {
+        baselinePlanByWbsNodeId = Object.fromEntries(
+          baselineTasks.map((t) => [
+            t.wbsNodeId,
+            {
+              plannedStartDate: t.plannedStartDate.toISOString(),
+              plannedEndDate: t.plannedEndDate.toISOString(),
+            },
+          ])
+        )
+      }
+    }
+
+    const nonWorkingDates = parseNonWorkingDatesFromJson(schedule.nonWorkingDates)
+
     return JSON.parse(
       JSON.stringify({
         ...schedule,
+        nonWorkingDates,
+        baselinePlanByWbsNodeId,
         projectStartDate: schedule.projectStartDate.toISOString(),
         projectEndDate: schedule.projectEndDate.toISOString(),
         baselineDate: schedule.baselineDate?.toISOString() ?? null,

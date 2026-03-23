@@ -22,6 +22,7 @@ export default async function PrintProjectDashboardPage({ params, searchParams }
   if (!project) return notFound()
 
   const budget = data.budget
+  const evm = data.evm
   const cashflowColumns = [
     { key: 'month' as const, label: 'Mes', align: 'left' as const },
     {
@@ -63,6 +64,30 @@ export default async function PrintProjectDashboardPage({ params, searchParams }
           <strong>Comprometido:</strong> {formatCurrency(budget.committed)} ·{' '}
           <strong>Restante:</strong> {formatCurrency(budget.remaining)}
         </p>
+        {evm.hasSchedule && (
+          <p>
+            <strong>EVM (resumen):</strong> BAC {formatCurrency(evm.bac)} · EV {formatCurrency(evm.ev)} · AC{' '}
+            {formatCurrency(evm.ac)}
+            {evm.pv != null && (
+              <>
+                {' '}
+                · PV {formatCurrency(evm.pv)}
+              </>
+            )}
+            {evm.taskCount > 0 && (
+              <>
+                {' '}
+                · Avance físico {evm.physicalProgressPct.toFixed(1)}%
+              </>
+            )}
+            {evm.scheduleName && (
+              <>
+                {' '}
+                · Cronograma: {evm.scheduleName}
+              </>
+            )}
+          </p>
+        )}
       </div>
       {data.cashflow.length > 0 && (
         <section>

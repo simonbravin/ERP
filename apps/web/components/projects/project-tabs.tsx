@@ -14,10 +14,11 @@ import {
 
 interface ProjectTabsProps {
   projectId: string
+  showScheduleTab?: boolean
 }
 
 /** Misma estética que el menú de Finanzas de empresa: barra redondeada, pestañas con íconos, activo con bg-card. */
-export function ProjectTabs({ projectId }: ProjectTabsProps) {
+export function ProjectTabs({ projectId, showScheduleTab = true }: ProjectTabsProps) {
   const pathname = usePathname()
   const t = useTranslations('nav')
 
@@ -25,7 +26,16 @@ export function ProjectTabs({ projectId }: ProjectTabsProps) {
     { name: t('overview'), href: `/projects/${projectId}`, icon: LayoutDashboard, exact: true },
     { name: t('projectDashboard'), href: `/projects/${projectId}/dashboard`, icon: BarChart3, exact: false },
     { name: t('budget'), href: `/projects/${projectId}/budget`, icon: Calculator, exact: false },
-    { name: t('schedule'), href: `/projects/${projectId}/schedule`, icon: Calendar, exact: false },
+    ...(showScheduleTab
+      ? [
+          {
+            name: t('schedule'),
+            href: `/projects/${projectId}/schedule`,
+            icon: Calendar,
+            exact: false,
+          },
+        ]
+      : []),
     { name: t('finance'), href: `/projects/${projectId}/finance`, icon: DollarSign, exact: false },
   ]
 

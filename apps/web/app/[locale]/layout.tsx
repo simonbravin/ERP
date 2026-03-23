@@ -4,6 +4,7 @@ import { hasLocale } from 'next-intl'
 import { notFound } from 'next/navigation'
 import { routing } from '@/i18n/routing'
 import { Providers } from '@/components/providers'
+import { DocumentHtmlLang } from '@/components/document-html-lang'
 
 type Props = {
   children: React.ReactNode
@@ -26,6 +27,7 @@ export default async function LocaleLayout({ children, params }: Props) {
 
   return (
     <NextIntlClientProvider messages={messages}>
+      <DocumentHtmlLang />
       <Providers>{children}</Providers>
     </NextIntlClientProvider>
   )

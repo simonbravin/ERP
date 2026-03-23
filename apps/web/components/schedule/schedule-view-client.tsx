@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { useTranslations } from 'next-intl'
+import { useState, useEffect, useRef, useCallback, useMemo, useTransition } from 'react'
+import { useLocale, useTranslations } from 'next-intl'
 import { useRouter, Link } from '@/i18n/navigation'
 import { useMessageBus } from '@/hooks/use-message-bus'
 import { ScheduleGanttBlock } from './schedule-gantt-block'
@@ -10,9 +10,19 @@ import { DependencyManager } from './dependency-manager'
 import { TaskEditDialog } from './task-edit-dialog'
 import { DateRangeSlider } from './date-range-slider'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import {
   Select,
@@ -26,8 +36,12 @@ import {
   setScheduleAsBaseline,
   approveSchedule,
   updateTaskDates,
+  updateScheduleNonWorkingDates,
+  importScheduleFromMsProjectXml,
 } from '@/app/actions/schedule'
+import { exportScheduleToExcel, exportScheduleToMsProjectXml } from '@/app/actions/export'
 import type { getScheduleForView } from '@/app/actions/schedule'
+import type { ScheduleAssignmentOption } from './schedule-view'
 import {
   Calendar,
   TrendingUp,
@@ -42,9 +56,13 @@ import {
   Columns2,
   PanelLeftClose,
   PanelLeft,
+  FileSpreadsheet,
+  FileCode2,
+  Upload,
 } from 'lucide-react'
 import { format, addDays, subDays, differenceInDays, startOfDay } from 'date-fns'
-import { es } from 'date-fns/locale'
+import { enUS, es } from 'date-fns/locale'
+import type { WorkingDayOptions } from '@/lib/schedule/working-days'
 
 export type ScheduleViewData = NonNullable<
   Awaited<ReturnType<typeof getScheduleForView>>
@@ -55,6 +73,8 @@ interface ScheduleViewClientProps {
   canEdit: boolean
   canSetBaseline: boolean
   canCreateVersion?: boolean
+  /** Miembros del proyecto (nombre guardado en `assigned_to`, texto libre). */
+  assignmentOptions?: ScheduleAssignmentOption[]
 }
 
 export function ScheduleViewClient({
@@ -62,8 +82,11 @@ export function ScheduleViewClient({
   canEdit,
   canSetBaseline,
   canCreateVersion = false,
+  assignmentOptions = [],
 }: ScheduleViewClientProps) {
   const t = useTranslations('schedule')
+  const intlLocale = useLocale()
+  const dateLocale = intlLocale.startsWith('en') ? enUS : es
   const router = useRouter()
 
   useMessageBus('WBS_NODE.CREATED', () => router.refresh())
@@ -72,12 +95,27 @@ export function ScheduleViewClient({
   useMessageBus('WBS_NODE.REORDERED', () => router.refresh())
   useMessageBus('PROJECT.UPDATED', () => router.refresh())
 
+  const [calendarSavePending, startCalendarSave] = useTransition()
   const [exporting, setExporting] = useState(false)
+  const [exportingViewPDF, setExportingViewPDF] = useState(false)
+  const [exportingExcel, setExportingExcel] = useState(false)
+  const [exportingMsXml, setExportingMsXml] = useState(false)
+  const [importingMsXml, setImportingMsXml] = useState(false)
+  const msXmlFileInputRef = useRef<HTMLInputElement>(null)
   const [approving, setApproving] = useState(false)
 
   const [zoom, setZoom] = useState<'day' | 'week' | 'month'>('week')
   const [showCriticalPath, setShowCriticalPath] = useState(true)
   const [showBaseline, setShowBaseline] = useState(false)
+
+  const baselineOverlayAvailable = Boolean(
+    scheduleData.baselinePlanByWbsNodeId &&
+      Object.keys(scheduleData.baselinePlanByWbsNodeId).length > 0
+  )
+
+  useEffect(() => {
+    if (!baselineOverlayAvailable) setShowBaseline(false)
+  }, [baselineOverlayAvailable, scheduleData.id])
   const [showProgress, setShowProgress] = useState(true)
   const [showDependencies, setShowDependencies] = useState(true)
   const [showTodayLine, setShowTodayLine] = useState(true)
@@ -200,6 +238,21 @@ export function ScheduleViewClient({
     })),
   }
 
+  const nonWorkingKey = (scheduleData.nonWorkingDates ?? []).join('|')
+
+  const calendarOptions = useMemo((): WorkingDayOptions | undefined => {
+    const d = scheduleData.nonWorkingDates ?? []
+    if (d.length === 0) return undefined
+    return { nonWorkingDates: d }
+  }, [nonWorkingKey])
+
+  const [exceptionsText, setExceptionsText] = useState(() =>
+    (scheduleData.nonWorkingDates ?? []).join('\n')
+  )
+  useEffect(() => {
+    setExceptionsText((scheduleData.nonWorkingDates ?? []).join('\n'))
+  }, [scheduleData.id, nonWorkingKey])
+
   // Stable across router.refresh(): parent often passes a new `tasks` array reference with the same ids.
   const expandedNodesResetKey = `${scheduleData.id}:${[...scheduleData.tasks]
     .map((t: { id: string }) => t.id)
@@ -219,6 +272,7 @@ export function ScheduleViewClient({
     const level = task.wbsNode.code.split('.').length - 1
     return {
       id: task.id,
+      wbsNodeId: task.wbsNodeId,
       name: `${task.wbsNode.code} ${task.wbsNode.name}`,
       startDate: task.plannedStartDate,
       endDate: task.plannedEndDate,
@@ -272,6 +326,7 @@ export function ScheduleViewClient({
       id: task.id,
       code: task.wbsNode.code,
       name: task.wbsNode.name,
+      assignedTo: task.assignedTo ?? null,
       taskType: (task.taskType as 'TASK' | 'SUMMARY' | 'MILESTONE') || 'TASK',
       startDate: task.plannedStartDate,
       endDate: task.plannedEndDate,
@@ -297,6 +352,18 @@ export function ScheduleViewClient({
           const phaseB = b.code.split('.')[0]
           return phaseA.localeCompare(phaseB, undefined, { numeric: true })
         })
+      : groupBy === 'assigned'
+        ? [...filteredTableTasks].sort((a, b) => {
+            const aAssigned = (a.assignedTo ?? '').trim().toLowerCase()
+            const bAssigned = (b.assignedTo ?? '').trim().toLowerCase()
+            if (aAssigned !== bAssigned) {
+              // First show assigned tasks, then unassigned ones.
+              if (!aAssigned) return 1
+              if (!bAssigned) return -1
+              return aAssigned.localeCompare(bAssigned, undefined, { numeric: true })
+            }
+            return a.code.localeCompare(b.code, undefined, { numeric: true })
+          })
       : filteredTableTasks
   const visibleTableTasks = sortedByGroup.filter((task) =>
     shouldShowTask(task, tableTasks)
@@ -337,6 +404,25 @@ export function ScheduleViewClient({
     }
   )
 
+  const workloadByAssigneeRows = (() => {
+    const counts = new Map<string, number>()
+    for (const t of schedule.tasks) {
+      if (t.taskType === 'SUMMARY') continue
+      const raw =
+        typeof t.assignedTo === 'string' ? t.assignedTo.trim() : ''
+      const k = raw || '__unassigned__'
+      counts.set(k, (counts.get(k) ?? 0) + 1)
+    }
+    return [...counts.entries()]
+      .map(([key, count]) => ({ key, count }))
+      .sort((a, b) => {
+        if (a.key === '__unassigned__' && b.key !== '__unassigned__') return 1
+        if (b.key === '__unassigned__' && a.key !== '__unassigned__') return -1
+        if (b.count !== a.count) return b.count - a.count
+        return a.key.localeCompare(b.key, undefined, { sensitivity: 'base' })
+      })
+  })()
+
   async function handleExportPDF() {
     setExporting(true)
     try {
@@ -374,6 +460,155 @@ export function ScheduleViewClient({
     } finally {
       setExporting(false)
     }
+  }
+
+  async function handleExportPDFView() {
+    setExportingViewPDF(true)
+    try {
+      const locale = typeof document !== 'undefined' ? document.documentElement.lang || 'es' : 'es'
+      const params = new URLSearchParams({
+        template: 'schedule',
+        id: schedule.id,
+        locale,
+        mode: 'view',
+        showEmitidoPor: '1',
+        showFullCompanyData: '1',
+      })
+      const toYmd = (d: Date) =>
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      params.set('from', toYmd(visibleStartDate))
+      params.set('to', toYmd(visibleEndDate))
+      const url = `/api/pdf?${params.toString()}`
+      const res = await fetch(url, { credentials: 'include' })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        toast.error(data?.error ?? t('exportError'))
+        return
+      }
+      const blob = await res.blob()
+      const disposition = res.headers.get('Content-Disposition')
+      const match = disposition?.match(/filename="?([^";]+)"?/)
+      const filename = match?.[1] ?? `cronograma-vista-${schedule.id}.pdf`
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(blob)
+      link.download = filename
+      link.click()
+      URL.revokeObjectURL(link.href)
+      toast.success(t('exportSuccess'), { description: t('pdfDownloaded') })
+    } catch {
+      toast.error(t('exportError'))
+    } finally {
+      setExportingViewPDF(false)
+    }
+  }
+
+  async function handleExportExcel() {
+    setExportingExcel(true)
+    try {
+      const locale =
+        typeof document !== 'undefined' ? document.documentElement.lang || 'es' : 'es'
+      const result = await exportScheduleToExcel(schedule.id, locale)
+      if (!result.success) {
+        toast.error(result.error ?? t('exportExcelError'))
+        return
+      }
+      if (result.data && result.filename) {
+        const bin = atob(result.data)
+        const arr = new Uint8Array(bin.length)
+        for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i)
+        const blob = new Blob([arr], {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        })
+        const link = document.createElement('a')
+        link.href = URL.createObjectURL(blob)
+        link.download = result.filename
+        link.click()
+        URL.revokeObjectURL(link.href)
+        toast.success(t('exportExcelSuccess'), {
+          description: t('exportExcelDownloaded'),
+        })
+      }
+    } catch {
+      toast.error(t('exportExcelError'))
+    } finally {
+      setExportingExcel(false)
+    }
+  }
+
+  async function handleExportMsProjectXml() {
+    setExportingMsXml(true)
+    try {
+      const result = await exportScheduleToMsProjectXml(schedule.id)
+      if (!result.success) {
+        toast.error(result.error ?? t('exportMsProjectXmlError'))
+        return
+      }
+      if (result.data && result.filename) {
+        const bin = atob(result.data)
+        const arr = new Uint8Array(bin.length)
+        for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i)
+        const blob = new Blob([arr], {
+          type: 'application/xml',
+        })
+        const link = document.createElement('a')
+        link.href = URL.createObjectURL(blob)
+        link.download = result.filename
+        link.click()
+        URL.revokeObjectURL(link.href)
+        toast.success(t('exportMsProjectXmlSuccess'))
+      }
+    } catch {
+      toast.error(t('exportMsProjectXmlError'))
+    } finally {
+      setExportingMsXml(false)
+    }
+  }
+
+  async function handleMsXmlFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    if (!canEdit || schedule.status !== 'DRAFT') {
+      toast.error(t('importMsProjectXmlDraftOnly'))
+      return
+    }
+    setImportingMsXml(true)
+    try {
+      const text = await file.text()
+      const result = await importScheduleFromMsProjectXml(schedule.id, text)
+      if (!result.success) {
+        toast.error(result.error ?? t('importMsProjectXmlError'))
+        return
+      }
+      toast.success(
+        t('importMsProjectXmlSuccess', {
+          tasks: result.updatedTasks ?? 0,
+          deps: result.createdDependencies ?? 0,
+        })
+      )
+      router.refresh()
+    } catch {
+      toast.error(t('importMsProjectXmlError'))
+    } finally {
+      setImportingMsXml(false)
+    }
+  }
+
+  function handleSaveCalendarExceptions() {
+    if (!canEdit || schedule.status !== 'DRAFT') return
+    startCalendarSave(async () => {
+      try {
+        const result = await updateScheduleNonWorkingDates(schedule.id, exceptionsText)
+        if (result.success) {
+          toast.success(t('calendarExceptionsSaved'))
+          router.refresh()
+        } else {
+          toast.error(result.error ?? t('calendarExceptionsError'))
+        }
+      } catch {
+        toast.error(t('calendarExceptionsError'))
+      }
+    })
   }
 
   async function handleSetBaseline() {
@@ -466,59 +701,15 @@ export function ScheduleViewClient({
       14,
       differenceInDays(visibleEndDate, visibleStartDate) + 1
     )
-    const half = Math.floor(daysToShow / 2)
-    const todayInProject = today >= projectStart && today <= projectEnd
 
-    let newStart = subDays(today, half)
-    let newEnd = addDays(newStart, daysToShow - 1)
+    // Primera columna visible = hoy (calendario real), sin forzar inicio de proyecto.
+    const newStart = today
+    const newEnd = addDays(newStart, daysToShow - 1)
 
-    if (newStart < projectStart) {
-      newStart = projectStart
-      newEnd = addDays(newStart, daysToShow - 1)
-    }
-    if (newEnd > projectEnd) {
-      newEnd = projectEnd
-      newStart = subDays(newEnd, daysToShow - 1)
-    }
-    if (newStart < projectStart) {
-      newStart = projectStart
-    }
-
-    const rangeContainsToday = (s: Date, e: Date) => today >= s && today <= e
-
-    if (todayInProject) {
-      if (!rangeContainsToday(newStart, newEnd)) {
-        newStart = subDays(today, half)
-        newEnd = addDays(newStart, daysToShow - 1)
-        if (newStart < projectStart) {
-          newStart = projectStart
-          newEnd = addDays(newStart, daysToShow - 1)
-        }
-        if (newEnd > projectEnd) {
-          newEnd = projectEnd
-          newStart = subDays(newEnd, daysToShow - 1)
-        }
-        if (newStart < projectStart) {
-          newStart = projectStart
-        }
-      }
-      if (!rangeContainsToday(newStart, newEnd)) {
-        newStart = projectStart
-        newEnd = projectEnd
-      }
-    } else {
+    if (today < projectStart || today > projectEnd) {
       toast.info(t('todayOutsideProject'), {
         description: t('todayOutsideProjectHint'),
       })
-      if (today > projectEnd) {
-        newEnd = projectEnd
-        newStart = subDays(newEnd, daysToShow - 1)
-        if (newStart < projectStart) newStart = projectStart
-      } else {
-        newStart = projectStart
-        newEnd = addDays(newStart, daysToShow - 1)
-        if (newEnd > projectEnd) newEnd = projectEnd
-      }
     }
 
     handleRangeChange(newStart, newEnd)
@@ -758,12 +949,12 @@ export function ScheduleViewClient({
               {t('dateRange')}:
             </p>
             <p className="text-sm text-foreground">
-              {format(schedule.projectStartDate, "dd 'de' MMMM, yyyy", {
-                locale: es,
+              {format(schedule.projectStartDate, 'dd/MM/yyyy', {
+                locale: dateLocale,
               })}{' '}
-              -{' '}
-              {format(schedule.projectEndDate, "dd 'de' MMMM, yyyy", {
-                locale: es,
+              –{' '}
+              {format(schedule.projectEndDate, 'dd/MM/yyyy', {
+                locale: dateLocale,
               })}
             </p>
           </div>
@@ -809,6 +1000,65 @@ export function ScheduleViewClient({
               </>
             )}
           </Button>
+          <Button
+            onClick={handleExportExcel}
+            disabled={exportingExcel}
+            variant="outline"
+          >
+            {exportingExcel ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {t('exportingExcel')}
+              </>
+            ) : (
+              <>
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                {t('exportExcel')}
+              </>
+            )}
+          </Button>
+          <Button
+            onClick={handleExportMsProjectXml}
+            disabled={exportingMsXml}
+            variant="outline"
+          >
+            {exportingMsXml ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {t('exportingMsProjectXml')}
+              </>
+            ) : (
+              <>
+                <FileCode2 className="mr-2 h-4 w-4" />
+                {t('exportMsProjectXml')}
+              </>
+            )}
+          </Button>
+          <input
+            ref={msXmlFileInputRef}
+            type="file"
+            accept=".xml,application/xml,text/xml"
+            className="hidden"
+            onChange={handleMsXmlFileSelected}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            disabled={importingMsXml || !canEdit || schedule.status !== 'DRAFT'}
+            onClick={() => msXmlFileInputRef.current?.click()}
+          >
+            {importingMsXml ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {t('importingMsProjectXml')}
+              </>
+            ) : (
+              <>
+                <Upload className="mr-2 h-4 w-4" />
+                {t('importMsProjectXml')}
+              </>
+            )}
+          </Button>
         </div>
       </div>
 
@@ -822,25 +1072,109 @@ export function ScheduleViewClient({
         </Alert>
       )}
 
+      {workloadByAssigneeRows.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">{t('workloadByAssigneeTitle')}</CardTitle>
+            <p className="text-sm text-muted-foreground">{t('workloadByAssigneeHint')}</p>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t('taskAssignedTo')}</TableHead>
+                  <TableHead className="w-[120px] text-right">{t('workloadColTasks')}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {workloadByAssigneeRows.map((row) => (
+                  <TableRow key={row.key}>
+                    <TableCell className="text-sm">
+                      {row.key === '__unassigned__'
+                        ? t('workloadUnassigned')
+                        : row.key}
+                    </TableCell>
+                    <TableCell className="text-right text-sm tabular-nums">
+                      {t('workloadTaskCount', { count: row.count })}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
       {!canEdit && schedule.status !== 'DRAFT' && canCreateVersion && (
         <Alert>
           <AlertTitle>{t('scheduleEditBlockedTitle')}</AlertTitle>
           <AlertDescription className="space-y-2">
             <p>{t('scheduleEditBlockedBody', { status: schedule.status })}</p>
-            <Button asChild size="sm" variant="default" className="mt-1">
-              <Link href={`/projects/${schedule.project.id}/schedule/new`}>
-                {t('scheduleCreateNewVersionCta')}
-              </Link>
-            </Button>
+            <div className="mt-1 flex flex-wrap gap-2">
+              <Button asChild size="sm" variant="default">
+                <Link href={`/projects/${schedule.project.id}/schedule/new?from=${schedule.id}`}>
+                  {t('newRevisionFromPlan')}
+                </Link>
+              </Button>
+              <Button asChild size="sm" variant="outline">
+                <Link href={`/projects/${schedule.project.id}/schedule/new`}>
+                  {t('scheduleCreateNewVersionCta')}
+                </Link>
+              </Button>
+            </div>
           </AlertDescription>
         </Alert>
       )}
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">{t('calendarExceptionsTitle')}</CardTitle>
+          <p className="text-sm text-muted-foreground">{t('calendarExceptionsHint')}</p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-2">
+            <Label htmlFor="schedule-non-working-dates" className="text-sm">
+              {t('calendarExceptionsLabel')}
+            </Label>
+            <Textarea
+              id="schedule-non-working-dates"
+              value={exceptionsText}
+              onChange={(e) => setExceptionsText(e.target.value)}
+              placeholder={t('calendarExceptionsPlaceholder')}
+              rows={4}
+              disabled={!canEdit || schedule.status !== 'DRAFT' || calendarSavePending}
+              className="font-mono text-sm"
+            />
+          </div>
+          {(!canEdit || schedule.status !== 'DRAFT') && (
+            <p className="text-xs text-muted-foreground">{t('calendarExceptionsReadOnly')}</p>
+          )}
+          {canEdit && schedule.status === 'DRAFT' && (
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleSaveCalendarExceptions}
+              disabled={calendarSavePending}
+            >
+              {calendarSavePending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {t('calendarExceptionsSaving')}
+                </>
+              ) : (
+                t('calendarExceptionsSave')
+              )}
+            </Button>
+          )}
+        </CardContent>
+      </Card>
 
       <GanttControlPanel
         showCriticalPath={showCriticalPath}
         onShowCriticalPathChange={setShowCriticalPath}
         showBaseline={showBaseline}
         onShowBaselineChange={setShowBaseline}
+        baselineOverlayAvailable={baselineOverlayAvailable}
         showProgress={showProgress}
         onShowProgressChange={setShowProgress}
         showDependencies={showDependencies}
@@ -850,6 +1184,10 @@ export function ScheduleViewClient({
         weekStartsOn={weekStartsOn}
         onWeekStartsOnChange={setWeekStartsOn}
         onExportPDF={handleExportPDF}
+        onExportPDFView={handleExportPDFView}
+        exportingPDFView={exportingViewPDF}
+        onExportExcel={handleExportExcel}
+        exportingExcel={exportingExcel}
       />
 
       <DateRangeSlider
@@ -1018,6 +1356,7 @@ export function ScheduleViewClient({
                 onHighlightTask={setHighlightedTask}
                 searchQuery={searchQuery}
                 workingDaysPerWeek={schedule.workingDaysPerWeek}
+                calendarOptions={calendarOptions}
                 groupBy={groupBy}
                 visibleStartDate={visibleStartDate}
                 visibleEndDate={visibleEndDate}
@@ -1026,6 +1365,8 @@ export function ScheduleViewClient({
                 showDependencies={showDependencies}
                 showTodayLine={showTodayLine}
                 showProgress={showProgress}
+                showBaseline={showBaseline && baselineOverlayAvailable}
+                baselinePlanByWbsNodeId={scheduleData.baselinePlanByWbsNodeId}
                 onTaskDragEnd={handleTaskDragEnd}
                 ganttAriaLabel={t('ganttAriaLabel')}
                 weekStartsOn={weekStartsOn}
@@ -1059,6 +1400,7 @@ export function ScheduleViewClient({
               onHighlightTask={setHighlightedTask}
               searchQuery={searchQuery}
               workingDaysPerWeek={schedule.workingDaysPerWeek}
+              calendarOptions={calendarOptions}
               groupBy={groupBy}
               visibleStartDate={visibleStartDate}
               visibleEndDate={visibleEndDate}
@@ -1067,6 +1409,8 @@ export function ScheduleViewClient({
               showDependencies={showDependencies}
               showTodayLine={showTodayLine}
               showProgress={showProgress}
+              showBaseline={showBaseline && baselineOverlayAvailable}
+              baselinePlanByWbsNodeId={scheduleData.baselinePlanByWbsNodeId}
               onTaskDragEnd={handleTaskDragEnd}
               ganttAriaLabel={t('ganttAriaLabel')}
               weekStartsOn={weekStartsOn}
@@ -1095,6 +1439,15 @@ export function ScheduleViewClient({
             />
             {t('legendToday')}
           </span>
+          {baselineOverlayAvailable && (
+            <span className="flex items-center gap-1.5">
+              <span
+                className="h-3 w-6 rounded-sm border border-dashed border-slate-500 bg-slate-300/50"
+                aria-hidden
+              />
+              {t('legendBaseline')}
+            </span>
+          )}
           <span className="flex items-center gap-1.5">
             <span
               className="h-3 w-6 rounded-sm border border-blue-800 bg-blue-500"
@@ -1137,9 +1490,13 @@ export function ScheduleViewClient({
             duration: selectedTaskForEditData.plannedDuration,
             progress: Number(selectedTaskForEditData.progressPercent),
             notes: selectedTaskForEditData.notes ?? null,
+            assignedTo: selectedTaskForEditData.assignedTo ?? null,
           }}
           workingDaysPerWeek={schedule.workingDaysPerWeek}
+          calendarOptions={calendarOptions}
           canEdit={canEdit}
+          scheduleStatus={schedule.status}
+          assignmentOptions={assignmentOptions}
           dependencies={editTaskDependencies}
           onOpenDependencies={() => {
             if (selectedTaskForEdit) {
