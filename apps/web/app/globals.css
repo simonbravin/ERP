@@ -328,7 +328,8 @@
   /* Short crossfade when toggling light/dark (global color props on *) */
   --motion-theme: 90ms;
   --motion-ease: cubic-bezier(0.4, 0, 0.2, 1);
-  --motion-ease-out: cubic-bezier(0.33, 1, 0.68, 1);
+  /* Symmetric ease for theme crossfade (light ↔ dark) */
+  --motion-ease-in-out: cubic-bezier(0.45, 0, 0.55, 1);
 
   /* Border Radius (shadcn: --radius is default) */
   --radius: 0.5rem;
@@ -362,7 +363,7 @@
       transition-property: background-color, border-color, color, fill, stroke, text-decoration-color,
         outline-color;
       transition-duration: var(--motion-theme, 90ms);
-      transition-timing-function: var(--motion-ease-out, cubic-bezier(0.33, 1, 0.68, 1));
+      transition-timing-function: var(--motion-ease-in-out, cubic-bezier(0.45, 0, 0.55, 1));
     }
   }
 }

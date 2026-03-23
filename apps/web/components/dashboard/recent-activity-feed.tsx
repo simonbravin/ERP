@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
-import { formatDistanceToNow, format } from 'date-fns'
+import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
 import {
   FolderPlus,
@@ -135,13 +135,13 @@ export function RecentActivityFeed({ activities, hideProjectName = false }: Rece
                       </>
                     )}
                   </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
+                  <p className="mt-1 min-h-[1rem] text-xs text-muted-foreground">
                     {mounted
                       ? formatDistanceToNow(new Date(activity.createdAt), {
                           addSuffix: true,
                           locale: es,
                         })
-                      : format(new Date(activity.createdAt), "d MMM yyyy, HH:mm", { locale: es })}
+                      : '\u00a0'}
                   </p>
                 </div>
               </div>
