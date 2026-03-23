@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { useRouter } from '@/i18n/navigation'
 import { useMessageBus } from '@/hooks/use-message-bus'
@@ -39,8 +39,11 @@ import {
   ZoomOut,
   Maximize2,
   Minimize2,
+  Columns2,
+  PanelLeftClose,
+  PanelLeft,
 } from 'lucide-react'
-import { format, addDays, subDays, differenceInDays } from 'date-fns'
+import { format, addDays, subDays, differenceInDays, startOfDay } from 'date-fns'
 import { es } from 'date-fns/locale'
 
 export type ScheduleViewData = NonNullable<
@@ -79,6 +82,11 @@ export function ScheduleViewClient({
   const [groupBy, setGroupBy] = useState<'none' | 'phase' | 'assigned'>('none')
   const [weekStartsOn, setWeekStartsOn] = useState<0 | 1>(1)
   const [viewMode, setViewMode] = useState<'gantt' | 'calendar'>('gantt')
+  const [showWbsDetailColumns, setShowWbsDetailColumns] = useState(true)
+  const [calendarWbsStrip, setCalendarWbsStrip] = useState(false)
+
+  const mainScheduleScrollRef = useRef<HTMLDivElement>(null)
+  const fullscreenScheduleScrollRef = useRef<HTMLDivElement>(null)
 
   const schedulePrefsKey = `bloqer-schedule-prefs-${scheduleData.id}`
   useEffect(() => {
@@ -94,6 +102,8 @@ export function ScheduleViewClient({
         groupBy: 'none' | 'phase' | 'assigned'
         weekStartsOn: 0 | 1
         viewMode: 'gantt' | 'calendar'
+        showWbsDetailColumns: boolean
+        calendarWbsStrip: boolean
       }>
       if (stored.zoom && ['day', 'week', 'month'].includes(stored.zoom)) setZoom(stored.zoom)
       if (typeof stored.showCriticalPath === 'boolean') setShowCriticalPath(stored.showCriticalPath)
@@ -103,6 +113,9 @@ export function ScheduleViewClient({
       if (stored.groupBy && ['none', 'phase', 'assigned'].includes(stored.groupBy)) setGroupBy(stored.groupBy)
       if (stored.weekStartsOn === 0 || stored.weekStartsOn === 1) setWeekStartsOn(stored.weekStartsOn)
       if (stored.viewMode && ['gantt', 'calendar'].includes(stored.viewMode)) setViewMode(stored.viewMode)
+      if (typeof stored.showWbsDetailColumns === 'boolean')
+        setShowWbsDetailColumns(stored.showWbsDetailColumns)
+      if (typeof stored.calendarWbsStrip === 'boolean') setCalendarWbsStrip(stored.calendarWbsStrip)
     } catch {
       // ignore invalid stored prefs
     }
@@ -125,9 +138,23 @@ export function ScheduleViewClient({
         groupBy,
         weekStartsOn,
         viewMode,
+        showWbsDetailColumns,
+        calendarWbsStrip,
       })
     )
-  }, [schedulePrefsKey, zoom, showCriticalPath, showProgress, showDependencies, showTodayLine, groupBy, weekStartsOn, viewMode])
+  }, [
+    schedulePrefsKey,
+    zoom,
+    showCriticalPath,
+    showProgress,
+    showDependencies,
+    showTodayLine,
+    groupBy,
+    weekStartsOn,
+    viewMode,
+    showWbsDetailColumns,
+    calendarWbsStrip,
+  ])
 
   const [visibleStartDate, setVisibleStartDate] = useState(
     () => new Date(scheduleData.projectStartDate)
@@ -420,32 +447,80 @@ export function ScheduleViewClient({
     setVisibleEndDate(endDate)
   }
 
+  const scrollScheduleToTop = useCallback(() => {
+    requestAnimationFrame(() => {
+      const el = isScheduleFullscreen
+        ? fullscreenScheduleScrollRef.current
+        : mainScheduleScrollRef.current
+      el?.scrollTo({ top: 0, behavior: 'smooth' })
+    })
+  }, [isScheduleFullscreen])
+
   function handleGoToToday() {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const projectStart = new Date(schedule.projectStartDate)
-    projectStart.setHours(0, 0, 0, 0)
-    const projectEnd = new Date(schedule.projectEndDate)
-    projectEnd.setHours(0, 0, 0, 0)
+    const today = startOfDay(new Date())
+    const projectStart = startOfDay(schedule.projectStartDate)
+    const projectEnd = startOfDay(schedule.projectEndDate)
     const daysToShow = Math.max(
       14,
       differenceInDays(visibleEndDate, visibleStartDate) + 1
     )
     const half = Math.floor(daysToShow / 2)
+    const todayInProject = today >= projectStart && today <= projectEnd
+
     let newStart = subDays(today, half)
     let newEnd = addDays(newStart, daysToShow - 1)
+
     if (newStart < projectStart) {
-      newStart = new Date(projectStart)
+      newStart = projectStart
       newEnd = addDays(newStart, daysToShow - 1)
     }
     if (newEnd > projectEnd) {
-      newEnd = new Date(projectEnd)
+      newEnd = projectEnd
       newStart = subDays(newEnd, daysToShow - 1)
     }
     if (newStart < projectStart) {
-      newStart = new Date(projectStart)
+      newStart = projectStart
     }
+
+    const rangeContainsToday = (s: Date, e: Date) => today >= s && today <= e
+
+    if (todayInProject) {
+      if (!rangeContainsToday(newStart, newEnd)) {
+        newStart = subDays(today, half)
+        newEnd = addDays(newStart, daysToShow - 1)
+        if (newStart < projectStart) {
+          newStart = projectStart
+          newEnd = addDays(newStart, daysToShow - 1)
+        }
+        if (newEnd > projectEnd) {
+          newEnd = projectEnd
+          newStart = subDays(newEnd, daysToShow - 1)
+        }
+        if (newStart < projectStart) {
+          newStart = projectStart
+        }
+      }
+      if (!rangeContainsToday(newStart, newEnd)) {
+        newStart = projectStart
+        newEnd = projectEnd
+      }
+    } else {
+      toast.info(t('todayOutsideProject'), {
+        description: t('todayOutsideProjectHint'),
+      })
+      if (today > projectEnd) {
+        newEnd = projectEnd
+        newStart = subDays(newEnd, daysToShow - 1)
+        if (newStart < projectStart) newStart = projectStart
+      } else {
+        newStart = projectStart
+        newEnd = addDays(newStart, daysToShow - 1)
+        if (newEnd > projectEnd) newEnd = projectEnd
+      }
+    }
+
     handleRangeChange(newStart, newEnd)
+    scrollScheduleToTop()
   }
 
   function handleCenterOnTask(taskId: string) {
@@ -846,6 +921,40 @@ export function ScheduleViewClient({
             </Select>
             <Button
               type="button"
+              variant={showWbsDetailColumns ? 'secondary' : 'ghost'}
+              size="sm"
+              className="h-7 w-7 p-0"
+              aria-pressed={showWbsDetailColumns}
+              title={
+                showWbsDetailColumns
+                  ? t('wbsDetailColumnsHide')
+                  : t('wbsDetailColumnsShow')
+              }
+              onClick={() => setShowWbsDetailColumns((v) => !v)}
+            >
+              <Columns2 className="h-3.5 w-3.5" />
+            </Button>
+            {viewMode === 'calendar' && (
+              <Button
+                type="button"
+                variant={calendarWbsStrip ? 'secondary' : 'ghost'}
+                size="sm"
+                className="h-7 w-7 p-0"
+                aria-pressed={calendarWbsStrip}
+                title={
+                  calendarWbsStrip ? t('calendarWbsWide') : t('calendarWbsNarrow')
+                }
+                onClick={() => setCalendarWbsStrip((v) => !v)}
+              >
+                {calendarWbsStrip ? (
+                  <PanelLeft className="h-3.5 w-3.5" />
+                ) : (
+                  <PanelLeftClose className="h-3.5 w-3.5" />
+                )}
+              </Button>
+            )}
+            <Button
+              type="button"
               variant="ghost"
               size="sm"
               className="h-7 gap-1.5 text-xs"
@@ -908,6 +1017,9 @@ export function ScheduleViewClient({
                 ganttAriaLabel={t('ganttAriaLabel')}
                 weekStartsOn={weekStartsOn}
                 viewMode={viewMode}
+                scrollContainerRef={fullscreenScheduleScrollRef}
+                showWbsDetailColumns={showWbsDetailColumns}
+                wbsMinimalStrip={viewMode === 'calendar' && calendarWbsStrip}
               />
             </div>
           </div>
@@ -946,6 +1058,9 @@ export function ScheduleViewClient({
               ganttAriaLabel={t('ganttAriaLabel')}
               weekStartsOn={weekStartsOn}
               viewMode={viewMode}
+              scrollContainerRef={mainScheduleScrollRef}
+              showWbsDetailColumns={showWbsDetailColumns}
+              wbsMinimalStrip={viewMode === 'calendar' && calendarWbsStrip}
             />
           </div>
           <div

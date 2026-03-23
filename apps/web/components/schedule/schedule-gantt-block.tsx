@@ -1,5 +1,7 @@
 'use client'
 
+import type { RefObject } from 'react'
+import { cn } from '@/lib/utils'
 import { GanttDataTable } from './gantt-data-table'
 import { GanttTimelineDynamic } from './gantt-timeline-dynamic'
 import { ScheduleCalendarView } from './schedule-calendar-view'
@@ -63,6 +65,9 @@ export interface ScheduleGanttBlockProps {
   viewMode?: 'gantt' | 'calendar'
   className?: string
   ganttAriaLabel?: string
+  scrollContainerRef?: RefObject<HTMLDivElement | null>
+  showWbsDetailColumns?: boolean
+  wbsMinimalStrip?: boolean
 }
 
 export function ScheduleGanttBlock({
@@ -92,10 +97,22 @@ export function ScheduleGanttBlock({
   viewMode = 'gantt',
   className,
   ganttAriaLabel,
+  scrollContainerRef,
+  showWbsDetailColumns = true,
+  wbsMinimalStrip = false,
 }: ScheduleGanttBlockProps) {
+  const wbsMinClass = wbsMinimalStrip
+    ? 'w-[72px] min-w-[72px] max-w-[72px]'
+    : showWbsDetailColumns
+      ? 'min-w-[420px]'
+      : 'min-w-[260px]'
+
   return (
-    <div className={className ?? 'flex min-h-0 flex-1 overflow-auto'}>
-      <div className="min-w-[420px] shrink-0 border-r border-border">
+    <div
+      ref={scrollContainerRef}
+      className={className ?? 'flex min-h-0 flex-1 overflow-auto'}
+    >
+      <div className={cn('shrink-0 border-r border-border', wbsMinClass)}>
         <GanttDataTable
           tasks={tableTasks}
           allTasks={allTableTasks}
@@ -109,6 +126,8 @@ export function ScheduleGanttBlock({
           searchQuery={searchQuery}
           workingDaysPerWeek={workingDaysPerWeek}
           groupBy={groupBy}
+          showDetailColumns={showWbsDetailColumns}
+          minimalWbsOnly={wbsMinimalStrip}
         />
       </div>
       <div className="min-h-0 min-w-0 flex-1">
@@ -125,6 +144,8 @@ export function ScheduleGanttBlock({
             }))}
             visibleStartDate={visibleStartDate}
             visibleEndDate={visibleEndDate}
+            zoom={zoom}
+            weekStartsOn={weekStartsOn}
             onTaskClick={onTaskClick}
             highlightedTask={highlightedTask}
             className="h-full"

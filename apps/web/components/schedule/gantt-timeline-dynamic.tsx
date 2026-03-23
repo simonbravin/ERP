@@ -264,7 +264,8 @@ export function GanttTimelineDynamic({
     const todayIdx = getDayIndex(today, days)
 
     if (todayIdx !== -1) {
-      const x = todayIdx * DAY_WIDTH
+      // Slight offset when today is the first column so the line is not flush against the WBS divider.
+      const x = todayIdx * DAY_WIDTH + (todayIdx === 0 ? 2 : 0)
 
       ctx.strokeStyle = '#dc2626'
       ctx.lineWidth = 2
