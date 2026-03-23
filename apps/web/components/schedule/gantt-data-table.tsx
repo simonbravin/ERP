@@ -85,7 +85,7 @@ export function GanttDataTable({
 
   return (
     <div className="flex h-full flex-col bg-card">
-      <div className="flex-1 overflow-visible">
+      <div className="shrink-0 overflow-visible">
         <Table>
           <TableHeader className="sticky top-0 z-10 bg-muted [&_tr]:border-0">
             <TableRow
@@ -160,9 +160,9 @@ export function GanttDataTable({
 
           <TableBody>
             {visibleTasks.map((task) => {
-              const isTopLevel = task.level === 0
-              const hasChildren =
-                isTopLevel && allTasks.some((x) => x.code.startsWith(task.code + '.'))
+              const hasChildren = allTasks.some(
+                (x) => x.code.startsWith(`${task.code}.`) && x.code !== task.code
+              )
               const isExpanded = expandedNodes.has(task.id)
               const isHighlighted = highlightedTask === task.id
               const isEditing = editingCell?.taskId === task.id

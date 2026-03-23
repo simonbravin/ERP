@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useEffect, useState } from 'react'
-import { format, eachDayOfInterval } from 'date-fns'
+import { format, eachDayOfInterval, startOfDay } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { addWorkingDays, countWorkingDays } from '@/lib/schedule/working-days'
 import { getDayIndex } from '@/lib/schedule/gantt-position'
@@ -260,7 +260,7 @@ export function GanttTimelineDynamic({
   }
 
   function drawTodayLine(ctx: CanvasRenderingContext2D) {
-    const today = new Date()
+    const today = startOfDay(new Date())
     const todayIdx = getDayIndex(today, days)
 
     if (todayIdx !== -1) {

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
-import { useRouter } from '@/i18n/navigation'
+import { useRouter, Link } from '@/i18n/navigation'
 import { useMessageBus } from '@/hooks/use-message-bus'
 import { ScheduleGanttBlock } from './schedule-gantt-block'
 import { GanttControlPanel } from './gantt-control-panel'
@@ -54,12 +54,14 @@ interface ScheduleViewClientProps {
   scheduleData: ScheduleViewData
   canEdit: boolean
   canSetBaseline: boolean
+  canCreateVersion?: boolean
 }
 
 export function ScheduleViewClient({
   scheduleData,
   canEdit,
   canSetBaseline,
+  canCreateVersion = false,
 }: ScheduleViewClientProps) {
   const t = useTranslations('schedule')
   const router = useRouter()
@@ -157,10 +159,10 @@ export function ScheduleViewClient({
   ])
 
   const [visibleStartDate, setVisibleStartDate] = useState(
-    () => new Date(scheduleData.projectStartDate)
+    () => startOfDay(new Date(scheduleData.projectStartDate))
   )
   const [visibleEndDate, setVisibleEndDate] = useState(
-    () => new Date(scheduleData.projectEndDate)
+    () => startOfDay(new Date(scheduleData.projectEndDate))
   )
 
   const [selectedTaskForEdit, setSelectedTaskForEdit] = useState<string | null>(
@@ -443,8 +445,8 @@ export function ScheduleViewClient({
   }
 
   function handleRangeChange(startDate: Date, endDate: Date) {
-    setVisibleStartDate(startDate)
-    setVisibleEndDate(endDate)
+    setVisibleStartDate(startOfDay(startDate))
+    setVisibleEndDate(startOfDay(endDate))
   }
 
   const scrollScheduleToTop = useCallback(() => {
@@ -820,6 +822,20 @@ export function ScheduleViewClient({
         </Alert>
       )}
 
+      {!canEdit && schedule.status !== 'DRAFT' && canCreateVersion && (
+        <Alert>
+          <AlertTitle>{t('scheduleEditBlockedTitle')}</AlertTitle>
+          <AlertDescription className="space-y-2">
+            <p>{t('scheduleEditBlockedBody', { status: schedule.status })}</p>
+            <Button asChild size="sm" variant="default" className="mt-1">
+              <Link href={`/projects/${schedule.project.id}/schedule/new`}>
+                {t('scheduleCreateNewVersionCta')}
+              </Link>
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       <GanttControlPanel
         showCriticalPath={showCriticalPath}
         onShowCriticalPathChange={setShowCriticalPath}
@@ -842,9 +858,6 @@ export function ScheduleViewClient({
         currentStartDate={visibleStartDate}
         currentEndDate={visibleEndDate}
         onRangeChange={handleRangeChange}
-        zoom={zoom}
-        onZoomChange={setZoom}
-        onGoToToday={handleGoToToday}
       />
 
       <div className="space-y-1">

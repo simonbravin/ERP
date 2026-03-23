@@ -5,16 +5,19 @@ import { useTranslations } from 'next-intl'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Calendar, ZoomIn, ZoomOut } from 'lucide-react'
-import { format, addDays } from 'date-fns'
+import { Calendar } from 'lucide-react'
+import { format, addDays, startOfDay } from 'date-fns'
 import { es } from 'date-fns/locale'
+
+/** Parse yyyy-MM-dd as local calendar day (avoids UTC shift from `new Date('yyyy-MM-dd')`). */
+function parseLocalDateInput(ymd: string): Date {
+  const parts = ymd.split('-').map((x) => parseInt(x, 10))
+  const y = parts[0]
+  const m = parts[1]
+  const d = parts[2]
+  if (!y || !m || !d) return startOfDay(new Date())
+  return startOfDay(new Date(y, m - 1, d))
+}
 
 interface DateRangeSliderProps {
   projectStartDate: Date
@@ -22,9 +25,6 @@ interface DateRangeSliderProps {
   currentStartDate: Date
   currentEndDate: Date
   onRangeChange: (startDate: Date, endDate: Date) => void
-  zoom?: 'day' | 'week' | 'month'
-  onZoomChange?: (zoom: 'day' | 'week' | 'month') => void
-  onGoToToday?: () => void
 }
 
 export function DateRangeSlider({
@@ -33,9 +33,6 @@ export function DateRangeSlider({
   currentStartDate,
   currentEndDate,
   onRangeChange,
-  zoom = 'week',
-  onZoomChange,
-  onGoToToday,
 }: DateRangeSliderProps) {
   const t = useTranslations('schedule')
 
@@ -112,62 +109,11 @@ export function DateRangeSlider({
 
   return (
     <div className="space-y-2 rounded-lg border border-border bg-card p-2">
-      {/* Fila 1: Título Visibilidad + Zoom + Restablecer */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Label className="text-xs font-semibold">{t('visibility')}</Label>
-        <div className="flex flex-wrap items-center gap-2">
-          {onZoomChange && (
-            <div className="flex items-center gap-1">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-7 w-7 p-0"
-                onClick={() => {
-                  if (zoom === 'month') onZoomChange('week')
-                  else if (zoom === 'week') onZoomChange('day')
-                }}
-                disabled={zoom === 'day'}
-              >
-                <ZoomIn className="h-3.5 w-3.5" />
-              </Button>
-              <Select
-                value={zoom}
-                onValueChange={(v) => onZoomChange(v as 'day' | 'week' | 'month')}
-              >
-                <SelectTrigger className="h-7 w-[90px] text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="day">{t('daily')}</SelectItem>
-                  <SelectItem value="week">{t('weekly')}</SelectItem>
-                  <SelectItem value="month">{t('monthly')}</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-7 w-7 p-0"
-                onClick={() => {
-                  if (zoom === 'day') onZoomChange('week')
-                  else if (zoom === 'week') onZoomChange('month')
-                }}
-                disabled={zoom === 'month'}
-              >
-                <ZoomOut className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          )}
-          {onGoToToday && (
-            <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={onGoToToday}>
-              {t('legendToday')}
-            </Button>
-          )}
-          <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={handleResetToProject}>
-            {t('resetToProject')}
-          </Button>
-        </div>
+        <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={handleResetToProject}>
+          {t('resetToProject')}
+        </Button>
       </div>
 
       {/* Fila 2: Ver desde / Ver hasta + slider de días */}
@@ -222,8 +168,8 @@ export function DateRangeSlider({
 
       <p className="text-[10px] text-slate-500">
         {t('showingDaysInfo', {
-          start: format(new Date(rangeStart), 'dd MMM', { locale: es }),
-          end: format(new Date(rangeEnd), 'dd MMM', { locale: es }),
+          start: format(parseLocalDateInput(rangeStart), 'dd MMM', { locale: es }),
+          end: format(parseLocalDateInput(rangeEnd), 'dd MMM', { locale: es }),
         })}
       </p>
     </div>

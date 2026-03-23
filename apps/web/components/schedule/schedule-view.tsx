@@ -5,12 +5,15 @@ interface ScheduleViewProps {
   scheduleId: string
   canEdit: boolean
   canSetBaseline: boolean
+  /** User can create a new schedule version (e.g. to get a DRAFT copy when viewing baseline). */
+  canCreateVersion?: boolean
 }
 
 export async function ScheduleView({
   scheduleId,
   canEdit,
   canSetBaseline,
+  canCreateVersion = false,
 }: ScheduleViewProps) {
   const scheduleData = await getScheduleForView(scheduleId)
 
@@ -34,6 +37,7 @@ export async function ScheduleView({
       scheduleData={scheduleData}
       canEdit={canEdit}
       canSetBaseline={canSetBaseline}
+      canCreateVersion={canCreateVersion}
     />
   )
 }

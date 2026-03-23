@@ -88,8 +88,11 @@ export default async function ProjectSchedulePage({
     )
   }
 
+  // Prefer a DRAFT version for editing when one exists; otherwise baseline / first.
   const activeSchedule =
-    schedules.find((s) => s.isBaseline) ?? schedules[0]
+    schedules.find((s) => s.status === 'DRAFT') ??
+    schedules.find((s) => s.isBaseline) ??
+    schedules[0]
 
   const projectRole = await getProjectMemberRole(id, orgContext.memberId)
   const canEditByOrg = ['EDITOR', 'ADMIN', 'OWNER'].includes(orgContext.role)
@@ -118,6 +121,7 @@ export default async function ProjectSchedulePage({
         scheduleId={activeSchedule.id}
         canEdit={canEdit}
         canSetBaseline={['ADMIN', 'OWNER'].includes(orgContext.role)}
+        canCreateVersion={canCreateVersion}
       />
     </div>
   )
