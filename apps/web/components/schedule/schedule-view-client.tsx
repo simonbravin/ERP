@@ -171,13 +171,20 @@ export function ScheduleViewClient({
     })),
   }
 
+  // Stable across router.refresh(): parent often passes a new `tasks` array reference with the same ids.
+  const expandedNodesResetKey = `${scheduleData.id}:${[...scheduleData.tasks]
+    .map((t: { id: string }) => t.id)
+    .sort()
+    .join('|')}`
+
   useEffect(() => {
-    if (scheduleData.tasks.length > 0) {
-      setExpandedNodes(
-        new Set(scheduleData.tasks.map((t: { id: string }) => t.id))
-      )
+    const tasks = scheduleData.tasks
+    if (tasks.length > 0) {
+      setExpandedNodes(new Set(tasks.map((t: { id: string }) => t.id)))
     }
-  }, [scheduleData.id, scheduleData.tasks])
+    // expandedNodesResetKey captures task id set; do not depend on `tasks` array identity (refresh()).
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sync expand-all only when schedule or task ids change
+  }, [expandedNodesResetKey])
 
   const ganttTasks = schedule.tasks.map((task: (typeof schedule.tasks)[0]) => {
     const level = task.wbsNode.code.split('.').length - 1

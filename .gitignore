@@ -12,6 +12,7 @@ node_modules/
 dist/
 out/
 build/
+*.tsbuildinfo
 
 # IDE and OS
 .idea/
