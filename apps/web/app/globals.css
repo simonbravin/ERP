@@ -325,7 +325,10 @@
   --motion-fast: 150ms;
   --motion-base: 200ms;
   --motion-slow: 300ms;
+  /* Short crossfade when toggling light/dark (global color props on *) */
+  --motion-theme: 90ms;
   --motion-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --motion-ease-out: cubic-bezier(0.33, 1, 0.68, 1);
 
   /* Border Radius (shadcn: --radius is default) */
   --radius: 0.5rem;
@@ -358,8 +361,8 @@
     *::after {
       transition-property: background-color, border-color, color, fill, stroke, text-decoration-color,
         outline-color;
-      transition-duration: var(--motion-base, 200ms);
-      transition-timing-function: var(--motion-ease, cubic-bezier(0.4, 0, 0.2, 1));
+      transition-duration: var(--motion-theme, 90ms);
+      transition-timing-function: var(--motion-ease-out, cubic-bezier(0.33, 1, 0.68, 1));
     }
   }
 }

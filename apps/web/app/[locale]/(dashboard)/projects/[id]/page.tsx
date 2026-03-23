@@ -286,19 +286,19 @@ export default async function ProjectDetailPage({ params }: PageProps) {
           </Link>
           <Link
             href={`/projects/${project.id}/quality/rfis`}
-            className="flex flex-col items-center gap-2 rounded-lg border border-slate-200 p-4 text-center transition-colors hover:bg-slate-50"
+            className="flex flex-col items-center gap-2 rounded-lg border border-border p-4 text-center transition-colors hover:bg-muted/50"
           >
-            <CheckSquare className="h-6 w-6 text-red-600" />
-            <span className="text-sm font-medium text-slate-700">
+            <CheckSquare className="h-6 w-6 text-red-600 dark:text-red-400" />
+            <span className="text-sm font-medium text-foreground">
               RFIs
             </span>
           </Link>
           <Link
             href={`/projects/${project.id}/documents`}
-            className="flex flex-col items-center gap-2 rounded-lg border border-slate-200 p-4 text-center transition-colors hover:bg-slate-50"
+            className="flex flex-col items-center gap-2 rounded-lg border border-border p-4 text-center transition-colors hover:bg-muted/50"
           >
-            <FileText className="h-6 w-6 text-slate-600" />
-            <span className="text-sm font-medium text-slate-700">
+            <FileText className="h-6 w-6 text-slate-600 dark:text-slate-300" />
+            <span className="text-sm font-medium text-foreground">
               {t('documents')}
             </span>
           </Link>
