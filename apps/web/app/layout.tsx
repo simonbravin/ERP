@@ -35,12 +35,7 @@ export default function RootLayout({
       className={`${inter.variable} ${robotoMono.variable}`}
     >
       <body className="erp-shell antialiased font-sans">
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           {children}
           <Toaster richColors position="top-right" />
           <GlobalNotificationsListener />

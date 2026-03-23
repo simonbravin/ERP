@@ -350,6 +350,18 @@
   html {
     font-family: var(--font-sans);
   }
+
+  /* Light/dark: interpolate token-backed colors when .dark toggles on <html> */
+  @media (prefers-reduced-motion: no-preference) {
+    *,
+    *::before,
+    *::after {
+      transition-property: background-color, border-color, color, fill, stroke, text-decoration-color,
+        outline-color;
+      transition-duration: var(--motion-base, 200ms);
+      transition-timing-function: var(--motion-ease, cubic-bezier(0.4, 0, 0.2, 1));
+    }
+  }
 }
 
 @layer components {
