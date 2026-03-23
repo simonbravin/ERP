@@ -3,7 +3,7 @@ import { getOrgContext } from '@/lib/org-context'
 import { redirect } from '@/i18n/navigation'
 import { getLocale } from 'next-intl/server'
 import { prisma } from '@repo/database'
-import { resolveLogoUrl } from '@/app/actions/settings'
+import { resolveLogoUrl } from '@/lib/media-urls'
 import { OrganizationSettingsForm } from '@/components/settings/organization-settings-form'
 
 export default async function OrganizationSettingsPage() {

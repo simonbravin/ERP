@@ -2,7 +2,7 @@ import { getSession } from '@/lib/session'
 import { redirect } from '@/i18n/navigation'
 import { getLocale } from 'next-intl/server'
 import { prisma } from '@repo/database'
-import { resolveAvatarUrl } from '@/app/actions/settings'
+import { resolveAvatarUrl } from '@/lib/media-urls'
 import { UserProfileForm } from '@/components/settings/user-profile-form'
 export default async function ProfilePage() {
   const session = await getSession()

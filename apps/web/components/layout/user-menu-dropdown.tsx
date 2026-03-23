@@ -26,7 +26,7 @@ import { Settings, LogOut } from 'lucide-react'
 import { Link } from '@/i18n/navigation'
 
 interface UserMenuDropdownProps {
-  user: { name?: string | null; email?: string | null }
+  user: { name?: string | null; email?: string | null; image?: string | null }
   /** Sidebar variant: full-width trigger, sidebar colors */
   variant?: 'default' | 'sidebar'
   /** When true (sidebar collapsed): show only avatar */
@@ -68,13 +68,23 @@ export function UserMenuDropdown({ user, variant = 'default', collapsed = false 
           <div
             className={
               isSidebar
-                ? 'flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sidebar-accent'
-                : 'flex h-8 w-8 items-center justify-center rounded-full bg-muted'
+                ? 'flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-sidebar-accent'
+                : 'flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted'
             }
           >
-            <span className={isSidebar ? 'text-sm font-semibold text-sidebar-foreground' : 'text-xs font-semibold text-slate-600'}>
-              {initials}
-            </span>
+            {user.image ? (
+              // eslint-disable-next-line @next/next/no-img-element -- presigned R2 / arbitrary hosts; avoid remotePatterns churn
+              <img
+                src={user.image}
+                alt=""
+                className="h-full w-full object-cover"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <span className={isSidebar ? 'text-sm font-semibold text-sidebar-foreground' : 'text-xs font-semibold text-slate-600'}>
+                {initials}
+              </span>
+            )}
           </div>
           {(!isSidebar || !collapsed) && (
             <span className={isSidebar ? 'truncate text-sm font-medium text-sidebar-foreground' : 'text-sm font-medium text-slate-700'}>

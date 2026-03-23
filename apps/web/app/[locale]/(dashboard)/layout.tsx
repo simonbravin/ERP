@@ -5,10 +5,10 @@ import { getSession } from '@/lib/session'
 import { getOrgContext, isRestrictedToProjects } from '@/lib/org-context'
 import { DashboardLayout } from '@/components/layouts/dashboard-layout'
 import { SignOutConfirmButton } from '@/components/auth/sign-out-confirm-button'
+import { prisma } from '@repo/database'
+import { resolveLogoUrl, resolveAvatarUrl } from '@/lib/media-urls'
 
 export const dynamic = 'force-dynamic'
-
-/** Logo is not fetched here to keep layout fast; can be loaded client-side later if needed. */
 
 function DashboardError({ message }: { message: string }) {
   const isEnvError = /DATABASE_URL|Environment variable|env\s*\(/.test(message)
@@ -69,13 +69,27 @@ export default async function DashboardLayoutPage({
       )
     }
 
+    const [profileRow, dbUser] = await Promise.all([
+      prisma.orgProfile.findUnique({
+        where: { orgId: orgContext.orgId },
+        select: { logoStorageKey: true },
+      }),
+      prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { avatarUrl: true },
+      }),
+    ])
+    const orgLogoUrl = await resolveLogoUrl(profileRow?.logoStorageKey ?? null)
+    const userImageUrl = await resolveAvatarUrl(dbUser?.avatarUrl ?? null)
+
     return (
       <DashboardLayout
         orgName={orgContext.orgName}
-        orgLogoUrl={null}
+        orgLogoUrl={orgLogoUrl}
         user={{
           name: session.user.name ?? session.user.email ?? 'User',
           email: session.user.email ?? null,
+          image: userImageUrl,
         }}
         restrictedToProjects={isRestrictedToProjects(orgContext)}
       >

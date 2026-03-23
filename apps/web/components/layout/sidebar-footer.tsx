@@ -7,7 +7,7 @@ import { NotificationsDropdown } from './notifications-dropdown'
 import { UserMenuDropdown } from './user-menu-dropdown'
 
 interface SidebarFooterProps {
-  user: { name: string; email?: string | null }
+  user: { name: string; email?: string | null; image?: string | null }
   collapsed?: boolean
 }
 

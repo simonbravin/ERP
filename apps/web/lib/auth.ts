@@ -48,11 +48,16 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           if (!user || !user.active || !user.passwordHash) return null
           const valid = await bcrypt.compare(password, user.passwordHash)
           if (!valid) return null
+          const avatar = user.avatarUrl ?? undefined
           return {
             id: user.id,
             email: user.email,
             name: user.fullName,
-            image: user.avatarUrl ?? undefined,
+            // r2: keys are not valid img src; sidebar resolves avatar from DB in layout.
+            image:
+              avatar && !avatar.startsWith('r2:')
+                ? avatar
+                : undefined,
             isSuperAdmin: user.isSuperAdmin ?? false,
           }
         } catch (err) {
@@ -84,6 +89,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.sub = user.id
         token.email = user.email ?? undefined
         token.name = user.name ?? undefined
+        token.picture = user.image ?? undefined
         const isSuperAdmin = (user as { isSuperAdmin?: boolean }).isSuperAdmin ?? false
         if (isSuperAdmin) {
           token.isSuperAdmin = true
@@ -109,6 +115,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         session.user.id = token.sub ?? ''
         session.user.email = token.email ?? ''
         session.user.name = token.name ?? ''
+        session.user.image =
+          typeof token.picture === 'string' && token.picture.length > 0 ? token.picture : null
         session.user.isSuperAdmin = token.isSuperAdmin as boolean | undefined
         session.user.orgId = token.orgId as string | undefined
         session.user.orgMemberId = token.orgMemberId as string | undefined

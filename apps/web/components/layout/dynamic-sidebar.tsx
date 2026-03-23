@@ -10,7 +10,7 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 interface DynamicSidebarProps {
   orgName?: string
   orgLogoUrl?: string | null
-  user: { name: string; email?: string | null }
+  user: { name: string; email?: string | null; image?: string | null }
   /** When true, global sidebar shows only Dashboard + Projects */
   restrictedToProjects?: boolean
   /** Mobile: sidebar as overlay drawer */

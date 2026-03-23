@@ -7,11 +7,18 @@ import { BreadcrumbsContainer } from '@/components/layout/breadcrumbs-container'
 
 const MOBILE_BP = 768
 
+export type DashboardShellUser = {
+  name: string
+  email?: string | null
+  /** Resolved URL for sidebar avatar (R2 presigned or /uploads). */
+  image?: string | null
+}
+
 interface DashboardShellProps {
   children: React.ReactNode
   orgName: string
   orgLogoUrl?: string | null
-  user: { name: string; email?: string | null }
+  user: DashboardShellUser
   restrictedToProjects?: boolean
 }
 
@@ -33,46 +40,16 @@ function useIsMobile() {
  * No top header bar: page titles live in each section; mobile gets a floating menu button to open the sidebar.
  */
 export function DashboardShell({ children, orgName, orgLogoUrl, user, restrictedToProjects }: DashboardShellProps) {
-  const [resolvedLogoUrl, setResolvedLogoUrl] = useState<string | null>(orgLogoUrl ?? null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const isMobile = useIsMobile()
-
-  // Keep local state in sync if server ever provides a logo URL.
-  useEffect(() => {
-    setResolvedLogoUrl(orgLogoUrl ?? null)
-  }, [orgLogoUrl])
-
-  // Lazy-load org logo via API so navigation is not blocked by R2/DB calls.
-  useEffect(() => {
-    if (resolvedLogoUrl !== null) return
-    let cancelled = false
-
-    async function loadLogo() {
-      try {
-        const res = await fetch('/api/org/logo')
-        if (!res.ok) return
-        const data = (await res.json()) as { logoUrl?: string | null }
-        if (!cancelled && data.logoUrl) {
-          setResolvedLogoUrl(data.logoUrl)
-        }
-      } catch {
-        // Ignore logo errors; sidebar will just show org initials/name.
-      }
-    }
-
-    loadLogo()
-    return () => {
-      cancelled = true
-    }
-  }, [resolvedLogoUrl])
 
   return (
     <div className="flex h-screen w-full bg-background">
       <div className="flex h-full w-full min-w-0 overflow-hidden">
         <DynamicSidebar
           orgName={orgName}
-          orgLogoUrl={resolvedLogoUrl}
+          orgLogoUrl={orgLogoUrl ?? null}
           user={user}
           restrictedToProjects={restrictedToProjects}
           isMobile={isMobile}

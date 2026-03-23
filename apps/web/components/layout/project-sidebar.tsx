@@ -35,7 +35,7 @@ interface ProjectSidebarProps {
   projectId: string
   orgName?: string
   orgLogoUrl?: string | null
-  user: { name: string; email?: string | null }
+  user: { name: string; email?: string | null; image?: string | null }
   isMobile?: boolean
   sidebarOpen?: boolean
   onSidebarClose?: () => void

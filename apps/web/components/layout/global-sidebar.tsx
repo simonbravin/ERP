@@ -50,7 +50,7 @@ interface NavItem {
 interface GlobalSidebarProps {
   orgName?: string
   orgLogoUrl?: string | null
-  user: { name: string; email?: string | null }
+  user: { name: string; email?: string | null; image?: string | null }
   /** When true, show only Tablero + Proyectos (restricted user) */
   restrictedToProjects?: boolean
   isMobile?: boolean

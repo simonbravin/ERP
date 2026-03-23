@@ -1,10 +1,10 @@
-import { DashboardShell } from '@/components/layouts/dashboard-shell'
+import { DashboardShell, type DashboardShellUser } from '@/components/layouts/dashboard-shell'
 
 interface DashboardLayoutProps {
   children: React.ReactNode
   orgName: string
   orgLogoUrl?: string | null
-  user: { name: string; email?: string | null }
+  user: DashboardShellUser
   /** When true (EDITOR/VIEWER restricted): sidebar shows only Dashboard + Projects */
   restrictedToProjects?: boolean
 }

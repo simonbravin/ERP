@@ -5,12 +5,7 @@ import { prisma, Prisma } from '@repo/database'
 import { getSession } from '@/lib/session'
 import { getOrgContext } from '@/lib/org-context'
 import { requireRole } from '@/lib/rbac'
-import {
-  uploadToR2,
-  getDownloadUrl,
-  r2Client,
-  StorageNotConfiguredError,
-} from '@/lib/r2-client'
+import { uploadToR2, r2Client, StorageNotConfiguredError } from '@/lib/r2-client'
 import type { UpdateUserProfileInput, UpdateOrganizationInput } from '@repo/validators'
 
 const IMAGE_MAX_BYTES = 5 * 1024 * 1024 // 5MB
@@ -258,6 +253,8 @@ export async function uploadUserAvatar(formData: FormData) {
     })
 
     revalidatePath('/settings/profile')
+    revalidatePath('/dashboard')
+    revalidatePath('/', 'layout')
     return { success: true }
   } catch (error) {
     console.error('Error uploading avatar:', error)
@@ -268,27 +265,3 @@ export async function uploadUserAvatar(formData: FormData) {
   }
 }
 
-/** Resolve logo URL for display from OrgProfile.logoStorageKey */
-export async function resolveLogoUrl(storageKey: string | null): Promise<string | null> {
-  if (!storageKey) return null
-  try {
-    const url = await getDownloadUrl(storageKey)
-    return url.startsWith('http') || url.startsWith('/') ? url : null
-  } catch {
-    return null
-  }
-}
-
-/** Resolve avatar URL for display (presigned when stored as r2:key) */
-export async function resolveAvatarUrl(avatarUrl: string | null): Promise<string | null> {
-  if (!avatarUrl) return null
-  if (avatarUrl.startsWith('r2:')) {
-    try {
-      const url = await getDownloadUrl(avatarUrl.slice(3))
-      return url.startsWith('http') || url.startsWith('/') ? url : null
-    } catch {
-      return null
-    }
-  }
-  return avatarUrl.startsWith('/') || avatarUrl.startsWith('http') ? avatarUrl : null
-}
