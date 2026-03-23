@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 import { getDocumentDownloadUrl } from '@/app/actions/documents'
 import { DocumentViewerModal } from './document-viewer-modal'
 import { FileText } from 'lucide-react'
+import Image from 'next/image'
 
 type DocumentThumbnailProps = {
   versionId: string
@@ -51,10 +52,13 @@ export function DocumentThumbnail({
             onClick={() => canPreview && setShowViewer(true)}
             className="block overflow-hidden rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
           >
-            <img
+            <Image
               src={url}
               alt={title ?? fileName}
+              width={96}
+              height={96}
               className="h-24 w-24 object-cover"
+              unoptimized
             />
           </button>
         ) : (

@@ -23,6 +23,7 @@ import {
   X,
   Home,
 } from 'lucide-react'
+import Image from 'next/image'
 import { SidebarFooter } from './sidebar-footer'
 import {
   canAccessProjectArea,
@@ -203,10 +204,13 @@ export function ProjectSidebar({ projectId, orgName = 'Bloqer', orgLogoUrl, user
         ) : (
           <Link href="/dashboard" prefetch onClick={closeOnNav} className="flex min-w-0 flex-1 items-center gap-2">
             {orgLogoUrl ? (
-              <img
+              <Image
                 src={orgLogoUrl}
                 alt={orgName}
+                width={140}
+                height={52}
                 className="h-[3.25rem] w-auto max-w-[140px] object-contain"
+                unoptimized
               />
             ) : (
               <span className="truncate text-base font-bold text-sidebar-foreground" title={orgName}>

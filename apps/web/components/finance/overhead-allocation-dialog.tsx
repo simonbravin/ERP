@@ -131,7 +131,7 @@ export function OverheadAllocationDialog({
         })
       }
     }
-  }, [open, transaction?.id, transaction?.allocations?.length, form])
+  }, [open, transaction, form])
 
   const handleNoAssign = async () => {
     setIsSubmitting(true)

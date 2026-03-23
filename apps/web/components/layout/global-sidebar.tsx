@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 import { Link, usePathname } from '@/i18n/navigation'
 import { cn } from '@/lib/utils'
 import { usePermissions } from '@/hooks/use-permissions'
+import Image from 'next/image'
 import {
   LayoutDashboard,
   FolderKanban,
@@ -123,7 +124,7 @@ export function GlobalSidebar({ orgName = 'Bloqer', orgLogoUrl, user, restricted
       )
     }
     return list
-  }, [allNav, status, loading, restrictedToProjects])
+  }, [allNav, status, loading, restrictedToProjects, canView])
 
   const sectionLabels: Record<string, string> = {
     operations: t('sectionOperations'),
@@ -153,10 +154,13 @@ export function GlobalSidebar({ orgName = 'Bloqer', orgLogoUrl, user, restricted
         ) : (
           <Link href="/dashboard" prefetch onClick={isMobile ? onSidebarClose : undefined} className="flex min-w-0 flex-1 items-center gap-2">
             {orgLogoUrl ? (
-              <img
+              <Image
                 src={orgLogoUrl}
                 alt={orgName}
+                width={180}
+                height={52}
                 className="h-[3.25rem] w-auto max-w-[180px] object-contain"
+                unoptimized
               />
             ) : (
               <span className="truncate text-lg font-bold text-sidebar-foreground" title={orgName}>

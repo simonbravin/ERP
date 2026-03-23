@@ -72,12 +72,16 @@ export function TransactionForm({
   const baseAmount = totalFromLines * exchangeRateSnapshot
 
   useEffect(() => {
-    if (!projectId || !fetchWbs) {
-      setWbsOptions([])
+    if (!fetchWbs) {
+      setWbsOptions(initialWbs)
+      return
+    }
+    if (!projectId) {
+      setWbsOptions(initialWbs)
       return
     }
     fetchWbs(projectId).then(setWbsOptions).catch(() => setWbsOptions([]))
-  }, [projectId])
+  }, [projectId, fetchWbs, initialWbs])
 
   const wbsOptionsToUse = wbsOptions
 

@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Lint, typecheck, tests, build
+    runs-on: ubuntu-latest
+    env:
+      # Satisfy turbo task env keys and any build-time reads; no DB server required for prisma generate / Next build.
+      DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci?schema=public
+      DATABASE_URL_UNPOOLED: postgresql://ci:ci@127.0.0.1:5432/ci?schema=public
+      DIRECT_URL: postgresql://ci:ci@127.0.0.1:5432/ci?schema=public
+      NEXTAUTH_SECRET: ci-nextauth-secret-min-32-chars-long
+      NEXTAUTH_URL: http://localhost:3333
+      NEXT_PUBLIC_APP_URL: http://localhost:3333
+      EMAIL_FROM: ci@example.com
+      RESEND_FROM_EMAIL: ci@example.com
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: check:ci (i18n, typecheck, lint, tests, build web)
+        run: pnpm check:ci

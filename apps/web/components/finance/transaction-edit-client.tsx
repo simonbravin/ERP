@@ -99,7 +99,7 @@ export function TransactionEditClient({
       return
     }
     fetchWbs(projectId).then(setWbsOptions).catch(() => setWbsOptions([]))
-  }, [projectId, fetchWbs])
+  }, [projectId, fetchWbs, initialWbs])
 
   const totalFromLines = transaction.lines.reduce((s, l) => s + l.lineTotal, 0)
   const baseAmount = totalFromLines * exchangeRate

@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { getDocumentDownloadUrl } from '@/app/actions/documents'
 import { X } from 'lucide-react'
+import Image from 'next/image'
 
 type DocumentViewerModalProps = {
   versionId: string
@@ -76,7 +77,14 @@ export function DocumentViewerModal({
             <iframe src={url} title={fileName} className="h-[70vh] w-full rounded border-0" />
           )}
           {!loading && !error && url && viewableImage && (
-            <img src={url} alt={fileName} className="max-h-[70vh] max-w-full object-contain" />
+            <Image
+              src={url}
+              alt={fileName}
+              width={1200}
+              height={800}
+              className="max-h-[70vh] max-w-full object-contain"
+              unoptimized
+            />
           )}
           {!loading && !error && url && !viewablePdf && !viewableImage && (
             <div className="space-y-2 text-center text-sm text-muted-foreground">

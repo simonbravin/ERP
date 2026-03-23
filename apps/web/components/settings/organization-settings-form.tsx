@@ -22,6 +22,7 @@ import {
 import { toast } from 'sonner'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { Trash2 } from 'lucide-react'
 import { FileAndCameraTrigger } from '@/components/ui/file-and-camera-trigger'
 
@@ -128,10 +129,13 @@ export function OrganizationSettingsForm({
         <div className="flex flex-wrap items-end gap-6">
           {logoUrl ? (
             <div className="flex items-center gap-4">
-              <img
+              <Image
                 src={logoUrl}
                 alt={organization.name}
+                width={200}
+                height={64}
                 className="h-16 w-auto max-w-[200px] rounded border border-slate-200 object-contain bg-white p-1"
+                unoptimized
               />
               <Button
                 type="button"

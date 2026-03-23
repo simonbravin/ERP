@@ -1,3 +1,5 @@
+import Image from 'next/image'
+
 /**
  * Reusable document header for print layout.
  * Shows org name/logo, optional legal details, project, date, folio block, and "Emitido por".
@@ -80,10 +82,13 @@ export function DocumentHeader({
       <div className="print-document-header__inner">
         <div className="print-document-header__brand">
           {logoUrl ? (
-            <img
+            <Image
               src={logoUrl}
               alt=""
+              width={160}
+              height={48}
               className="print-document-header__logo"
+              unoptimized
             />
           ) : null}
           <div className="print-document-header__brand-text">

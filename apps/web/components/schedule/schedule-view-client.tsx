@@ -177,7 +177,7 @@ export function ScheduleViewClient({
         new Set(scheduleData.tasks.map((t: { id: string }) => t.id))
       )
     }
-  }, [scheduleData.id, scheduleData.tasks.length])
+  }, [scheduleData.id, scheduleData.tasks])
 
   const ganttTasks = schedule.tasks.map((task: (typeof schedule.tasks)[0]) => {
     const level = task.wbsNode.code.split('.').length - 1

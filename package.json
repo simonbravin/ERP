@@ -21,6 +21,7 @@
     "typecheck:web": "pnpm --filter @repo/validators build && pnpm -C apps/web exec tsc --noEmit",
     "i18n:check-keys": "node scripts/check-i18n-keys.mjs",
     "verify": "pnpm typecheck && pnpm turbo run build --filter=web",
+    "check:ci": "pnpm i18n:check-keys && pnpm typecheck && pnpm turbo run lint && pnpm --filter web test && pnpm turbo run build --filter=web",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "db:generate": "turbo run db:generate",
     "db:push": "turbo run db:push",

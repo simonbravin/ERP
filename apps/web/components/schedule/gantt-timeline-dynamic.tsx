@@ -96,6 +96,7 @@ export function GanttTimelineDynamic({
     return () => resizeObserver.disconnect()
   }, [])
 
+  /* eslint-disable react-hooks/exhaustive-deps -- Canvas redraw: draw* helpers read latest closure; listing them is unstable/noisy. */
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas || containerWidth === 0) return
@@ -141,6 +142,7 @@ export function GanttTimelineDynamic({
     highlightedTask,
     dragState,
   ])
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   function drawBackground(ctx: CanvasRenderingContext2D) {
     ctx.fillStyle = '#ffffff'

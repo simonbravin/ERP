@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useTransition } from 'react'
+import { useState, useEffect, useTransition, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useMessageBus } from '@/hooks/use-message-bus'
@@ -241,14 +241,14 @@ export function ProjectTransactionsListClient({
     getPartiesForProjectFilter(projectId).then(setParties)
   }, [projectId])
 
-  function buildApiFilters(a: AppliedTxFilters): GetProjectTransactionsFilters {
+  const buildApiFilters = useCallback((a: AppliedTxFilters): GetProjectTransactionsFilters => {
     const f: GetProjectTransactionsFilters = {}
     if (a.dateFrom) f.dateFrom = a.dateFrom
     if (a.dateTo) f.dateTo = a.dateTo
     if (a.partyId !== 'all') f.partyId = a.partyId
     if (a.filter !== 'all') f.type = a.filter
     return f
-  }
+  }, [])
 
   useEffect(() => {
     if (appliedFilters == null) {
@@ -265,7 +265,7 @@ export function ProjectTransactionsListClient({
       .then(setTransactions)
       .catch(() => toast.error(t('filterApplyError')))
       .finally(() => setIsLoadingFilters(false))
-  }, [projectId, appliedFilters, initialTransactions, t])
+  }, [projectId, appliedFilters, initialTransactions, t, buildApiFilters])
 
   const filteredTransactions = transactions
 

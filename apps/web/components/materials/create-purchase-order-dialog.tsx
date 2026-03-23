@@ -100,7 +100,7 @@ export function CreatePurchaseOrderDialog({
         toast.error(tMat('toast.loadDataError'))
       })
       .finally(() => setLoading(false))
-  }, [open, budgetVersionId, projectId])
+  }, [open, budgetVersionId, projectId, tMat])
 
   const toggleLine = (budgetResourceId: string, checked: boolean) => {
     const line = lines.find((l) => l.budgetResourceId === budgetResourceId)

@@ -42,7 +42,7 @@ export function ProjectCashflowPeriodSelector({ range }: Props) {
   useEffect(() => {
     setCustomFrom(range.from.toISOString().slice(0, 10))
     setCustomTo(range.to.toISOString().slice(0, 10))
-  }, [range.from.getTime(), range.to.getTime()])
+  }, [range.from, range.to])
 
   const setRange = useCallback(
     (from: Date, to: Date) => {
