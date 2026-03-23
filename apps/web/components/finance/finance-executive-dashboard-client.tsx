@@ -24,6 +24,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { formatCurrency, formatDateShort } from '@/lib/format-utils'
+import { chartMonthYearShortEs } from '@/lib/chart-date-labels'
 import { Download, AlertTriangle } from 'lucide-react'
 import { Link } from '@/i18n/navigation'
 import { useTranslations } from 'next-intl'
@@ -93,9 +94,7 @@ export function FinanceExecutiveDashboardClient({ data, alerts = [] }: Props) {
   }
 
   const trendChartData = data.monthlyTrend.map((m) => ({
-    mes: new Intl.DateTimeFormat('es', { month: 'short', year: '2-digit' }).format(
-      new Date(m.month + '-01')
-    ),
+    mes: chartMonthYearShortEs(m.month),
     Ingresos: m.income,
     Gastos: m.expense,
     Balance: m.balance,

@@ -30,6 +30,7 @@ import type {
   CashflowDataPointDetailed,
   CashflowBreakdownItem,
 } from '@/app/actions/finance'
+import { chartMonthLongYearEs, chartMonthYearShortEs } from '@/lib/chart-date-labels'
 
 interface Props {
   initialData: CashflowDataPointDetailed[]
@@ -38,15 +39,11 @@ interface Props {
 }
 
 function formatMonthKey(monthKey: string): string {
-  return new Intl.DateTimeFormat('es', { month: 'short', year: '2-digit' }).format(
-    new Date(monthKey + '-01')
-  )
+  return chartMonthYearShortEs(monthKey)
 }
 
 function formatMonthLong(monthKey: string): string {
-  return new Intl.DateTimeFormat('es', { month: 'long', year: 'numeric' }).format(
-    new Date(monthKey + '-01')
-  )
+  return chartMonthLongYearEs(monthKey)
 }
 
 export function CompanyCashflowChartClient({

@@ -16,6 +16,7 @@ import {
 } from 'recharts'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatCurrency } from '@/lib/format-utils'
+import { chartMonthLongYearEs, chartMonthYearShortEs } from '@/lib/chart-date-labels'
 import type {
   CashflowDataPoint,
   ProjectCashflowBreakdownByWbsItem,
@@ -32,9 +33,7 @@ interface Props {
 }
 
 function formatMonthKey(monthKey: string): string {
-  return new Intl.DateTimeFormat('es', { month: 'short', year: '2-digit' }).format(
-    new Date(monthKey + '-01')
-  )
+  return chartMonthYearShortEs(monthKey)
 }
 
 const CHART_COLORS = [
@@ -123,12 +122,7 @@ export function CashflowChartClient({
                           }}
                           labelFormatter={(_, payload) =>
                             payload?.[0]?.payload?.monthKey
-                              ? new Intl.DateTimeFormat('es', {
-                                  month: 'long',
-                                  year: 'numeric',
-                                }).format(
-                                  new Date(payload[0].payload.monthKey + '-01')
-                                )
+                              ? chartMonthLongYearEs(payload[0].payload.monthKey)
                               : ''
                           }
                         />
@@ -226,12 +220,7 @@ export function CashflowChartClient({
                       }}
                       labelFormatter={(_, payload) =>
                         payload?.[0]?.payload?.monthKey
-                          ? new Intl.DateTimeFormat('es', {
-                              month: 'long',
-                              year: 'numeric',
-                            }).format(
-                              new Date(payload[0].payload.monthKey + '-01')
-                            )
+                          ? chartMonthLongYearEs(payload[0].payload.monthKey)
                           : ''
                       }
                     />
@@ -295,10 +284,7 @@ export function CashflowChartClient({
                     return (
                       <tr key={point.month} className="border-b last:border-0">
                         <td className="px-4 py-2">
-                          {new Intl.DateTimeFormat('es', {
-                            month: 'long',
-                            year: 'numeric',
-                          }).format(new Date(point.month + '-01'))}
+                          {chartMonthLongYearEs(point.month)}
                         </td>
                         <td className="px-4 py-2 text-right tabular-nums">
                           {formatCurrency(point.income, 'ARS')}

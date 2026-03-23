@@ -15,6 +15,7 @@ import {
 } from 'recharts'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { CashflowDataPointDetailed } from '@/app/actions/finance'
+import { chartMonthYearShortEs } from '@/lib/chart-date-labels'
 
 export type CashflowRange = 'currentMonth' | 'last3' | 'last6' | 'last12'
 
@@ -26,9 +27,7 @@ const RANGES: { value: CashflowRange; key: string }[] = [
 ]
 
 function formatMonthKey(monthKey: string): string {
-  return new Intl.DateTimeFormat('es', { month: 'short', year: '2-digit' }).format(
-    new Date(monthKey + '-01')
-  )
+  return chartMonthYearShortEs(monthKey)
 }
 
 interface CashflowChartProps {

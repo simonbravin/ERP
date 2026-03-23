@@ -325,10 +325,9 @@
   --motion-fast: 150ms;
   --motion-base: 200ms;
   --motion-slow: 300ms;
-  /* Short crossfade when toggling light/dark (global color props on *) */
-  --motion-theme: 90ms;
   --motion-ease: cubic-bezier(0.4, 0, 0.2, 1);
-  /* Symmetric ease for theme crossfade (light ↔ dark) */
+  /* Theme toggle: same duration + easing on all elements so colors move together */
+  --motion-theme: 200ms;
   --motion-ease-in-out: cubic-bezier(0.45, 0, 0.55, 1);
 
   /* Border Radius (shadcn: --radius is default) */
@@ -355,14 +354,14 @@
     font-family: var(--font-sans);
   }
 
-  /* Light/dark: interpolate token-backed colors when .dark toggles on <html> */
+  /* Light/dark: all elements share the same color transition (no View Transitions split). */
   @media (prefers-reduced-motion: no-preference) {
     *,
     *::before,
     *::after {
       transition-property: background-color, border-color, color, fill, stroke, text-decoration-color,
         outline-color;
-      transition-duration: var(--motion-theme, 90ms);
+      transition-duration: var(--motion-theme, 200ms);
       transition-timing-function: var(--motion-ease-in-out, cubic-bezier(0.45, 0, 0.55, 1));
     }
   }

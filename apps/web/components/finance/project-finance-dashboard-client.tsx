@@ -20,6 +20,7 @@ import { CompanyFinanceKPICards } from '@/components/finance/company-finance-kpi
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { formatCurrency, formatDateShort } from '@/lib/format-utils'
+import { chartMonthYearShortEs } from '@/lib/chart-date-labels'
 import { useTranslations } from 'next-intl'
 import { AlertCircle } from 'lucide-react'
 import { Link } from '@/i18n/navigation'
@@ -60,9 +61,7 @@ export function ProjectFinanceDashboardClient({ data, alerts = [] }: ProjectFina
   }
 
   const trendChartData = data.monthlyTrend.map((m) => ({
-    mes: new Intl.DateTimeFormat('es', { month: 'short', year: '2-digit' }).format(
-      new Date(m.month + '-01')
-    ),
+    mes: chartMonthYearShortEs(m.month),
     Ingresos: m.income,
     Gastos: m.expense,
     Balance: m.balance,

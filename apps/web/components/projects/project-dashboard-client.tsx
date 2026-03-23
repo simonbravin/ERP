@@ -28,6 +28,7 @@ import { toast } from 'sonner'
 import { Link } from '@/i18n/navigation'
 import type { ProjectDashboardData } from '@/app/actions/project-dashboard'
 import type { ProjectDashboardCrossAlert } from '@/app/actions/project-dashboard'
+import { chartMonthShortEs } from '@/lib/chart-date-labels'
 
 interface ProjectInfo {
   id: string
@@ -129,9 +130,7 @@ export function ProjectDashboardClient({ project, data }: Props) {
   }))
 
   const cashflowChartData = data.cashflow.map((m) => ({
-    mes: new Intl.DateTimeFormat('es', { month: 'short' }).format(
-      new Date(m.month + '-01')
-    ),
+    mes: chartMonthShortEs(m.month),
     Ingresos: m.income,
     Gastos: m.expense,
     Balance: m.balance,
