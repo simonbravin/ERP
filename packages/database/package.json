@@ -31,7 +31,7 @@
     "ensure-demo-org": "tsx src/ensure-demo-org.ts",
     "ensure-demo-org:prod": "dotenv -e .env.production.local -- tsx src/ensure-demo-org.ts",
     "build": "prisma generate",
-    "lint": "echo \"Add lint\""
+    "lint": "prisma validate"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -14,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { formatDistanceToNow } from 'date-fns'
-import { es } from 'date-fns/locale'
+import { enUS, es as esLocale } from 'date-fns/locale'
 import { formatCurrency } from '@/lib/format-utils'
 import {
   ShoppingCart,
@@ -23,44 +23,28 @@ import {
   Plus,
   ArrowRight,
   Search,
-  X,
   ChevronDown,
 } from 'lucide-react'
+import { ListFiltersBar } from '@/components/list'
+import type { InventoryMovementClientRow } from '@/lib/types/inventory-dto'
 
 interface MovementsListClientProps {
-  movements: Array<{
-    id: string
-    movementType: string
-    quantity: unknown
-    unitCost: unknown
-    createdAt: Date
-    item: { sku: string; name: string; unit: string }
-    fromLocation?: { name: string; type: string } | null
-    toLocation?: { name: string; type: string } | null
-    project?: { projectNumber: string; name: string } | null
-    wbsNode?: { code: string; name: string } | null
-    createdBy?: { user?: { fullName: string } } | null
-  }>
+  movements: InventoryMovementClientRow[]
   items: Array<{ id: string; sku: string; name: string }>
   locations: Array<{ id: string; name: string }>
 }
 
-const movementTypes: Record<
-  string,
-  { label: string; icon: typeof ShoppingCart; variant: 'success' | 'info' | 'warning' | 'neutral' }
-> = {
-  PURCHASE: { label: 'Compra', icon: ShoppingCart, variant: 'success' },
-  TRANSFER: { label: 'Transferencia', icon: ArrowRightLeft, variant: 'info' },
-  ISSUE: { label: 'Consumo', icon: Minus, variant: 'warning' },
-  ADJUSTMENT: { label: 'Ajuste', icon: Plus, variant: 'neutral' },
-}
+const MOVEMENT_TYPE_IDS = ['PURCHASE', 'TRANSFER', 'ISSUE', 'ADJUSTMENT'] as const
 
-const MOVEMENT_TYPE_OPTIONS = [
-  { id: 'PURCHASE', label: 'Compra' },
-  { id: 'TRANSFER', label: 'Transferencia' },
-  { id: 'ISSUE', label: 'Consumo' },
-  { id: 'ADJUSTMENT', label: 'Ajuste' },
-]
+const movementTypeIcons: Record<
+  string,
+  { icon: typeof ShoppingCart; variant: 'success' | 'info' | 'warning' | 'neutral' }
+> = {
+  PURCHASE: { icon: ShoppingCart, variant: 'success' },
+  TRANSFER: { icon: ArrowRightLeft, variant: 'info' },
+  ISSUE: { icon: Minus, variant: 'warning' },
+  ADJUSTMENT: { icon: Plus, variant: 'neutral' },
+}
 
 function toNum(v: unknown): number {
   if (v == null) return 0
@@ -80,6 +64,8 @@ function FilterMultiSelect({
   onSelectionChange,
   searchPlaceholder = 'Buscar...',
   allLabel = 'Todos',
+  emptyMessage = 'Sin resultados',
+  partialSelectionLabel,
 }: {
   label: string
   options: { id: string; label: string }[]
@@ -87,6 +73,8 @@ function FilterMultiSelect({
   onSelectionChange: (ids: string[]) => void
   searchPlaceholder?: string
   allLabel?: string
+  emptyMessage?: string
+  partialSelectionLabel?: (count: number) => string
 }) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
@@ -108,7 +96,9 @@ function FilterMultiSelect({
       ? allLabel
       : selectedIds.length === options.length
         ? allLabel
-        : `${selectedIds.length} seleccionado(s)`
+        : partialSelectionLabel
+          ? partialSelectionLabel(selectedIds.length)
+          : `${selectedIds.length} seleccionado(s)`
 
   return (
     <div>
@@ -151,7 +141,7 @@ function FilterMultiSelect({
             ))}
             {filtered.length === 0 && (
               <p className="px-2 py-4 text-center text-sm text-muted-foreground">
-                Sin resultados
+                {emptyMessage}
               </p>
             )}
           </div>
@@ -166,7 +156,10 @@ export function MovementsListClient({
   items,
   locations,
 }: MovementsListClientProps) {
+  const t = useTranslations('inventory')
   const tCommon = useTranslations('common')
+  const locale = useLocale()
+  const dateFnsLocale = locale.startsWith('es') ? esLocale : enUS
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -181,6 +174,18 @@ export function MovementsListClient({
   const locationIds = useMemo(() => parseMultiParam(locationIdParam), [locationIdParam])
 
   const [searchQuery, setSearchQuery] = useState('')
+
+  const movementTypeOptions = MOVEMENT_TYPE_IDS.map((id) => ({
+    id,
+    label: t(`movementTypes.${id}`),
+  }))
+
+  function movementTypeLabel(code: string): string {
+    if ((MOVEMENT_TYPE_IDS as readonly string[]).includes(code)) {
+      return t(`movementTypes.${code}` as 'movementTypes.PURCHASE')
+    }
+    return code
+  }
 
   const updateUrl = useCallback(
     (updates: {
@@ -212,13 +217,6 @@ export function MovementsListClient({
     router.push('/inventory/movements')
   }
 
-  const hasActiveFilters =
-    typeIds.length > 0 ||
-    itemIds.length > 0 ||
-    locationIds.length > 0 ||
-    fromParam !== '' ||
-    toParam !== ''
-
   const itemOptions = useMemo(
     () => items.map((i) => ({ id: i.id, label: `${i.sku} - ${i.name}` })),
     [items]
@@ -231,17 +229,21 @@ export function MovementsListClient({
   const filteredBySearch = useMemo(() => {
     if (!searchQuery.trim()) return movements
     const q = searchQuery.trim().toLowerCase()
+    const typeMatches = (code: string) => {
+      const lab = (MOVEMENT_TYPE_IDS as readonly string[]).includes(code)
+        ? t(`movementTypes.${code}` as 'movementTypes.PURCHASE')
+        : code
+      return lab.toLowerCase().includes(q)
+    }
     return movements.filter((m) => {
       const itemMatch =
         m.item.name.toLowerCase().includes(q) ||
         m.item.sku.toLowerCase().includes(q)
       const fromMatch = m.fromLocation?.name?.toLowerCase().includes(q)
       const toMatch = m.toLocation?.name?.toLowerCase().includes(q)
-      const typeLabel =
-        movementTypes[m.movementType]?.label?.toLowerCase().includes(q)
-      return itemMatch || fromMatch || toMatch || typeLabel
+      return itemMatch || fromMatch || toMatch || typeMatches(m.movementType)
     })
-  }, [movements, searchQuery])
+  }, [movements, searchQuery, t])
 
   return (
     <div className="space-y-4">
@@ -249,88 +251,86 @@ export function MovementsListClient({
       <div className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
-          placeholder="Buscar por item, SKU, ubicación o tipo..."
+          placeholder={t('movementsSearchPlaceholder')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="pl-9"
         />
       </div>
 
-      {/* Filtros siempre visibles */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-        <FilterMultiSelect
-          label="Tipo de movimiento"
-          options={MOVEMENT_TYPE_OPTIONS}
-          selectedIds={typeIds}
-          onSelectionChange={(ids) => updateUrl({ type: ids })}
-          searchPlaceholder="Buscar tipo..."
-          allLabel="Todos"
-        />
-        <FilterMultiSelect
-          label="Item"
-          options={itemOptions}
-          selectedIds={itemIds}
-          onSelectionChange={(ids) => updateUrl({ itemId: ids })}
-          searchPlaceholder="Buscar item..."
-          allLabel="Todos"
-        />
-        <FilterMultiSelect
-          label="Ubicación"
-          options={locationOptions}
-          selectedIds={locationIds}
-          onSelectionChange={(ids) => updateUrl({ locationId: ids })}
-          searchPlaceholder="Buscar ubicación..."
-          allLabel="Todas"
-        />
-        <div>
-          <label className="mb-2 block text-sm font-medium">Desde</label>
-          <Input
-            type="date"
-            value={fromParam}
-            onChange={(e) => updateUrl({ from: e.target.value })}
+      <ListFiltersBar onClear={handleClearFilters}>
+        <div className="grid w-full gap-4 md:grid-cols-2 lg:grid-cols-5">
+          <FilterMultiSelect
+            label={t('filterMovementType')}
+            options={movementTypeOptions}
+            selectedIds={typeIds}
+            onSelectionChange={(ids) => updateUrl({ type: ids })}
+            searchPlaceholder={t('searchTypePlaceholder')}
+            allLabel={tCommon('all')}
+            emptyMessage={tCommon('noResults')}
+            partialSelectionLabel={(count) => t('filterSelectedCount', { count })}
           />
-        </div>
-        <div>
-          <label className="mb-2 block text-sm font-medium">Hasta</label>
-          <Input
-            type="date"
-            value={toParam}
-            onChange={(e) => updateUrl({ to: e.target.value })}
+          <FilterMultiSelect
+            label={t('filterItem')}
+            options={itemOptions}
+            selectedIds={itemIds}
+            onSelectionChange={(ids) => updateUrl({ itemId: ids })}
+            searchPlaceholder={t('searchItemPlaceholder')}
+            allLabel={tCommon('all')}
+            emptyMessage={tCommon('noResults')}
+            partialSelectionLabel={(count) => t('filterSelectedCount', { count })}
           />
+          <FilterMultiSelect
+            label={t('filterLocation')}
+            options={locationOptions}
+            selectedIds={locationIds}
+            onSelectionChange={(ids) => updateUrl({ locationId: ids })}
+            searchPlaceholder={t('searchLocationPlaceholder')}
+            allLabel={t('allLocations')}
+            emptyMessage={tCommon('noResults')}
+            partialSelectionLabel={(count) => t('filterSelectedCount', { count })}
+          />
+          <div>
+            <label className="mb-2 block text-sm font-medium">{t('filterDateFrom')}</label>
+            <Input
+              type="date"
+              value={fromParam}
+              onChange={(e) => updateUrl({ from: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="mb-2 block text-sm font-medium">{t('filterDateTo')}</label>
+            <Input
+              type="date"
+              value={toParam}
+              onChange={(e) => updateUrl({ to: e.target.value })}
+            />
+          </div>
         </div>
-      </div>
-
-      {hasActiveFilters && (
-        <div className="flex justify-end">
-          <Button variant="ghost" size="sm" onClick={handleClearFilters}>
-            <X className="mr-2 h-4 w-4" />
-            {tCommon('clear')}
-          </Button>
-        </div>
-      )}
+      </ListFiltersBar>
 
       <Card>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="border-b border-border bg-muted/50">
               <tr className="text-left text-sm">
-                <th className="p-4 font-medium">Fecha</th>
-                <th className="p-4 font-medium">Tipo</th>
-                <th className="p-4 font-medium">Item</th>
-                <th className="p-4 font-medium">Desde</th>
-                <th className="p-4 font-medium"></th>
-                <th className="p-4 font-medium">Hacia</th>
-                <th className="p-4 text-right font-medium">Cantidad</th>
-                <th className="p-4 text-right font-medium">Costo Unit.</th>
-                <th className="p-4 text-right font-medium">Total</th>
-                <th className="p-4 font-medium">Usuario</th>
+                <th className="p-4 font-medium">{t('movementsColDate')}</th>
+                <th className="p-4 font-medium">{t('movementsColType')}</th>
+                <th className="p-4 font-medium">{t('movementsColItem')}</th>
+                <th className="p-4 font-medium">{t('movementsColFrom')}</th>
+                <th className="p-4 font-medium" aria-hidden />
+                <th className="p-4 font-medium">{t('movementsColTo')}</th>
+                <th className="p-4 text-right font-medium">{t('movementsColQuantity')}</th>
+                <th className="p-4 text-right font-medium">{t('movementsColUnitCost')}</th>
+                <th className="p-4 text-right font-medium">{t('movementsColTotal')}</th>
+                <th className="p-4 font-medium">{t('movementsColUser')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {filteredBySearch.map((movement) => {
                 const typeInfo =
-                  movementTypes[movement.movementType] ??
-                  movementTypes.ADJUSTMENT
+                  movementTypeIcons[movement.movementType] ??
+                  movementTypeIcons.ADJUSTMENT
                 const Icon = typeInfo.icon
                 const qty = toNum(movement.quantity)
                 const unitCost = toNum(movement.unitCost)
@@ -344,7 +344,7 @@ export function MovementsListClient({
                     <td className="p-4 text-muted-foreground">
                       {formatDistanceToNow(new Date(movement.createdAt), {
                         addSuffix: true,
-                        locale: es,
+                        locale: dateFnsLocale,
                       })}
                     </td>
                     <td className="p-4">
@@ -353,7 +353,7 @@ export function MovementsListClient({
                         className="inline-flex items-center gap-1"
                       >
                         <Icon className="h-3 w-3" />
-                        {typeInfo.label}
+                        {movementTypeLabel(movement.movementType)}
                       </Badge>
                     </td>
                     <td className="p-4">
@@ -393,7 +393,7 @@ export function MovementsListClient({
                       {unitCost > 0 ? formatCurrency(totalCost) : '-'}
                     </td>
                     <td className="p-4 text-muted-foreground">
-                      {movement.createdBy?.user?.fullName ?? 'Sistema'}
+                      {movement.createdBy?.user?.fullName ?? t('movementSystemUser')}
                     </td>
                   </tr>
                 )
@@ -403,9 +403,7 @@ export function MovementsListClient({
 
           {filteredBySearch.length === 0 && (
             <div className="py-12 text-center text-muted-foreground">
-              {movements.length === 0
-                ? 'No se encontraron movimientos'
-                : 'Ningún movimiento coincide con la búsqueda'}
+              {movements.length === 0 ? t('noMovements') : t('noMovementsMatchSearch')}
             </div>
           )}
         </div>

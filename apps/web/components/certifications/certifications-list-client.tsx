@@ -48,15 +48,6 @@ function formatDate(d: Date | null): string {
   return new Date(d).toLocaleDateString(undefined, { dateStyle: 'short' })
 }
 
-const EXPORT_COLUMNS = [
-  { field: 'number', label: 'Número', defaultVisible: true },
-  { field: 'period', label: 'Período', defaultVisible: true },
-  { field: 'budgetVersion', label: 'Presupuesto', defaultVisible: true },
-  { field: 'issuedDate', label: 'Fecha Emisión', defaultVisible: true },
-  { field: 'totalAmount', label: 'Monto', defaultVisible: true },
-  { field: 'status', label: 'Estado', defaultVisible: true },
-]
-
 export function CertificationsListClient({
   projectId,
   certifications,
@@ -71,15 +62,42 @@ export function CertificationsListClient({
   const t = useTranslations('certifications')
   const tCommon = useTranslations('common')
   const tBudget = useTranslations('budget')
+  const tFinance = useTranslations('finance')
+
+  const exportColumns = [
+    { field: 'number', label: t('number'), defaultVisible: true },
+    { field: 'period', label: t('period'), defaultVisible: true },
+    { field: 'budgetVersion', label: tBudget('title'), defaultVisible: true },
+    { field: 'issuedDate', label: t('issuedDate'), defaultVisible: true },
+    { field: 'totalAmount', label: t('totalAmount'), defaultVisible: true },
+    { field: 'status', label: t('status'), defaultVisible: true },
+  ]
 
   const prefix = basePath === 'finance' ? `/projects/${projectId}/finance/certifications` : `/projects/${projectId}/certifications`
   const newHref = basePath === 'finance' ? `${prefix}/new` : `${prefix}/new`
   const certHref = (certId: string) => `${prefix}/${certId}`
 
   const years = Array.from(new Set(certifications.map((c) => c.periodYear))).sort((a, b) => b - a)
+  const monthKeys = [
+    'monthShortJan',
+    'monthShortFeb',
+    'monthShortMar',
+    'monthShortApr',
+    'monthShortMay',
+    'monthShortJun',
+    'monthShortJul',
+    'monthShortAug',
+    'monthShortSep',
+    'monthShortOct',
+    'monthShortNov',
+    'monthShortDec',
+  ] as const
   const months = [
-    { value: '', label: 'Todos' },
-    ...Array.from({ length: 12 }, (_, i) => ({ value: String(i + 1), label: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'][i] })),
+    { value: '', label: tCommon('all') },
+    ...Array.from({ length: 12 }, (_, i) => ({
+      value: String(i + 1),
+      label: t(monthKeys[i]!),
+    })),
   ]
 
   let filtered = certifications
@@ -132,7 +150,7 @@ export function CertificationsListClient({
             onChange={(e) => setPeriodYearFilter(e.target.value)}
             className="rounded-md border border-input bg-card px-2 py-1.5 text-sm dark:bg-background w-[100px]"
           >
-            <option value="">Todos</option>
+            <option value="">{tCommon('all')}</option>
             {years.map((y) => (
               <option key={y} value={y}>{y}</option>
             ))}
@@ -153,9 +171,9 @@ export function CertificationsListClient({
             onChange={(e) => setSortOrder(e.target.value as typeof sortOrder)}
             className="rounded-md border border-input bg-card px-2 py-1.5 text-sm dark:bg-background min-w-[180px]"
           >
-            <option value="period-desc">Período (más reciente primero)</option>
-            <option value="period-asc">Período (más antiguo primero)</option>
-            <option value="number-desc">Número (mayor primero)</option>
+            <option value="period-desc">{t('sortPeriodDesc')}</option>
+            <option value="period-asc">{t('sortPeriodAsc')}</option>
+            <option value="number-desc">{t('sortNumberDesc')}</option>
           </select>
         </ListFiltersBar>
         <div className="flex gap-2">
@@ -166,7 +184,7 @@ export function CertificationsListClient({
           <Link href={newHref}>
             <Button type="button">
               <PlusIcon className="mr-2 h-4 w-4" />
-            Nueva Certificación
+            {t('new')}
           </Button>
           </Link>
         </div>
@@ -175,8 +193,8 @@ export function CertificationsListClient({
       <ExportDialog
         open={showExportDialog}
         onOpenChange={setShowExportDialog}
-        title="Exportar certificaciones del proyecto"
-        columns={EXPORT_COLUMNS}
+        title={t('exportListTitle')}
+        columns={exportColumns}
         showPdfOptions
         onExport={async (format, selectedColumns, pdfOptions) => {
           if (format === 'excel') return exportCertificationsToExcel(projectId, selectedColumns)
@@ -185,7 +203,7 @@ export function CertificationsListClient({
           const res = await fetch(url, { credentials: 'include' })
           if (!res.ok) {
             const data = await res.json().catch(() => ({}))
-            return { success: false, error: data?.error ?? 'No se pudo generar el PDF' }
+            return { success: false, error: data?.error ?? t('exportPdfError') }
           }
           const blob = await res.blob()
           const disposition = res.headers.get('Content-Disposition')
@@ -206,11 +224,11 @@ export function CertificationsListClient({
             <TableRow>
               <TableHead>{t('number')}</TableHead>
               <TableHead>{t('period')}</TableHead>
-              <TableHead>Presupuesto Base</TableHead>
-              <TableHead>Fecha Emisión</TableHead>
-              <TableHead className="text-right">Monto del Período</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead className="w-24">Acciones</TableHead>
+              <TableHead>{t('listColumnBudgetBase')}</TableHead>
+              <TableHead>{t('issuedDate')}</TableHead>
+              <TableHead className="text-right">{t('listColumnPeriodAmount')}</TableHead>
+              <TableHead>{t('status')}</TableHead>
+              <TableHead className="w-24">{tFinance('actions')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -239,7 +257,7 @@ export function CertificationsListClient({
                   </TableCell>
                   <TableCell>
                     <Link href={certHref(cert.id)}>
-                      <Button type="button" variant="ghost" size="icon" aria-label="Ver">
+                      <Button type="button" variant="ghost" size="icon" aria-label={tCommon('view')}>
                         <Eye className="h-4 w-4" />
                       </Button>
                     </Link>

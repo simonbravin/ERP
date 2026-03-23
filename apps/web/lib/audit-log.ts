@@ -1,4 +1,5 @@
 import { prisma } from '@repo/database'
+import { toInputJson } from '@/lib/json-prisma'
 
 interface CreateAuditLogParams {
   orgId: string
@@ -37,10 +38,10 @@ export async function createAuditLog(params: CreateAuditLogParams) {
         entityType: params.entity,
         entityId: params.entityId,
         projectId: params.projectId ?? null,
-        beforeSnapshot: params.oldValues ?? null,
-        afterSnapshot: params.newValues ?? null,
+        beforeSnapshot: params.oldValues != null ? toInputJson(params.oldValues) : null,
+        afterSnapshot: params.newValues != null ? toInputJson(params.newValues) : null,
         detailsJson: params.description
-          ? ({ description: params.description } as object)
+          ? toInputJson({ description: params.description })
           : null,
         ipAddress,
         userAgent,

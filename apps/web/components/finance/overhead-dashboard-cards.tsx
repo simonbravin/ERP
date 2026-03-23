@@ -1,7 +1,7 @@
 'use client'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { formatCurrency, formatCurrencyForDisplay } from '@/lib/format-utils'
+import { formatCurrencyForDisplay } from '@/lib/format-utils'
 import { DollarSign, CheckCircle, AlertCircle, Percent } from 'lucide-react'
 
 export type OverheadDashboardData = {

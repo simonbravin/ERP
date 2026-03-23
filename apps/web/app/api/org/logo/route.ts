@@ -17,9 +17,7 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const user = session.user as any
-    const orgId: string | undefined = user.orgId
-    const orgName: string | undefined = user.orgName
+    const { orgId, orgName } = session.user
 
     if (!orgId) {
       return NextResponse.json(

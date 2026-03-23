@@ -56,10 +56,15 @@ export async function renderHtmlToPdf(
     args = ['--no-sandbox', '--disable-setuid-sandbox', '--headless=new']
   } else {
     const chromiumModule = await import('@sparticuz/chromium')
-    const chromium =
-      (chromiumModule as { default?: typeof chromiumModule }).default ?? chromiumModule
-    if (typeof (chromium as { graphicsMode?: boolean }).graphicsMode === 'boolean') {
-      (chromium as { graphicsMode: boolean }).graphicsMode = false
+    type ChromiumLike = {
+      executablePath?: unknown
+      args?: unknown
+      graphicsMode?: boolean
+    }
+    const root = chromiumModule as unknown as ChromiumLike & { default?: ChromiumLike }
+    const chromium: ChromiumLike = root.default ?? root
+    if (typeof chromium.graphicsMode === 'boolean') {
+      chromium.graphicsMode = false
     }
     const execPath = chromium.executablePath
     const execArgs = chromium.args

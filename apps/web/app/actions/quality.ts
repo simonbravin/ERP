@@ -5,7 +5,7 @@ import { prisma } from '@repo/database'
 import { requireRole } from '@/lib/rbac'
 import { getAuthContext } from '@/lib/auth-helpers'
 import { assertProjectAccess, canEditProjectArea, PROJECT_AREAS } from '@/lib/project-permissions'
-import { parseUuid } from '@/lib/schemas/ids'
+import { parseUuidOrThrow } from '@/lib/schemas/ids'
 
 async function generateRfiNumber(projectId: string): Promise<number> {
   const lastRfi = await prisma.rFI.findFirst({
@@ -27,18 +27,17 @@ export async function createRfi(
     dueDate?: Date | null
   }
 ) {
-  const parsedProject = parseUuid(projectId, 'ID de proyecto')
-  if (!parsedProject.success) throw new Error(parsedProject.error)
+  const validProjectId = parseUuidOrThrow(projectId, 'ID de proyecto')
 
   const { org } = await getAuthContext()
   requireRole(org.role, 'VIEWER')
 
   const project = await prisma.project.findFirst({
-    where: { id: parsedProject.value, orgId: org.orgId },
+    where: { id: validProjectId, orgId: org.orgId },
   })
   if (!project) throw new Error('Project not found')
   try {
-    const access = await assertProjectAccess(parsedProject.value, org)
+    const access = await assertProjectAccess(validProjectId, org)
     if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.QUALITY)) {
       throw new Error('No tenés permiso para editar calidad de este proyecto')
     }
@@ -47,12 +46,12 @@ export async function createRfi(
     throw new Error(e instanceof Error ? e.message : 'Acceso denegado')
   }
 
-  const number = await generateRfiNumber(parsedProject.value)
+  const number = await generateRfiNumber(validProjectId)
 
   const rfi = await prisma.rFI.create({
     data: {
       orgId: org.orgId,
-      projectId: parsedProject.value,
+      projectId: validProjectId,
       number,
       status: 'OPEN',
       priority: data.priority,
@@ -65,19 +64,18 @@ export async function createRfi(
     },
   })
 
-  revalidatePath(`/projects/${parsedProject.value}/quality`)
-  revalidatePath(`/projects/${parsedProject.value}/quality/rfis`)
+  revalidatePath(`/projects/${validProjectId}/quality`)
+  revalidatePath(`/projects/${validProjectId}/quality/rfis`)
   return { success: true, rfiId: rfi.id }
 }
 
 export async function addRfiComment(rfiId: string, comment: string) {
-  const parsedRfi = parseUuid(rfiId, 'ID de RFI')
-  if (!parsedRfi.success) throw new Error(parsedRfi.error)
+  const validRfiId = parseUuidOrThrow(rfiId, 'ID de RFI')
 
   const { org } = await getAuthContext()
 
   const rfi = await prisma.rFI.findFirst({
-    where: { id: parsedRfi.value, orgId: org.orgId },
+    where: { id: validRfiId, orgId: org.orgId },
     select: { projectId: true },
   })
   if (!rfi) throw new Error('RFI not found')
@@ -94,25 +92,24 @@ export async function addRfiComment(rfiId: string, comment: string) {
   await prisma.rFIComment.create({
     data: {
       orgId: org.orgId,
-      rfiId: parsedRfi.value,
+      rfiId: validRfiId,
       orgMemberId: org.memberId,
       comment,
     },
   })
 
-  revalidatePath(`/projects/${rfi.projectId}/quality/rfis/${parsedRfi.value}`)
+  revalidatePath(`/projects/${rfi.projectId}/quality/rfis/${validRfiId}`)
   return { success: true }
 }
 
 export async function answerRfi(rfiId: string, answer: string) {
-  const parsedRfi = parseUuid(rfiId, 'ID de RFI')
-  if (!parsedRfi.success) throw new Error(parsedRfi.error)
+  const validRfiId = parseUuidOrThrow(rfiId, 'ID de RFI')
 
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
 
   const rfi = await prisma.rFI.findFirst({
-    where: { id: parsedRfi.value, orgId: org.orgId },
+    where: { id: validRfiId, orgId: org.orgId },
     select: { projectId: true },
   })
   if (!rfi) throw new Error('RFI not found')
@@ -127,7 +124,7 @@ export async function answerRfi(rfiId: string, answer: string) {
   }
 
   await prisma.rFI.update({
-    where: { id: parsedRfi.value },
+    where: { id: validRfiId },
     data: {
       answer,
       status: 'ANSWERED',
@@ -135,20 +132,19 @@ export async function answerRfi(rfiId: string, answer: string) {
     },
   })
 
-  revalidatePath(`/projects/${rfi.projectId}/quality/rfis/${parsedRfi.value}`)
+  revalidatePath(`/projects/${rfi.projectId}/quality/rfis/${validRfiId}`)
   revalidatePath(`/projects/${rfi.projectId}/quality`)
   return { success: true }
 }
 
 export async function closeRfi(rfiId: string) {
-  const parsedRfi = parseUuid(rfiId, 'ID de RFI')
-  if (!parsedRfi.success) throw new Error(parsedRfi.error)
+  const validRfiId = parseUuidOrThrow(rfiId, 'ID de RFI')
 
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
 
   const rfi = await prisma.rFI.findFirst({
-    where: { id: parsedRfi.value, orgId: org.orgId },
+    where: { id: validRfiId, orgId: org.orgId },
     select: { projectId: true },
   })
   if (!rfi) throw new Error('RFI not found')
@@ -163,14 +159,14 @@ export async function closeRfi(rfiId: string) {
   }
 
   await prisma.rFI.update({
-    where: { id: parsedRfi.value },
+    where: { id: validRfiId },
     data: {
       status: 'CLOSED',
       closedDate: new Date(),
     },
   })
 
-  revalidatePath(`/projects/${rfi.projectId}/quality/rfis/${parsedRfi.value}`)
+  revalidatePath(`/projects/${rfi.projectId}/quality/rfis/${validRfiId}`)
   revalidatePath(`/projects/${rfi.projectId}/quality`)
   return { success: true }
 }
@@ -185,18 +181,17 @@ export async function createSubmittal(
     dueDate: Date
   }
 ) {
-  const parsedProject = parseUuid(projectId, 'ID de proyecto')
-  if (!parsedProject.success) throw new Error(parsedProject.error)
+  const validProjectId = parseUuidOrThrow(projectId, 'ID de proyecto')
 
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
 
   const project = await prisma.project.findFirst({
-    where: { id: parsedProject.value, orgId: org.orgId },
+    where: { id: validProjectId, orgId: org.orgId },
   })
   if (!project) throw new Error('Project not found')
   try {
-    const access = await assertProjectAccess(parsedProject.value, org)
+    const access = await assertProjectAccess(validProjectId, org)
     if (!canEditProjectArea(access.projectRole, PROJECT_AREAS.QUALITY)) {
       throw new Error('No tenés permiso para editar calidad de este proyecto')
     }
@@ -206,7 +201,7 @@ export async function createSubmittal(
   }
 
   const lastSubmittal = await prisma.submittal.findFirst({
-    where: { projectId: parsedProject.value },
+    where: { projectId: validProjectId },
     orderBy: { number: 'desc' },
     select: { number: true },
   })
@@ -215,7 +210,7 @@ export async function createSubmittal(
   const submittal = await prisma.submittal.create({
     data: {
       orgId: org.orgId,
-      projectId: parsedProject.value,
+      projectId: validProjectId,
       number,
       submittalType: data.submittalType,
       status: 'DRAFT',
@@ -227,20 +222,19 @@ export async function createSubmittal(
     },
   })
 
-  revalidatePath(`/projects/${parsedProject.value}/quality`)
-  revalidatePath(`/projects/${parsedProject.value}/quality/submittals`)
+  revalidatePath(`/projects/${validProjectId}/quality`)
+  revalidatePath(`/projects/${validProjectId}/quality/submittals`)
   return { success: true, submittalId: submittal.id }
 }
 
 export async function submitSubmittal(submittalId: string) {
-  const parsedSubmittal = parseUuid(submittalId, 'ID de submittal')
-  if (!parsedSubmittal.success) throw new Error(parsedSubmittal.error)
+  const validSubmittalId = parseUuidOrThrow(submittalId, 'ID de submittal')
 
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
 
   const submittal = await prisma.submittal.findFirst({
-    where: { id: parsedSubmittal.value, orgId: org.orgId },
+    where: { id: validSubmittalId, orgId: org.orgId },
     select: { projectId: true },
   })
   if (!submittal) throw new Error('Submittal not found')
@@ -255,14 +249,14 @@ export async function submitSubmittal(submittalId: string) {
   }
 
   await prisma.submittal.update({
-    where: { id: parsedSubmittal.value },
+    where: { id: validSubmittalId },
     data: {
       status: 'SUBMITTED',
       submittedDate: new Date(),
     },
   })
 
-  revalidatePath(`/projects/${submittal.projectId}/quality/submittals/${parsedSubmittal.value}`)
+  revalidatePath(`/projects/${submittal.projectId}/quality/submittals/${validSubmittalId}`)
   revalidatePath(`/projects/${submittal.projectId}/quality`)
   return { success: true }
 }
@@ -274,14 +268,13 @@ export async function reviewSubmittal(
     reviewComments?: string | null
   }
 ) {
-  const parsedSubmittal = parseUuid(submittalId, 'ID de submittal')
-  if (!parsedSubmittal.success) throw new Error(parsedSubmittal.error)
+  const validSubmittalId = parseUuidOrThrow(submittalId, 'ID de submittal')
 
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
 
   const submittal = await prisma.submittal.findFirst({
-    where: { id: parsedSubmittal.value, orgId: org.orgId },
+    where: { id: validSubmittalId, orgId: org.orgId },
     select: { projectId: true, revisionNumber: true },
   })
   if (!submittal) throw new Error('Submittal not found')
@@ -300,7 +293,7 @@ export async function reviewSubmittal(
     : submittal.revisionNumber
 
   await prisma.submittal.update({
-    where: { id: parsedSubmittal.value },
+    where: { id: validSubmittalId },
     data: {
       status: data.status,
       reviewComments: data.reviewComments || undefined,
@@ -310,7 +303,7 @@ export async function reviewSubmittal(
     },
   })
 
-  revalidatePath(`/projects/${submittal.projectId}/quality/submittals/${parsedSubmittal.value}`)
+  revalidatePath(`/projects/${submittal.projectId}/quality/submittals/${validSubmittalId}`)
   revalidatePath(`/projects/${submittal.projectId}/quality`)
   return { success: true }
 }

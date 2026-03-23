@@ -30,7 +30,7 @@ type CertEditFormProps = {
 
 export function CertEditForm({
   certId,
-  projectId,
+  projectId: _projectId,
   defaultValues,
   backHref,
 }: CertEditFormProps) {

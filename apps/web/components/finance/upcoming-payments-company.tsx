@@ -10,7 +10,6 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { formatCurrency, formatDateShort } from '@/lib/format-utils'
-import Link from 'next/link'
 
 interface Payment {
   id: string

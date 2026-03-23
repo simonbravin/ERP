@@ -4,6 +4,6 @@
   "private": true,
   "scripts": {
     "build": "echo \"Add build\"",
-    "lint": "echo \"Add lint\""
+    "lint": "node -e \"process.exit(0)\""
   }
 }

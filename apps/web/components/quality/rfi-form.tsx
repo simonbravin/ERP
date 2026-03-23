@@ -69,10 +69,12 @@ export function RfiForm({ projectId, wbsNodes, orgMembers }: RfiFormProps) {
   async function onSubmit(data: CreateRfiInput) {
     try {
       const result = await createRfi(projectId, {
-        ...data,
+        subject: data.subject,
+        question: data.question,
+        priority: data.priority,
         wbsNodeId: data.wbsNodeId || null,
         assignedToOrgMemberId: data.assignedToOrgMemberId || null,
-        dueDate: data.dueDate || null,
+        dueDate: data.dueDate ?? undefined,
       })
       if (!result || typeof result !== 'object' || !('rfiId' in result)) {
         setError('root', { message: result && typeof result === 'object' && 'error' in result ? (result as { error?: string }).error : t('createRfi') })

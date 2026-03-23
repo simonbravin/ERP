@@ -27,14 +27,16 @@ import type {
   ProjectTransactionUpdateInput,
 } from '@repo/validators'
 import { toBaseAmount } from '@/lib/currency-utils'
-import { isEditableStatus, toNum, serializeTransaction } from './finance-helpers'
+import { isEditableStatus, serializeTransaction } from './finance-helpers'
 
+/** DB may store types outside TRANSACTION_TYPE (e.g. PURCHASE from commitments). */
 export async function getNextTransactionNumber(
   orgId: string,
-  type: TransactionType,
+  type: TransactionType | 'PURCHASE',
   year: number
 ): Promise<string> {
-  const prefix = getTransactionTypePrefix(type)
+  const prefix =
+    type === 'PURCHASE' ? 'PO' : getTransactionTypePrefix(type as TransactionType)
   const yearStart = new Date(year, 0, 1)
   const yearEnd = new Date(year + 1, 0, 1)
   const count = await prisma.financeTransaction.count({
@@ -167,7 +169,7 @@ export async function listPartiesForFinance() {
 }
 
 export async function listCurrencies() {
-  const { org } = await requireOrgFinanceAccess()
+  await requireOrgFinanceAccess()
   const currencies = await prisma.currency.findMany({
     where: { active: true },
     select: { code: true, name: true, symbol: true },
@@ -274,7 +276,7 @@ export async function createFinanceTransactionWithLines(
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
 
   const { projectId, partyId, currencyCode, exchangeRateSnapshot: rateNum, issueDate, ...rest } = parsed.data
-  let projectIdCheck: string | null = projectId ?? null
+  const projectIdCheck: string | null = projectId ?? null
   if (projectId) {
     const project = await prisma.project.findFirst({
       where: { id: projectId, orgId: org.orgId },

@@ -23,7 +23,7 @@ export default async function PrintGastosPorProveedorPage({ searchParams }: Page
     ? projectIdsParam.split(',').map((id) => id.trim()).filter(Boolean)
     : undefined
 
-  const { org } = await getAuthContext()
+  await getAuthContext()
   const data = await getExpensesBySupplierReport(undefined, projectIds)
 
   const rows: Row[] = data.map((s) => ({

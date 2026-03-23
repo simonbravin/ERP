@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { linkGlobalSupplier } from '@/app/actions/global-suppliers'
 import { OrgPartyLinkForm } from './org-party-link-form'
-import { cn } from '@/lib/utils'
 
 type GlobalSupplierDetailProps = {
   supplier: {
@@ -38,7 +37,7 @@ function formatRating(r: GlobalSupplierDetailProps['supplier']['avgRating']): st
 export function GlobalSupplierDetail({
   supplier,
   isLinked,
-  linkId,
+  linkId: _linkId,
 }: GlobalSupplierDetailProps) {
   const router = useRouter()
   const [showLinkForm, setShowLinkForm] = useState(false)

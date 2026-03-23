@@ -85,8 +85,8 @@ const textareaClassName =
 
 export function RfiDetail({
   rfi,
-  comments = [],
-  projectId,
+  comments: _comments = [],
+  projectId: _projectId,
   canAnswer,
 }: RfiDetailProps) {
   const t = useTranslations('quality')

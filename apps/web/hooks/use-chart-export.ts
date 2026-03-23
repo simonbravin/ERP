@@ -3,12 +3,14 @@
 import { useCallback } from 'react'
 import html2canvas from 'html2canvas'
 import { toast } from 'sonner'
+import { useTranslations } from 'next-intl'
 
 export function useChartExport() {
+  const t = useTranslations('common')
   const captureChart = useCallback(async (elementId: string): Promise<string | null> => {
     const element = document.getElementById(elementId)
     if (!element) {
-      toast.error('Elemento no encontrado')
+      toast.error(t('toast.elementNotFound'))
       return null
     }
 
@@ -22,10 +24,10 @@ export function useChartExport() {
       return canvas.toDataURL('image/png')
     } catch (error) {
       console.error('Error capturing chart:', error)
-      toast.error('Error al capturar gráfico')
+      toast.error(t('toast.chartCaptureError'))
       return null
     }
-  }, [])
+  }, [t])
 
   const downloadFile = useCallback((base64: string, filename: string) => {
     const link = document.createElement('a')

@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { acceptInvitation } from '@/app/actions/team'
 import { toast } from 'sonner'
+import { useTranslations } from 'next-intl'
 import { Building2, Mail, Shield } from 'lucide-react'
 
 const formSchema = z
@@ -46,6 +47,7 @@ export function AcceptInvitationClient({
   invitation,
   token,
 }: AcceptInvitationClientProps) {
+  const tTeam = useTranslations('team')
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -65,11 +67,11 @@ export function AcceptInvitationClient({
         fullName: data.fullName,
         password: data.password,
       })
-      toast.success('¡Bienvenido! Redirigiendo...')
+      toast.success(tTeam('toast.welcomeRedirect'))
       router.push('/login')
     } catch (err: unknown) {
       toast.error(
-        err instanceof Error ? err.message : 'Error al aceptar invitación'
+        err instanceof Error ? err.message : tTeam('toast.invitationAcceptError')
       )
     } finally {
       setIsSubmitting(false)

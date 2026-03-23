@@ -13,6 +13,7 @@ import { createInventoryMovement, getItemStockByLocation, getProjectWBSNodes } f
 import { formatCurrency } from '@/lib/format-utils'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { AlertTriangle } from 'lucide-react'
 
 const issueSchema = z.object({
@@ -44,6 +45,7 @@ export function IssueForm({
   projects,
   initialItemId,
 }: IssueFormProps) {
+  const t = useTranslations('inventory')
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [selectedItem, setSelectedItem] = useState<
@@ -120,7 +122,10 @@ export function IssueForm({
   async function onSubmit(data: IssueInput) {
     if (hasInsufficientStock) {
       toast.error(
-        `Stock insuficiente. Disponible: ${availableStock.toFixed(2)} ${selectedItem?.unit ?? ''}`
+        t('toast.insufficientStockDetail', {
+          available: availableStock.toFixed(2),
+          unit: selectedItem?.unit ?? '',
+        })
       )
       return
     }
@@ -140,14 +145,14 @@ export function IssueForm({
       })
 
       if (result.success) {
-        toast.success('Consumo registrado. Se creó la transacción financiera.')
+        toast.success(t('toast.issueOk'))
         router.push('/inventory/movements')
         router.refresh()
       } else {
-        toast.error('Error al registrar consumo')
+        toast.error(t('toast.issueError'))
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error inesperado')
+      toast.error(err instanceof Error ? err.message : t('errors.unexpectedError'))
     } finally {
       setIsSubmitting(false)
     }

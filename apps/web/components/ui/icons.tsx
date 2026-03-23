@@ -77,6 +77,14 @@ export function IconChevronDown({ className, size = 'md' }: { className?: string
   )
 }
 
+export function IconChevronUp({ className, size = 'md' }: { className?: string; size?: 'sm' | 'md' | 'lg' }) {
+  return (
+    <svg className={cn(iconClass, sizeClass[size], className)} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
+    </svg>
+  )
+}
+
 export function IconHome({ className, size = 'md' }: { className?: string; size?: 'sm' | 'md' | 'lg' }) {
   return (
     <svg className={cn(iconClass, sizeClass[size], className)} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">

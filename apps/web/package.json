@@ -8,6 +8,7 @@
     "build:safe": "next build",
     "start": "next start",
     "lint": "next lint",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -56,10 +57,14 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3",
     "@prisma/nextjs-monorepo-workaround-plugin": "^7.4.2",
     "@tailwindcss/postcss": "^4.0.0",
     "@types/bcryptjs": "^2.4.6",
     "cross-env": "^7.0.3",
+    "eslint": "^9",
+    "eslint-config-next": "15.2.8",
+    "eslint-plugin-unused-imports": "^4.4.1",
     "postcss": "^8.4.49",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.9.3",

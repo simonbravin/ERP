@@ -79,7 +79,7 @@ function downloadCsv(
 }
 
 export function BudgetLinesClient({
-  projectId,
+  projectId: _projectId,
   versionId,
   version,
   lines,

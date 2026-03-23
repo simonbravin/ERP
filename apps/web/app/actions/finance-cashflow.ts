@@ -534,7 +534,7 @@ export async function getCompanyCashflow(dateRange?: { from: Date; to: Date }): 
   })
 
   const monthly = new Map<string, { income: number; expense: number; overhead: number }>()
-  let cur = new Date(fromDate)
+  const cur = new Date(fromDate)
   while (cur <= toDate) {
     const key = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}`
     monthly.set(key, { income: 0, expense: 0, overhead: 0 })
@@ -622,7 +622,7 @@ export async function getCompanyCashflowDetailed(
     string,
     { income: number; expense: number; overhead: number; projectExpenses: Record<string, number> }
   >()
-  let cur = new Date(fromDate)
+  const cur = new Date(fromDate)
   while (cur <= toDate) {
     const key = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}`
     monthlyData.set(key, {

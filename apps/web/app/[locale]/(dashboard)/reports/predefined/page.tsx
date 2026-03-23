@@ -2,9 +2,10 @@ import { redirectToLogin } from '@/lib/i18n-redirect'
 import { getSession } from '@/lib/session'
 import { getOrgContext } from '@/lib/org-context'
 import { PageHeader } from '@/components/layout/page-header'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { BarChart3, PieChart, TrendingUp, FileCheck } from 'lucide-react'
 import { Link } from '@/i18n/navigation'
+import { getTranslations } from 'next-intl/server'
 
 export default async function PredefinedReportsPage() {
   const session = await getSession()
@@ -13,45 +14,47 @@ export default async function PredefinedReportsPage() {
   const org = await getOrgContext(session.user.id)
   if (!org) return redirectToLogin()
 
+  const t = await getTranslations('reports')
+
   const reports = [
     {
-      title: 'Gastos por Proveedor',
-      description: 'Análisis de compras consolidado multi-proyecto',
+      title: t('expensesBySupplier'),
+      description: t('predefinedDescGastosPorProveedor'),
       icon: BarChart3,
       href: '/reports/predefined/gastos-por-proveedor',
       color: 'text-blue-600',
     },
     {
-      title: 'Presupuesto vs Real',
-      description: 'Control de costos por proyecto',
+      title: t('predefinedTitleBudgetVsReal'),
+      description: t('predefinedDescBudgetVsReal'),
       icon: TrendingUp,
       href: '/reports/predefined/budget-vs-actual',
       color: 'text-green-600',
     },
     {
-      title: 'Avance vs Costo',
-      description: 'Consumido vs avance de obra por proyecto',
+      title: t('predefinedTitleProgressVsCost'),
+      description: t('predefinedDescProgressVsCost'),
       icon: TrendingUp,
       href: '/reports/predefined/progress-vs-cost',
       color: 'text-emerald-600',
     },
     {
-      title: 'Top 10 Materiales',
-      description: 'Materiales más caros de la empresa',
+      title: t('predefinedTitleTop10Materials'),
+      description: t('predefinedDescTop10Materials'),
       icon: PieChart,
       href: '/reports/predefined/top-materials',
       color: 'text-orange-600',
     },
     {
-      title: 'Certificaciones por Proyecto',
-      description: 'Estado de certificaciones consolidado',
+      title: t('predefinedTitleCertificationsByProject'),
+      description: t('predefinedDescCertificationsByProject'),
       icon: FileCheck,
       href: '/reports/predefined/certifications',
       color: 'text-purple-600',
     },
     {
-      title: 'Compras Multi-Proyecto',
-      description: 'Compras consolidadas por proyecto',
+      title: t('purchasesMultiProject'),
+      description: t('predefinedDescPurchasesMultiProjectCard'),
       icon: BarChart3,
       href: '/reports/predefined/purchases-multi-project',
       color: 'text-cyan-600',
@@ -61,17 +64,17 @@ export default async function PredefinedReportsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Reportes Predefinidos"
-        subtitle="Reportes listos para usar con visualizaciones interactivas"
+        title={t('predefinedReports')}
+        subtitle={t('predefinedListingSubtitle')}
         breadcrumbs={[
-          { label: 'Reportes', href: '/reports' },
-          { label: 'Predefinidos' },
+          { label: t('title'), href: '/reports' },
+          { label: t('predefinedListingBreadcrumb') },
         ]}
       />
 
       <div className="grid gap-6 md:grid-cols-2">
         {reports.map((report) => (
-          <Link key={report.title} href={report.href}>
+          <Link key={report.href} href={report.href}>
             <Card className="h-full transition-shadow hover:shadow-lg cursor-pointer">
               <CardHeader>
                 <div className="flex items-start justify-between">

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { FileDown, Loader2 } from 'lucide-react'
+import { downloadReportPdf } from '@/lib/reports/download-report-pdf'
 import { toast } from 'sonner'
 
 type ReportExportPdfButtonProps = {
@@ -25,33 +26,12 @@ export function ReportExportPdfButton({
   const handleExport = async () => {
     setIsExporting(true)
     try {
-      const locale = typeof document !== 'undefined' ? document.documentElement.lang || 'es' : 'es'
-      const params = new URLSearchParams({
-        template: templateId,
-        locale,
-        showEmitidoPor: '1',
-        showFullCompanyData: '1',
-        ...queryParams,
+      await downloadReportPdf(templateId, queryParams, {
+        success: t('toast.pdfExportSuccess'),
+        errorFallback: t('toast.pdfExportError'),
       })
-      const url = `/api/pdf?${params.toString()}`
-      const res = await fetch(url, { credentials: 'include' })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        toast.error(data?.error ?? 'Error al exportar PDF')
-        return
-      }
-      const blob = await res.blob()
-      const disposition = res.headers.get('Content-Disposition')
-      const match = disposition?.match(/filename="?([^";]+)"?/)
-      const filename = match?.[1] ?? `${templateId}.pdf`
-      const link = document.createElement('a')
-      link.href = URL.createObjectURL(blob)
-      link.download = filename
-      link.click()
-      URL.revokeObjectURL(link.href)
-      toast.success('PDF exportado correctamente')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al exportar PDF')
+      toast.error(err instanceof Error ? err.message : t('toast.pdfExportError'))
     } finally {
       setIsExporting(false)
     }

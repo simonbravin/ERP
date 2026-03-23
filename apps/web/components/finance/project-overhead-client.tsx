@@ -22,7 +22,7 @@ interface Props {
 }
 
 export function ProjectOverheadClient({
-  projectId,
+  projectId: _projectId,
   budgeted,
   consumed,
   initialItems,

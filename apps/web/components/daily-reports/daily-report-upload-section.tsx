@@ -33,7 +33,7 @@ export function DailyReportUploadSection({
     const files = e.target.files
     if (!files?.length) return
     if (photoCount + files.length > MAX_FILES) {
-      toast.error('Máximo 10 archivos por reporte.')
+      toast.error(t('toast.maxFiles'))
       return
     }
     setUploading(true)
@@ -41,10 +41,10 @@ export function DailyReportUploadSection({
       const formData = new FormData()
       for (let i = 0; i < files.length; i++) formData.append('files', files[i])
       await uploadDailyReportFiles(reportId, projectId, formData)
-      toast.success('Archivos subidos.')
+      toast.success(t('toast.filesUploaded'))
       router.refresh()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al subir.')
+      toast.error(err instanceof Error ? err.message : t('toast.uploadError'))
     } finally {
       setUploading(false)
       e.target.value = ''
@@ -56,7 +56,7 @@ export function DailyReportUploadSection({
   return (
     <div className="mt-6 rounded-lg border border-dashed border-gray-300 p-4 dark:border-gray-600">
       <h2 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-        {photoCount > 0 ? 'Agregar más fotos/documentos' : t('photosAndDocs')}
+        {photoCount > 0 ? t('addMoreAttachments') : t('photosAndDocs')}
       </h2>
       <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t('dropzoneHint')}</p>
       <div className="mt-3 flex flex-wrap gap-2">

@@ -34,12 +34,6 @@ function toNum(v: number | undefined): number {
   return typeof v === 'number' ? v : 0
 }
 
-function unitCost(line: BudgetLineRow): number {
-  const qty = toNum(line.quantity)
-  const total = toNum(line.directCostTotal)
-  return qty > 0 ? total / qty : 0
-}
-
 function calculateLineBreakdown(line: BudgetLineRow) {
   const qty = toNum(line.quantity)
   const directTotal = toNum(line.directCostTotal)

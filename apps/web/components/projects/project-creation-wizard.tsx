@@ -13,7 +13,6 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
   Card,
-  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
@@ -73,7 +72,7 @@ export function ProjectCreationWizard({
 
   async function onSubmit(data: Record<string, unknown>) {
     if (!selectedTemplate) {
-      toast.error('Debes seleccionar un template')
+      toast.error(t('selectTemplate'))
       return
     }
 

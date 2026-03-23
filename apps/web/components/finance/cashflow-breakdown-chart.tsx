@@ -92,7 +92,7 @@ export function CashflowBreakdownChart({ breakdown }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {breakdown.map((item, index) => {
+                {breakdown.map((item) => {
                   const percentage = totalExpenses > 0 ? (item.totalExpense / totalExpenses) * 100 : 0
                   return (
                     <tr key={item.projectId ?? 'overhead'} className="border-b last:border-0">

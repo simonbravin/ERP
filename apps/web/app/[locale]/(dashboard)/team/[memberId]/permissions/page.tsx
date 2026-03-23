@@ -1,5 +1,6 @@
 import { getMemberPermissions, getProjectAssignmentsForMember } from '@/app/actions/team'
-import { listProjects } from '@/app/actions/projects'
+import { listProjects, type ListProjectRow } from '@/app/actions/projects'
+import { unwrapListProjects } from '@/lib/list-projects-utils'
 import { MemberPermissionsClient } from '@/components/team/member-permissions-client'
 import { redirect } from '@/i18n/navigation'
 import { getLocale } from 'next-intl/server'
@@ -23,17 +24,17 @@ export default async function MemberPermissionsPage({ params }: PageProps) {
 
   let member
   let projectAssignments: Awaited<ReturnType<typeof getProjectAssignmentsForMember>> = []
-  let allProjects: Awaited<ReturnType<typeof listProjects>> = []
+  let allProjects: ListProjectRow[] = []
   const canManageRestricted = orgContext.role === 'OWNER' || orgContext.role === 'ADMIN'
   try {
     member = await getMemberPermissions(memberId)
     if (canManageRestricted) {
       const [assignments, projects] = await Promise.all([
         getProjectAssignmentsForMember(memberId).catch(() => []),
-        listProjects().catch(() => []),
+        listProjects().catch((): ListProjectRow[] => []),
       ])
       projectAssignments = assignments
-      allProjects = projects
+      allProjects = unwrapListProjects(projects)
     }
   } catch {
     redirect({ href: '/team', locale })

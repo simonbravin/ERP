@@ -39,8 +39,6 @@ export function MovementForm({
     (l) => l.type === 'CENTRAL_WAREHOUSE' || l.type === 'PROJECT_SITE'
   )
   const projectSites = locations.filter((l) => l.type === 'PROJECT_SITE')
-  const supplierLocs = locations.filter((l) => l.type === 'SUPPLIER')
-
   useEffect(() => {
     if (projectId) {
       setProjectWbsNodes(wbsNodes.filter((w) => w.projectId === projectId))

@@ -34,7 +34,7 @@ interface BudgetVersionStatusDropdownProps {
 
 export function BudgetVersionStatusDropdown({
   versionId,
-  projectId,
+  projectId: _projectId,
   currentStatus,
   canEdit,
 }: BudgetVersionStatusDropdownProps) {

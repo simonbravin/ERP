@@ -42,7 +42,7 @@ export function ResourceSelector({
   const [options, setOptions] = useState<ResourceOption[]>([])
   const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState(false)
-  const [selected, setSelected] = useState<ResourceOption | null>(null)
+  const [_selected, setSelected] = useState<ResourceOption | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 

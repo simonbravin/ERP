@@ -97,7 +97,6 @@ export function DailyReportForm({
   })
 
   const laborEntries = watch('laborEntries') as LaborEntryInput[] | undefined
-  const setLaborEntries = (entries: LaborEntryInput[]) => setValue('laborEntries', entries)
   const reportDateForm = watch('reportDate')
   const [reportDateStr, setReportDateStr] = useState(() =>
     reportDateForm instanceof Date ? formatDateDDMMYYYY(reportDateForm) : ''

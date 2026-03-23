@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Warehouse, Building2, MapPin, FolderGit2 } from 'lucide-react'
 import { Link } from '@/i18n/navigation'
-import { serializeForClient } from '@/lib/utils/serialization'
+import { toInventoryMovementClientRows } from '@/lib/inventory-serialize'
 
 const typeLabels: Record<string, string> = {
   CENTRAL_WAREHOUSE: 'Almacén central',
@@ -102,7 +102,7 @@ export default async function LocationDetailPage({ params }: PageProps) {
   const totalQty = stats ? Number(stats.total_quantity) : 0
   const Icon = typeIcons[location.type] ?? Warehouse
   const typeLabel = typeLabels[location.type] ?? location.type
-  const movementsPlain = recentMovements.map((m) => serializeForClient(m))
+  const movementsPlain = toInventoryMovementClientRows(recentMovements)
 
   return (
     <div className="h-full">
@@ -181,7 +181,7 @@ export default async function LocationDetailPage({ params }: PageProps) {
                   </tr>
                 </thead>
                 <tbody>
-                  {movementsPlain.map((m: any) => (
+                  {movementsPlain.map((m) => (
                     <tr key={m.id} className="border-b border-border last:border-0">
                       <td className="py-2 pr-4">
                         {m.createdAt

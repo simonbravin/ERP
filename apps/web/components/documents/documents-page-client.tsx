@@ -100,7 +100,6 @@ export function DocumentsPageClient({
     )
   }, [documents, search])
 
-  const hasContent = subfolders.length > 0 || filtered.length > 0
   const emptyList = subfolders.length === 0 && filtered.length === 0
 
   return (

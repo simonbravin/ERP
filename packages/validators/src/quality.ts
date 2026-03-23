@@ -27,7 +27,7 @@ export const SUBMITTAL_TYPES = [
 ] as const
 
 export const createSubmittalSchema = z.object({
-  submittalType: z.string().min(1, 'Type is required'),
+  submittalType: z.enum(SUBMITTAL_TYPES),
   specSection: z.string().max(50).optional().nullable(),
   wbsNodeId: z.string().uuid().optional().nullable(),
   submittedByPartyId: z.string().uuid().optional().nullable(),

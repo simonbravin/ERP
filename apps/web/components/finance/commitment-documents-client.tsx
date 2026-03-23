@@ -13,6 +13,7 @@ import { COMMITMENT_ENTITY } from '@/lib/document-entities'
 import { FileAndCameraTrigger } from '@/components/ui/file-and-camera-trigger'
 import { FileDown, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
 
 interface Props {
   commitmentId: string
@@ -21,6 +22,7 @@ interface Props {
 
 export function CommitmentDocumentsClient({ commitmentId, projectId }: Props) {
   const t = useTranslations('common')
+  const tFin = useTranslations('finance')
   const [docs, setDocs] = useState<{ id: string; documentId: string; title: string; docType: string; versionId: string; fileName: string }[]>([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
@@ -46,10 +48,10 @@ export function CommitmentDocumentsClient({ commitmentId, projectId }: Props) {
         await linkDocumentToEntity(result.docId, COMMITMENT_ENTITY, commitmentId)
         const list = await listDocumentsForEntity(COMMITMENT_ENTITY, commitmentId)
         setDocs(list)
-        toast.success('Documento adjuntado')
+        toast.success(tFin('toast.documentAttached'))
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'No se pudo adjuntar')
+      toast.error(err instanceof Error ? err.message : tFin('toast.attachUploadError'))
     } finally {
       setUploading(false)
     }
@@ -60,14 +62,14 @@ export function CommitmentDocumentsClient({ commitmentId, projectId }: Props) {
       const { url } = await getDocumentDownloadUrl(versionId)
       window.open(url, '_blank')
     } catch {
-      toast.error('No se pudo descargar')
+      toast.error(tFin('downloadAttachmentError'))
     }
   }
 
   return (
     <Card>
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4">
-        <CardTitle className="text-base">Documentos / Cotizaciones</CardTitle>
+        <CardTitle className="text-base">{tFin('commitmentDocumentsSectionTitle')}</CardTitle>
         <FileAndCameraTrigger
           onFileSelect={handleFileSelect}
           disabled={!commitmentId || !projectId}

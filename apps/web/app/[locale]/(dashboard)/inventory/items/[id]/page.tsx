@@ -4,6 +4,7 @@ import { redirectToLogin } from '@/lib/i18n-redirect'
 import { notFound } from 'next/navigation'
 import { prisma } from '@repo/database'
 import { serializeForClient } from '@/lib/utils/serialization'
+import { toInventoryMovementClientRows } from '@/lib/inventory-serialize'
 import { PageHeader } from '@/components/layout/page-header'
 import { ItemDetailInfo } from '@/components/inventory/item-detail-info'
 import { ItemStockByLocation } from '@/components/inventory/item-stock-by-location'
@@ -52,6 +53,7 @@ export default async function ItemDetailPage({ params }: PageProps) {
             user: { select: { fullName: true } },
           },
         },
+        item: { select: { id: true, sku: true, name: true, unit: true } },
       },
       orderBy: { createdAt: 'desc' },
       take: 50,
@@ -72,7 +74,7 @@ export default async function ItemDetailPage({ params }: PageProps) {
     current_stock: currentStock,
     last_purchase_cost: lastPurchase?.unitCost != null ? Number(lastPurchase.unitCost.toString()) : null,
   }
-  const movementsPlain = movements.map((m) => serializeForClient(m))
+  const movementsPlain = toInventoryMovementClientRows(movements)
 
   return (
     <div className="h-full">

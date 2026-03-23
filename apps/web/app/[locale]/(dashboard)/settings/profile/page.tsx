@@ -4,9 +4,6 @@ import { getLocale } from 'next-intl/server'
 import { prisma } from '@repo/database'
 import { resolveAvatarUrl } from '@/app/actions/settings'
 import { UserProfileForm } from '@/components/settings/user-profile-form'
-import { PageHeader } from '@/components/layout/page-header'
-import { getTranslations } from 'next-intl/server'
-
 export default async function ProfilePage() {
   const session = await getSession()
   const locale = await getLocale()
@@ -25,7 +22,6 @@ export default async function ProfilePage() {
 
   if (!user) redirect({ href: '/login', locale })
 
-  const t = await getTranslations('settings')
   const displayAvatarUrl = await resolveAvatarUrl(user!.avatarUrl)
 
   const userData = {

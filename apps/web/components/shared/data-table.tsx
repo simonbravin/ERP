@@ -34,7 +34,7 @@ export function DataTable<T extends Record<string, unknown>>({
   data,
   columns,
   keyExtractor,
-  stickyHeader = true,
+  stickyHeader: _stickyHeader = true,
   className,
   emptyMessage = 'No hay datos',
 }: DataTableProps<T>) {

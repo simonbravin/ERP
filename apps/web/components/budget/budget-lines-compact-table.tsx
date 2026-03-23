@@ -142,7 +142,8 @@ function SortableBudgetRow({
   className?: string
   children: React.ReactNode
 }) {
-  const { setNodeRef, transform, transition, attributes, listeners, isDragging } = useSortable({ id })
+  const { setNodeRef, transform, transition, attributes, listeners, isDragging: _isDragging } =
+    useSortable({ id })
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -178,7 +179,7 @@ export function BudgetLinesCompactTable({
   versionId,
   projectId,
   canEdit,
-  markupMode,
+  markupMode: _markupMode,
   wbsTemplates = [],
   searchQuery = '',
   columnView = 'totals',
@@ -417,7 +418,7 @@ export function BudgetLinesCompactTable({
     const level = entry.level
     const bgColor = bgColors[Math.min(level, bgColors.length - 1)] ?? 'bg-muted/30'
     if (entry.kind === 'line') {
-      const { node, line } = entry
+      const { node: _node, line } = entry
       const sums = lineResourceSums(line)
       return (
         <TableRow key={line.id} style={rowStyle} className={`${bgColor} h-8 hover:bg-muted/50`}>
@@ -653,11 +654,16 @@ export function BudgetLinesCompactTable({
         quantity: 1,
         unitCost: 0,
       })
-      if (result && 'lineId' in result) {
+      if (result && 'error' in result && result.error) {
+        const err = result.error
+        const description =
+          typeof err === 'object' && err !== null
+            ? Object.values(err as Record<string, string[]>).flat().join(', ')
+            : String(err)
+        toast.error(t('error'), { description })
+      } else if (result && 'lineId' in result) {
         setEditingAPU(result.lineId)
         router.refresh()
-      } else if (result && 'error' in result) {
-        toast.error(t('error'), { description: typeof result.error === 'object' ? Object.values(result.error).flat().join(', ') : String(result.error) })
       }
     }
 

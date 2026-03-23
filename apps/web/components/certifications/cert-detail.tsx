@@ -45,7 +45,7 @@ function formatDate(d: Date | null): string {
 export function CertDetail({
   certId,
   projectId,
-  number,
+  number: _number,
   periodMonth,
   periodYear,
   status,

@@ -36,7 +36,7 @@ function usePageTitle(): string {
  * Minimal header: page title + search (+ hamburger on mobile).
  * User, notifications, theme, and settings live in the sidebar footer.
  */
-export function DashboardHeader({ orgName, sidebarOpen, onSidebarToggle }: DashboardHeaderProps) {
+export function DashboardHeader({ orgName: _orgName, sidebarOpen, onSidebarToggle }: DashboardHeaderProps) {
   const title = usePageTitle()
   const t = useTranslations('common')
 

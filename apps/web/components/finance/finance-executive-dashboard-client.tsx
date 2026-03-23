@@ -26,6 +26,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { formatCurrency, formatDateShort } from '@/lib/format-utils'
 import { Download, AlertTriangle } from 'lucide-react'
 import { Link } from '@/i18n/navigation'
+import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import type { FinanceExecutiveDashboard, FinanceAlert } from '@/app/actions/finance'
 
@@ -49,6 +50,7 @@ interface Props {
 }
 
 export function FinanceExecutiveDashboardClient({ data, alerts = [] }: Props) {
+  const tFin = useTranslations('finance')
   const [isExporting, setIsExporting] = useState(false)
   const handleExportPDF = async () => {
     setIsExporting(true)
@@ -58,7 +60,7 @@ export function FinanceExecutiveDashboardClient({ data, alerts = [] }: Props) {
       const res = await fetch(url, { credentials: 'include' })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        toast.error(data?.error ?? 'Error al exportar')
+        toast.error(data?.error ?? tFin('toast.executiveExportError'))
         return
       }
       const blob = await res.blob()
@@ -70,9 +72,9 @@ export function FinanceExecutiveDashboardClient({ data, alerts = [] }: Props) {
       link.download = filename
       link.click()
       URL.revokeObjectURL(link.href)
-      toast.success('Dashboard exportado correctamente')
+      toast.success(tFin('toast.executiveDashboardExported'))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al exportar')
+      toast.error(err instanceof Error ? err.message : tFin('toast.executiveExportError'))
     } finally {
       setIsExporting(false)
     }

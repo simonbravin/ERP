@@ -182,7 +182,7 @@ export function PurchaseOrdersListClient({
           placeholder={t('dueTo')}
           className="max-w-[140px]"
         />
-        <Button type="button" variant="secondary" onClick={applyFilters} disabled={isPending}>
+        <Button type="button" variant="secondary" onClick={() => applyFilters()} disabled={isPending}>
           {isPending ? t('filtering') : t('apply')}
         </Button>
       </div>

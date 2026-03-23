@@ -1,4 +1,7 @@
-import type { OrgRole } from '@prisma/client'
+import type { OrgRole } from '@repo/database'
+
+/** Session may include SUPER_ADMIN (next-auth); DB org roles are Prisma OrgRole only. */
+export type SessionOrgRole = OrgRole | 'SUPER_ADMIN'
 
 // Definición de módulos del sistema
 export const MODULES = {
@@ -120,29 +123,34 @@ export function getEffectivePermissions(
 }
 
 export function hasPermission(
-  role: OrgRole,
+  role: SessionOrgRole,
   module: Module,
   permission: Permission,
   customPermissions?: CustomPermissionsMap
 ): boolean {
+  if (role === 'SUPER_ADMIN') return true
   const effective = getEffectivePermissions(role, customPermissions ?? null)
   return effective[module]?.includes(permission) ?? false
 }
 
 export function canAccess(
-  role: OrgRole,
+  role: SessionOrgRole,
   module: Module,
   customPermissions?: CustomPermissionsMap
 ): boolean {
+  if (role === 'SUPER_ADMIN') return true
   const effective = getEffectivePermissions(role, customPermissions ?? null)
   return effective[module]?.includes('view') ?? false
 }
 
+const ALL_PERMISSIONS: Permission[] = ['view', 'create', 'edit', 'delete', 'export', 'approve']
+
 export function getModulePermissions(
-  role: OrgRole,
+  role: SessionOrgRole,
   module: Module,
   customPermissions?: CustomPermissionsMap
 ): Permission[] {
+  if (role === 'SUPER_ADMIN') return ALL_PERMISSIONS
   const effective = getEffectivePermissions(role, customPermissions ?? null)
   return effective[module] ?? []
 }

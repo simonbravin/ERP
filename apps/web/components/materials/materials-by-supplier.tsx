@@ -40,7 +40,7 @@ export function MaterialsBySupplierView({
 
   const [searchQuery, setSearchQuery] = useState('')
   const [sortBy, setSortBy] = useState<'supplier' | 'materials' | 'cost'>('supplier')
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+  const [sortOrder, _setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
   const [expandedSuppliers, setExpandedSuppliers] = useState<Set<string>>(new Set())
   const [generatingPO, setGeneratingPO] = useState<string | null>(null)
@@ -125,7 +125,7 @@ export function MaterialsBySupplierView({
     setGeneratingPO(supplierName)
     try {
       const result = await generatePurchaseOrder(budgetVersionId, supplierName)
-      if (result.success) {
+      if (result.success === true) {
         const exportResult = await exportMaterialsBySupplierToExcel(
           budgetVersionId,
           supplierName,

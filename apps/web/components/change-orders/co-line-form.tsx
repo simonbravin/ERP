@@ -4,7 +4,6 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
   createChangeOrderLineSchema,
-  CHANGE_ORDER_LINE_TYPE,
   type CreateChangeOrderLineInput,
 } from '@repo/validators'
 import { Button } from '@/components/ui/button'
@@ -19,7 +18,7 @@ type COLineFormProps = {
   onSubmit: (data: CreateChangeOrderLineInput) => Promise<{ error?: Record<string, string[]> } | { success: boolean }>
 }
 
-export function COLineForm({ coId, wbsOptions, onSubmit }: COLineFormProps) {
+export function COLineForm({ coId: _coId, wbsOptions, onSubmit }: COLineFormProps) {
   const {
     register,
     handleSubmit,

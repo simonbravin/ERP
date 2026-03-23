@@ -43,14 +43,14 @@ export default async function ProjectEditPage({ params }: PageProps) {
     status: project.status,
     phase: (project.phase ?? 'PRE_CONSTRUCTION') as UpdateProjectInput['phase'],
     startDate: project.startDate
-      ? (project.startDate instanceof Date
-          ? project.startDate.toISOString().slice(0, 10)
-          : new Date(project.startDate).toISOString().slice(0, 10))
+      ? project.startDate instanceof Date
+        ? project.startDate
+        : new Date(project.startDate)
       : undefined,
     plannedEndDate: project.plannedEndDate
-      ? (project.plannedEndDate instanceof Date
-          ? project.plannedEndDate.toISOString().slice(0, 10)
-          : new Date(project.plannedEndDate).toISOString().slice(0, 10))
+      ? project.plannedEndDate instanceof Date
+        ? project.plannedEndDate
+        : new Date(project.plannedEndDate)
       : undefined,
     active: project.active,
   }

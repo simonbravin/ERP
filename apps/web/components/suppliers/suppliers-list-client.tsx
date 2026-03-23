@@ -19,7 +19,6 @@ import { Card, CardContent } from '@/components/ui/card'
 import { ListFiltersBar } from '@/components/list'
 import { Search, List, Grid3x3, Building2, Pencil, ArrowUpDown } from 'lucide-react'
 import { SupplierSearch } from './supplier-search'
-import { GlobalSupplierCard } from './global-supplier-card'
 import { PartyDetailDialog } from './party-detail-dialog'
 
 type LinkedSupplier = {

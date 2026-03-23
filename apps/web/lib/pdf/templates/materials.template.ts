@@ -1,5 +1,5 @@
 import { prisma } from '@repo/database'
-import type { DocumentTemplate, DocumentTemplateSession } from '@/lib/pdf/document-template'
+import type { DocumentTemplate } from '@/lib/pdf/document-template'
 
 export const materialsTemplate: DocumentTemplate = {
   id: 'materials',

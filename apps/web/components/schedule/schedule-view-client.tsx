@@ -78,6 +78,7 @@ export function ScheduleViewClient({
   const [showTodayLine, setShowTodayLine] = useState(true)
   const [groupBy, setGroupBy] = useState<'none' | 'phase' | 'assigned'>('none')
   const [weekStartsOn, setWeekStartsOn] = useState<0 | 1>(1)
+  const [viewMode, setViewMode] = useState<'gantt' | 'calendar'>('gantt')
 
   const schedulePrefsKey = `bloqer-schedule-prefs-${scheduleData.id}`
   useEffect(() => {
@@ -145,7 +146,6 @@ export function ScheduleViewClient({
   const [highlightedTask, setHighlightedTask] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [isScheduleFullscreen, setIsScheduleFullscreen] = useState(false)
-  const [viewMode, setViewMode] = useState<'gantt' | 'calendar'>('gantt')
 
   useEffect(() => {
     if (!isScheduleFullscreen) return

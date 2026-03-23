@@ -8,7 +8,7 @@ import { prisma } from '@repo/database'
 import { revalidatePath } from 'next/cache'
 import crypto from 'crypto'
 import bcrypt from 'bcryptjs'
-import type { OrgRole } from '@prisma/client'
+import type { OrgRole } from '@repo/database'
 import type { InviteTeamMemberInput } from '@repo/validators'
 import { sendInvitationEmail, sendAddedToOrgEmail } from '@/lib/email'
 import { requirePermission } from '@/lib/auth-helpers'
@@ -191,7 +191,7 @@ export async function activateMember(memberId: string) {
   }
 }
 
-export async function resendInvitation(memberId: string) {
+export async function resendInvitation(_memberId: string) {
   const session = await getSession()
   if (!session?.user?.id) {
     return { success: false, error: 'Unauthorized' }
@@ -242,7 +242,7 @@ export async function resendInvitationEmail(invitationId: string) {
       expiresAt: { gte: new Date() },
     },
     include: {
-      invitedBy: { select: { fullName: true, name: true, email: true } },
+      invitedBy: { select: { fullName: true, email: true } },
     },
   })
 
@@ -260,10 +260,7 @@ export async function resendInvitationEmail(invitationId: string) {
   })
 
   const inviterName =
-    invitation.invitedBy?.fullName ??
-    invitation.invitedBy?.name ??
-    invitation.invitedBy?.email ??
-    'Un administrador'
+    invitation.invitedBy?.fullName ?? invitation.invitedBy?.email ?? 'Un administrador'
 
   const emailResult = await sendInvitationEmail({
     to: invitation.email,

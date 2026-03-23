@@ -7,6 +7,7 @@ import { getProject } from '@/app/actions/projects'
 import { getChangeOrder } from '@/app/actions/change-orders'
 import { getWbsNodesForProject } from '@/app/actions/daily-reports'
 import { COForm } from '@/components/change-orders/co-form'
+import type { ChangeOrderFormInput } from '@repo/validators'
 
 type PageProps = {
   params: Promise<{ id: string; coId: string }>
@@ -37,17 +38,22 @@ export default async function ChangeOrderEditPage({ params }: PageProps) {
 
   const wbsOptions = await getWbsNodesForProject(projectId)
 
-  const defaultValues = {
+  const rawImpact = (co as { budgetImpactType?: string }).budgetImpactType
+  const budgetImpactType: ChangeOrderFormInput['budgetImpactType'] =
+    rawImpact === 'APPROVED_CHANGE' ? 'APPROVED_CHANGE' : 'DEVIATION'
+
+  const defaultValues: Partial<ChangeOrderFormInput> = {
     title: co.title,
     reason: co.reason,
     justification: co.justification ?? undefined,
     changeType: co.changeType,
-    budgetImpactType: (co as { budgetImpactType?: string }).budgetImpactType ?? 'DEVIATION',
+    budgetImpactType,
     costImpact: Number(co.costImpact),
     timeImpactDays: co.timeImpactDays ?? 0,
     requestDate: toDateOnly(co.requestDate),
     implementedDate: toDateOnly(co.implementedDate),
     lines: co.lines.map((l) => ({
+      id: l.id,
       wbsNodeId: l.wbsNodeId,
       changeType: l.changeType as 'ADD' | 'MODIFY' | 'DELETE',
       justification: l.justification,

@@ -9,6 +9,7 @@ import { parseUuid } from '@/lib/schemas/ids'
 import { publishOutboxEvent } from '@/lib/events/event-publisher'
 import { calculateTotalStock, calculateStockBalance } from '@/lib/inventory-utils'
 import { createInAppNotificationsForUsers } from '@/app/actions/notifications'
+import { notificationDeepLinkMetadata } from '@/lib/notification-deeplink'
 
 /** List all inventory categories (for dropdowns). */
 export async function getInventoryCategories() {
@@ -59,8 +60,13 @@ export async function createInventoryCategory(name: string) {
 export async function createInventorySubcategory(categoryId: string, name: string) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  const parsedCat = parseUuid(categoryId, 'ID de categoría')
+  if (parsedCat.success === false) {
+    return { success: false as const, error: parsedCat.error }
+  }
+
   const maxOrder = await prisma.inventorySubcategory.findFirst({
-    where: { categoryId },
+    where: { categoryId: parsedCat.value },
     orderBy: { sortOrder: 'desc' },
     select: { sortOrder: true },
   })
@@ -145,7 +151,7 @@ export async function updateInventoryItem(
   }
 ) {
   const parsedItem = parseUuid(itemId, 'ID de ítem')
-  if (!parsedItem.success) return { success: false as const, error: parsedItem.error }
+  if (parsedItem.success === false) return { success: false as const, error: parsedItem.error }
 
   await requirePermission('INVENTORY', 'edit')
   const { org } = await getAuthContext()
@@ -194,7 +200,7 @@ export async function updateInventoryItem(
 
 export async function deleteInventoryItem(itemId: string) {
   const parsedItem = parseUuid(itemId, 'ID de ítem')
-  if (!parsedItem.success) return { success: false as const, error: parsedItem.error }
+  if (parsedItem.success === false) return { success: false as const, error: parsedItem.error }
 
   await requirePermission('INVENTORY', 'delete')
   const { org } = await getAuthContext()
@@ -578,15 +584,15 @@ async function notifyLowStockIfNeeded(
     category: 'LOW_STOCK',
     title: 'Stock bajo',
     message: `${item.name} está por debajo del stock mínimo.`,
-    metadata: { link: '/inventory' },
+    metadata: notificationDeepLinkMetadata(`/inventory/items/${itemId}`),
   })
 }
 
 export async function getItemStockByLocation(itemId: string, locationId: string) {
   const parsedItem = parseUuid(itemId, 'ID de ítem')
   const parsedLocation = parseUuid(locationId, 'ID de ubicación')
-  if (!parsedItem.success) return { success: false as const, error: parsedItem.error }
-  if (!parsedLocation.success) return { success: false as const, error: parsedLocation.error }
+  if (parsedItem.success === false) return { success: false as const, error: parsedItem.error }
+  if (parsedLocation.success === false) return { success: false as const, error: parsedLocation.error }
 
   try {
     const { org } = await getAuthContext()
@@ -609,7 +615,9 @@ export async function getItemStockByLocation(itemId: string, locationId: string)
 
 export async function getProjectWBSNodes(projectId: string) {
   const parsedProject = parseUuid(projectId, 'ID de proyecto')
-  if (!parsedProject.success) return { success: false as const, error: parsedProject.error, nodes: [] }
+  if (parsedProject.success === false) {
+    return { success: false as const, error: parsedProject.error, nodes: [] }
+  }
 
   try {
     const { org } = await getAuthContext()

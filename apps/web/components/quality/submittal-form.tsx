@@ -20,7 +20,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { QualityAttachmentsInput } from '@/components/quality/quality-attachments-input'
-import { cn } from '@/lib/utils'
 
 const SUBMITTAL_TYPES = [
   'MATERIAL',
@@ -79,7 +78,8 @@ export function SubmittalForm({
   async function onSubmit(data: CreateSubmittalInput) {
     try {
       const result = await createSubmittal(projectId, {
-        ...data,
+        submittalType: data.submittalType,
+        dueDate: data.dueDate,
         wbsNodeId: data.wbsNodeId || null,
         submittedByPartyId: data.submittedByPartyId || null,
         specSection: data.specSection || null,

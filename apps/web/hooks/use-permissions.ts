@@ -9,7 +9,7 @@ import {
   type Permission,
   type CustomPermissionsMap,
 } from '@/lib/permissions'
-import type { OrgRole } from '@/types/next-auth'
+import type { SessionOrgRole } from '@/lib/permissions'
 
 type ModuleKey = keyof typeof MODULES
 
@@ -34,7 +34,7 @@ export function usePermissions() {
       .finally(() => setLoading(false))
   }, [orgMemberId])
 
-  const role = session?.user?.role as OrgRole | undefined
+  const role = session?.user?.role as SessionOrgRole | undefined
 
   const can = (moduleKey: ModuleKey, permission: Permission): boolean => {
     if (!role) return false

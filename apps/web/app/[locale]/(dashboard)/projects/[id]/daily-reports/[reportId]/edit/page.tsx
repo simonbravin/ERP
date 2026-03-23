@@ -69,7 +69,10 @@ export default async function EditDailyReportPage({ params }: PageProps) {
           projectId={projectId}
           reportId={reportId}
           defaultValues={{
-            reportDate: report.reportDate,
+            reportDate:
+              report.reportDate instanceof Date
+                ? report.reportDate
+                : new Date(report.reportDate as string),
             summary: report.summary,
             workAccomplished: report.workAccomplished ?? undefined,
             weather: (report.weather && ['SUNNY', 'CLOUDY', 'RAINY', 'SNOWY', 'WINDY'].includes(report.weather) ? report.weather : null) as 'SUNNY' | 'CLOUDY' | 'RAINY' | 'SNOWY' | 'WINDY' | null,

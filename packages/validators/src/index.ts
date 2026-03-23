@@ -26,8 +26,10 @@ export {
 export {
   createProjectSchema,
   updateProjectSchema,
+  PROJECT_PHASE,
   type CreateProjectInput,
   type UpdateProjectInput,
+  type ProjectPhase,
 } from './project'
 
 export {

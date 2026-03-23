@@ -3,13 +3,11 @@ import createNextIntlPlugin from 'next-intl/plugin'
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { PrismaPlugin } = require('@prisma/nextjs-monorepo-workaround-plugin')
 
-process.env.SKIP_TYPE_CHECK = 'true'
-
 const withNextIntl = createNextIntlPlugin('./i18n/request.ts')
 
 const nextConfig: NextConfig = {
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   eslint: {
     ignoreDuringBuilds: true,

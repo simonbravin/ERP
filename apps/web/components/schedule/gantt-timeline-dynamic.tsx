@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useEffect, useState } from 'react'
-import { format, eachDayOfInterval, addDays } from 'date-fns'
+import { format, eachDayOfInterval } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { addWorkingDays, countWorkingDays } from '@/lib/schedule/working-days'
 import { getDayIndex } from '@/lib/schedule/gantt-position'

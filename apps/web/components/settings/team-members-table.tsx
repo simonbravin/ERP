@@ -29,6 +29,7 @@ import { toast } from 'sonner'
 import { MoreVertical, Shield, ShieldCheck, ShieldAlert, Mail, FileDown } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
+import type { OrgRole } from '@repo/database'
 
 interface Member {
   id: string
@@ -88,12 +89,12 @@ export function TeamMembersTable({ members, currentUserId, canManage }: TeamMemb
     VIEWER: Shield,
   }
 
-  async function handleChangeRole(memberId: string, newRole: string) {
+  async function handleChangeRole(memberId: string, newRole: OrgRole) {
     setLoadingId(memberId)
     try {
       const result = await updateMemberRole(memberId, newRole)
 
-      if (result.success) {
+      if (result.success === true) {
         toast.success(t('roleUpdateSuccess'))
         router.refresh()
       } else {
@@ -113,7 +114,7 @@ export function TeamMembersTable({ members, currentUserId, canManage }: TeamMemb
         ? await deactivateMember(memberId)
         : await activateMember(memberId)
 
-      if (result.success) {
+      if (result.success === true) {
         toast.success(
           currentlyActive ? t('memberDeactivated') : t('memberActivated')
         )

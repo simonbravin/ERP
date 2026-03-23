@@ -73,7 +73,7 @@ export function BudgetTreeTable({
   lines,
   versionId,
   canEdit,
-  onDelete,
+  onDelete: _onDelete,
 }: BudgetTreeTableProps) {
   const t = useTranslations('budget')
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set(wbsTree.map((n) => n.id)))

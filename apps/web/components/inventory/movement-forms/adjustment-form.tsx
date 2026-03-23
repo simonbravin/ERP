@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge'
 import { createInventoryMovement, getItemStockByLocation } from '@/app/actions/inventory'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 
 const adjustmentSchema = z.object({
   itemId: z.string().min(1, 'Selecciona un item'),
@@ -37,6 +38,7 @@ export function AdjustmentForm({
   locations,
   initialItemId,
 }: AdjustmentFormProps) {
+  const t = useTranslations('inventory')
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [selectedItem, setSelectedItem] = useState<
@@ -86,7 +88,10 @@ export function AdjustmentForm({
   async function onSubmit(data: AdjustmentInput) {
     if (isNegative && Math.abs(data.quantity) > currentStock) {
       toast.error(
-        `No se puede quitar más de lo disponible. Stock actual: ${currentStock.toFixed(2)} ${selectedItem?.unit ?? ''}`
+        t('toast.adjustmentExceedsStock', {
+          stock: currentStock.toFixed(2),
+          unit: selectedItem?.unit ?? '',
+        })
       )
       return
     }
@@ -105,14 +110,14 @@ export function AdjustmentForm({
       })
 
       if (result.success) {
-        toast.success('Ajuste registrado correctamente')
+        toast.success(t('toast.adjustmentOk'))
         router.push('/inventory/movements')
         router.refresh()
       } else {
-        toast.error('Error al registrar ajuste')
+        toast.error(t('toast.adjustmentError'))
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error inesperado')
+      toast.error(err instanceof Error ? err.message : t('errors.unexpectedError'))
     } finally {
       setIsSubmitting(false)
     }

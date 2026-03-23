@@ -11,7 +11,7 @@ Este documento define los pasos para comprobar que la homogeneización de filtro
 3. **Fase 2 – Finanzas:** Migrar AP, AR, transacciones, proyección, cashflow. ✅
 4. **Fase 3 – Reportes y documentos:** Migrar reportes (run + predefinido gastos por proveedor); documentos sin export listado. ✅
 5. **Fase 4 – Resto:** Calidad, certificaciones, change orders, inventario, proveedores, equipo, proyectos. ✅
-6. **Cierre:** Comprobar "Paso 5 – Criterios finales" y ejecutar manualmente la matriz de regresión. ⏳ (pendiente pruebas manuales)
+6. **Cierre:** `pnpm verify` (tipos + build web) ✅ automatizable; comprobar "Paso 5 – Criterios finales" y ejecutar manualmente la matriz de regresión. ⏳ (pendiente pruebas manuales en UI)
 
 ---
 
@@ -53,6 +53,26 @@ Marcar cada flujo cuando se haya verificado tras un cambio.
 - [ ] **PO:** Descargar PDF y Excel → mismo contenido que antes.
 - [ ] **Cronograma:** Export PDF → proyecto y org en cabecera.
 - [ ] **Equipo:** Export Excel → mismas columnas.
+- [ ] **Fase 4 – RFI (proyecto):** Filtros → Aplicar / Limpiar; lista coherente con criterios.
+- [ ] **Fase 4 – Submittals (proyecto):** Idem.
+- [ ] **Fase 4 – Certificaciones (proyecto):** Filtros + SummaryCard (total aprobado); export Excel con `common.export`.
+- [ ] **Fase 4 – Change orders (proyecto):** Filtro estado + Limpiar; lista correcta.
+- [ ] **Fase 4 – Inventario ítems:** Búsqueda, categoría, stock → Aplicar / Limpiar.
+- [ ] **Fase 4 – Inventario movimientos:** Limpiar filtros usa `common.clear`.
+- [ ] **Fase 4 – Proveedores (listado):** Búsqueda + categoría → Aplicar / Limpiar.
+- [ ] **Fase 4 – Proyectos (lista org):** Estado + fase → Aplicar / Limpiar; export Excel.
+
+---
+
+## Verificación automatizada (tipos + build)
+
+Antes del cierre manual de la matriz, el repo debe pasar:
+
+```bash
+pnpm verify
+```
+
+Eso ejecuta `pnpm typecheck` (Turbo: `tsc --noEmit` en `@repo/validators` y `apps/web`, con `^build` para Prisma y `dist` de validators) y después `pnpm turbo run build --filter=web`. El `next build` valida tipos en la app (`typescript.ignoreBuildErrors: false`). No sustituye la matriz de regresión funcional arriba.
 
 ---
 

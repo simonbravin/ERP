@@ -85,7 +85,7 @@ interface APUEditorDialogProps {
 
 export function APUEditorDialog({
   budgetLineId,
-  versionId,
+  versionId: _versionId,
   projectId,
   onClose,
 }: APUEditorDialogProps) {

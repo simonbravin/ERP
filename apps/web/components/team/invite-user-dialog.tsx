@@ -25,7 +25,7 @@ import { Label } from '@/components/ui/label'
 import { inviteUser } from '@/app/actions/team'
 import { toast } from 'sonner'
 import { ROLE_DESCRIPTIONS } from '@/lib/permissions'
-import type { OrgRole } from '@prisma/client'
+import type { OrgRole } from '@repo/database'
 
 const formSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -58,7 +58,7 @@ export function InviteUserDialog({
   const handleSubmit = async (data: FormData) => {
     setIsSubmitting(true)
     try {
-      await inviteUser(data)
+      await inviteUser({ email: data.email, role: data.role })
       onSuccess()
       form.reset()
     } catch (err: unknown) {

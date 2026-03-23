@@ -199,10 +199,12 @@ export function BudgetTreeTableAdmin({
                   step="0.01"
                   value={editingQuantity.value}
                   onChange={(e) => setEditingQuantity({ lineId: line.id, value: e.target.value })}
-                  onBlur={() => editingQuantity && handleQuantityChange(line.id, editingQuantity.value)}
+                  onBlur={() => {
+                    if (editingQuantity) handleQuantityChange(line.id, editingQuantity.value)
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
-                      editingQuantity && handleQuantityChange(line.id, editingQuantity.value)
+                      if (editingQuantity) handleQuantityChange(line.id, editingQuantity.value)
                     } else if (e.key === 'Escape') {
                       setEditingQuantity(null)
                     }
@@ -214,9 +216,11 @@ export function BudgetTreeTableAdmin({
               ) : (
                 <button
                   type="button"
-                  onClick={() =>
-                    canEdit && setEditingQuantity({ lineId: line.id, value: String(line.quantity) })
-                  }
+                  onClick={() => {
+                    if (canEdit) {
+                      setEditingQuantity({ lineId: line.id, value: String(line.quantity) })
+                    }
+                  }}
                   className={`font-mono text-sm tabular-nums ${canEdit ? 'cursor-pointer hover:text-blue-600 dark:hover:text-blue-400' : ''}`}
                 >
                   {formatNumber(toNum(line.quantity))}

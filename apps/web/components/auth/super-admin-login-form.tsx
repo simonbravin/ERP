@@ -33,7 +33,7 @@ export function SuperAdminLoginForm() {
       return
     }
     if (result.error) {
-      const err = result.error as { _form?: string[] }
+      const err = result.error as unknown as { _form?: string[] }
       if (err._form) setError('root', { message: err._form[0] })
       return
     }

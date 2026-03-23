@@ -18,12 +18,13 @@ import type {
   CreateBudgetLineInput,
   UpdateBudgetLineInput,
 } from '@repo/validators'
-import { calculateLineTotal, calculateBudgetLineTotal } from '@/lib/budget-utils'
+import { calculateBudgetLineTotal } from '@/lib/budget-utils'
 import { calculateBudgetLine } from '@/lib/budget-calculations'
 import { createAuditLog } from '@/lib/audit-log'
 import { publishOutboxEvent } from '@/lib/events/event-publisher'
 import { serializeForClient } from '@/lib/utils/serialization'
 import { assertProjectAccess, canEditProjectArea, PROJECT_AREAS } from '@/lib/project-permissions'
+import { notificationDeepLinkMetadata } from '@/lib/notification-deeplink'
 
 function ensureProjectInOrg(projectId: string, orgId: string) {
   return prisma.project.findFirst({
@@ -106,7 +107,13 @@ export async function listBudgetVersions(projectId: string) {
     const subtotal1 = totalDirectCost * (1 + gg / 100)
     const subtotal2 = subtotal1 * (1 + gf / 100 + util / 100)
     const totalSale = subtotal2 * (1 + tax / 100)
-    const { globalOverheadPct, globalFinancialPct, globalProfitPct, globalTaxPct, ...rest } = v
+    const {
+      globalOverheadPct: _globalOverheadPct,
+      globalFinancialPct: _globalFinancialPct,
+      globalProfitPct: _globalProfitPct,
+      globalTaxPct: _globalTaxPct,
+      ...rest
+    } = v
     return {
       ...rest,
       totalCost: totalSale,
@@ -212,7 +219,7 @@ export async function getBudgetExportData(versionId: string): Promise<{
     },
   })
   if (!versionRaw) return null
-  const version = serializeForClient(versionRaw) as (typeof versionRaw) & { budgetLines: typeof versionRaw.budgetLines }
+  const version = serializeForClient(versionRaw) as unknown as typeof versionRaw
   const projectId = version.projectId as string
   const wbsNodes = await prisma.wbsNode.findMany({
     where: { projectId, orgId: org.orgId, active: true },
@@ -509,7 +516,7 @@ export async function approveBudgetVersion(versionId: string) {
         category: 'BUDGET_APPROVED',
         title: 'Presupuesto aprobado',
         message: `Versión ${version.versionCode} fue aprobada.`,
-        metadata: { link: `/projects/${version.projectId}/budget/${versionId}` },
+        metadata: notificationDeepLinkMetadata(`/projects/${version.projectId}/budget/${versionId}`),
       })
     }
   }

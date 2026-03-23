@@ -3,8 +3,16 @@ import { cn } from '@/lib/utils'
 import { BADGE_CLASSES, type StatusColor } from '@/lib/design-tokens'
 
 export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
-  /** Semantic status (preferred) or legacy variance names */
-  variant?: StatusColor | 'default' | 'under' | 'track' | 'over' | 'outline' | 'secondary'
+  /** Semantic status (preferred) or legacy variance names; destructive maps to danger (shadcn compat) */
+  variant?:
+    | StatusColor
+    | 'default'
+    | 'under'
+    | 'track'
+    | 'over'
+    | 'outline'
+    | 'secondary'
+    | 'destructive'
 }
 
 const SEMANTIC_MAP: Record<string, StatusColor> = {
@@ -14,6 +22,7 @@ const SEMANTIC_MAP: Record<string, StatusColor> = {
   success: 'success',
   warning: 'warning',
   danger: 'danger',
+  destructive: 'danger',
   neutral: 'neutral',
   info: 'info',
 }

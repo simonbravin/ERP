@@ -10,7 +10,7 @@ type RfiCommentFormProps = {
   projectId: string
 }
 
-export function RfiCommentForm({ rfiId, projectId }: RfiCommentFormProps) {
+export function RfiCommentForm({ rfiId, projectId: _projectId }: RfiCommentFormProps) {
   const router = useRouter()
   const [comment, setComment] = useState('')
   const [submitting, setSubmitting] = useState(false)

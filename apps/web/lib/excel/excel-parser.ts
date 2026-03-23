@@ -20,7 +20,7 @@ export class ExcelParser {
           const workbook = XLSX.read(data, { type: 'binary' })
 
           const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
-          const rows = XLSX.utils.sheet_to_json<any>(firstSheet, { header: 1 })
+          const rows = XLSX.utils.sheet_to_json<unknown[]>(firstSheet, { header: 1 })
 
           const parsedRows = this.extractRows(rows)
           resolve(parsedRows)
@@ -38,7 +38,7 @@ export class ExcelParser {
    * Extrae filas relevantes del Excel.
    * Formato estándar: Código, Descripción, Unidad, Cantidad, Importe
    */
-  private extractRows(rows: any[][]): ExcelRow[] {
+  private extractRows(rows: unknown[][]): ExcelRow[] {
     const extracted: ExcelRow[] = []
 
     let headerRow = -1
@@ -82,7 +82,7 @@ export class ExcelParser {
 
     for (let i = headerRow + 1; i < rows.length; i++) {
       const row = rows[i]
-      if (!row || row.length === 0) continue
+      if (!Array.isArray(row) || row.length === 0) continue
 
       const code = this.cleanCode(row[codeColIdx])
       if (!code) continue

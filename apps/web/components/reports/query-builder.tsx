@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import { useTranslations } from 'next-intl'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
@@ -59,6 +60,7 @@ function QueryBuilderPreview({
   selectedFields: string[]
   fields: QueryField[]
 }) {
+  const t = useTranslations('reports')
   const columns = selectedFields.length > 0
     ? selectedFields.filter((k) => data[0] && k in data[0])
     : data[0]
@@ -69,7 +71,7 @@ function QueryBuilderPreview({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Vista Previa ({data.length} registros)</CardTitle>
+        <CardTitle>{t('queryPreviewTitle', { count: data.length })}</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto rounded-md border">
@@ -97,19 +99,22 @@ function QueryBuilderPreview({
   )
 }
 
-const OPERATORS: { value: QueryFilter['operator']; label: string }[] = [
-  { value: '=', label: '=' },
-  { value: '!=', label: '!=' },
-  { value: '>', label: '>' },
-  { value: '<', label: '<' },
-  { value: '>=', label: '>=' },
-  { value: '<=', label: '<=' },
-  { value: 'CONTAINS', label: 'Contiene' },
-]
-
 type ProjectOption = { id: string; name: string; projectNumber: string }
 
 export function QueryBuilder() {
+  const t = useTranslations('reports')
+  const operators = useMemo(
+    (): { value: QueryFilter['operator']; label: string }[] => [
+      { value: '=', label: '=' },
+      { value: '!=', label: '!=' },
+      { value: '>', label: '>' },
+      { value: '<', label: '<' },
+      { value: '>=', label: '>=' },
+      { value: '<=', label: '<=' },
+      { value: 'CONTAINS', label: t('operatorContains') },
+    ],
+    [t]
+  )
   const [tables, setTables] = useState<TableMetadata[]>([])
   const [projects, setProjects] = useState<ProjectOption[]>([])
   const [selectedTable, setSelectedTable] = useState('')
@@ -150,7 +155,7 @@ export function QueryBuilder() {
 
   const handleRunQuery = async () => {
     if (!selectedTable || selectedFields.length === 0) {
-      toast.error('Selecciona tabla y al menos un campo')
+      toast.error(t('toast.queryNeedTableAndFields'))
       return
     }
     setIsLoading(true)
@@ -167,9 +172,9 @@ export function QueryBuilder() {
       }
       const result = await executeCustomQuery(config)
       setPreviewData(result.data)
-      toast.success(`${result.totalRows} registros en ${result.executionTime}ms`)
+      toast.success(t('toast.querySuccess', { count: result.totalRows, ms: result.executionTime }))
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Error al ejecutar')
+      toast.error(error instanceof Error ? error.message : t('toast.queryExecuteError'))
     } finally {
       setIsLoading(false)
     }
@@ -379,7 +384,7 @@ export function QueryBuilder() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {OPERATORS.map((op) => (
+                      {operators.map((op) => (
                         <SelectItem key={op.value} value={op.value}>
                           {op.label}
                         </SelectItem>

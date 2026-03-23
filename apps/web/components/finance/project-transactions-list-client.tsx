@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useMessageBus } from '@/hooks/use-message-bus'
@@ -54,30 +54,9 @@ import {
 import { exportProjectTransactionsToExcel } from '@/app/actions/export'
 import { ExportDialog } from '@/components/export/export-dialog'
 import { toast } from 'sonner'
-import { STATUS_LABELS, getStatusLabel } from '@/lib/finance-labels'
-
-function formatAuditLogDetail(log: {
-  action: string
-  beforeSnapshot?: Record<string, unknown> | null
-  afterSnapshot?: Record<string, unknown> | null
-  detailsJson?: { description?: string } | null
-}): string {
-  const desc = log.detailsJson?.description
-  if (desc) return desc
-  if (log.action === 'CREATE') return 'Transacción creada'
-  if (log.action === 'DELETE') return 'Transacción anulada'
-  if (log.action === 'UPDATE') {
-    const before = log.beforeSnapshot as { status?: string } | undefined
-    const after = log.afterSnapshot as { status?: string } | undefined
-    if (before?.status !== undefined && after?.status !== undefined && before.status !== after.status) {
-      return `Estado: ${getStatusLabel(before.status)} → ${getStatusLabel(after.status)}`
-    }
-    return 'Transacción actualizada'
-  }
-  return ''
-}
 
 function TransactionAttachmentsCell({ transactionId, count }: { transactionId: string; count: number }) {
+  const t = useTranslations('finance')
   const [docs, setDocs] = useState<{ id: string; documentId: string; title: string; docType: string; versionId: string; fileName: string }[] | null>(null)
   const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState(false)
@@ -99,14 +78,14 @@ function TransactionAttachmentsCell({ transactionId, count }: { transactionId: s
       const { url } = await getDocumentDownloadUrl(versionId)
       window.open(url, '_blank')
     } catch {
-      toast.error('No se pudo descargar')
+      toast.error(t('downloadAttachmentError'))
     }
   }
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="relative h-8 w-8 p-0" aria-label="Ver adjuntos">
+        <Button variant="ghost" size="sm" className="relative h-8 w-8 p-0" aria-label={t('attachmentsAria')}>
           <Paperclip className="h-4 w-4" />
           {count > 0 && (
             <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-muted px-1 text-[10px] font-medium">
@@ -119,10 +98,10 @@ function TransactionAttachmentsCell({ transactionId, count }: { transactionId: s
         {loading ? (
           <div className="flex items-center gap-2 px-2 py-3 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
-            Cargando...
+            {t('attachmentsLoading')}
           </div>
         ) : !docs || docs.length === 0 ? (
-          <div className="px-2 py-3 text-sm text-muted-foreground">Sin adjuntos</div>
+          <div className="px-2 py-3 text-sm text-muted-foreground">{t('attachmentsEmpty')}</div>
         ) : (
           docs.map((d) => (
             <DropdownMenuItem key={d.id} onClick={() => handleDownload(d.versionId)}>
@@ -147,7 +126,7 @@ export type ProjectTransactionRow = {
   dueDate?: Date | null
   subtotal?: number
   taxTotal?: number
-  total: number
+  total: number | null | { toNumber: () => number }
   amountBaseCurrency: number
   currency: string
   reference?: string | null
@@ -186,6 +165,16 @@ export function ProjectTransactionsListClient({
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [isLoadingFilters, setIsLoadingFilters] = useState(false)
+  const [, startTransition] = useTransition()
+
+  type AppliedTxFilters = {
+    filter: string
+    dateFrom: string
+    dateTo: string
+    partyId: string
+  }
+
+  const [appliedFilters, setAppliedFilters] = useState<AppliedTxFilters | null>(null)
   const [showExportDialog, setShowExportDialog] = useState(false)
   const [historyTxId, setHistoryTxId] = useState<string | null>(null)
   const [historyLogs, setHistoryLogs] = useState<{
@@ -198,6 +187,50 @@ export function ProjectTransactionsListClient({
   }[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
 
+  const t = useTranslations('finance')
+  const tCommon = useTranslations('common')
+
+  function getStatusLabelI18n(status: string, txType?: string): string {
+    if (status === 'PAID' && (txType === 'INCOME' || txType === 'SALE')) {
+      return t('statusPaidCollected')
+    }
+    if (status === 'DRAFT') return t('statuses.DRAFT')
+    if (status === 'SUBMITTED') return t('statuses.SUBMITTED')
+    if (status === 'APPROVED') return t('statuses.APPROVED')
+    if (status === 'PAID') return t('statuses.PAID')
+    if (status === 'VOIDED') return t('statuses.VOIDED')
+    return status
+  }
+
+  function formatProjectTxAuditDetail(
+    log: {
+      action: string
+      beforeSnapshot?: Record<string, unknown> | null
+      afterSnapshot?: Record<string, unknown> | null
+      detailsJson?: { description?: string } | null
+    },
+    transactionType?: string
+  ): string {
+    const desc = log.detailsJson?.description
+    if (desc) return desc
+    if (log.action === 'CREATE') return t('auditLogCreated')
+    if (log.action === 'DELETE') return t('auditLogDeleted')
+    if (log.action === 'UPDATE') {
+      const before = log.beforeSnapshot as { status?: string } | undefined
+      const after = log.afterSnapshot as { status?: string } | undefined
+      if (before?.status !== undefined && after?.status !== undefined && before.status !== after.status) {
+        return t('auditLogStatusChange', {
+          from: getStatusLabelI18n(before.status, transactionType),
+          to: getStatusLabelI18n(after.status, transactionType),
+        })
+      }
+      return t('auditLogUpdated')
+    }
+    return ''
+  }
+
+  const historyTx = historyTxId ? transactions.find((x) => x.id === historyTxId) : undefined
+
   useMessageBus('FINANCE_TRANSACTION.CREATED', () => router.refresh())
   useMessageBus('FINANCE_TRANSACTION.UPDATED', () => router.refresh())
   useMessageBus('PARTY.CREATED', () => {
@@ -208,59 +241,80 @@ export function ProjectTransactionsListClient({
     getPartiesForProjectFilter(projectId).then(setParties)
   }, [projectId])
 
+  function buildApiFilters(a: AppliedTxFilters): GetProjectTransactionsFilters {
+    const f: GetProjectTransactionsFilters = {}
+    if (a.dateFrom) f.dateFrom = a.dateFrom
+    if (a.dateTo) f.dateTo = a.dateTo
+    if (a.partyId !== 'all') f.partyId = a.partyId
+    if (a.filter !== 'all') f.type = a.filter
+    return f
+  }
+
   useEffect(() => {
-    const filters: GetProjectTransactionsFilters = {}
-    if (dateFrom) filters.dateFrom = dateFrom
-    if (dateTo) filters.dateTo = dateTo
-    if (partyId !== 'all') filters.partyId = partyId
-    if (filter !== 'all') filters.type = filter
-    const hasFilter = Object.keys(filters).length > 0
-    if (!hasFilter) {
+    if (appliedFilters == null) {
+      setTransactions(initialTransactions)
+      return
+    }
+    const api = buildApiFilters(appliedFilters)
+    if (Object.keys(api).length === 0) {
       setTransactions(initialTransactions)
       return
     }
     setIsLoadingFilters(true)
-    getProjectTransactions(projectId, filters)
+    getProjectTransactions(projectId, api)
       .then(setTransactions)
-      .catch(() => toast.error('Error al aplicar filtros'))
+      .catch(() => toast.error(t('filterApplyError')))
       .finally(() => setIsLoadingFilters(false))
-  }, [projectId, dateFrom, dateTo, partyId, filter, initialTransactions])
+  }, [projectId, appliedFilters, initialTransactions, t])
 
   const filteredTransactions = transactions
 
-  function toNum(t: ProjectTransactionRow): number {
-    return typeof t.total === 'object' && t.total !== null && 'toNumber' in t.total
-      ? (t.total as { toNumber: () => number }).toNumber()
-      : Number(t.total)
+  function toNum(row: ProjectTransactionRow): number {
+    const raw = row.total
+    if (raw == null) return 0
+    if (typeof raw === 'number') return raw
+    if (typeof raw === 'object' && 'toNumber' in raw) {
+      return (raw as { toNumber: () => number }).toNumber()
+    }
+    return Number(raw)
   }
 
   const handleDelete = async (id: string) => {
     setIsDeleting(true)
     try {
       const result = await deleteProjectTransaction(id)
-      if (result.success) {
-        setTransactions((prev) =>
-          prev.map((t) => (t.id === id ? { ...t, deleted: true } : t))
-        )
-        toast.success('Transacción anulada')
-      } else {
-        toast.error(result.error ?? 'Error al anular')
+      if (result.success === false) {
+        toast.error(result.error)
+        return
       }
-    } catch (error) {
-      toast.error('Error al anular')
+      setTransactions((prev) => prev.map((tx) => (tx.id === id ? { ...tx, deleted: true } : tx)))
+      toast.success(t('transactionVoidedToast'))
+    } catch {
+      toast.error(t('voidTransactionError'))
     } finally {
       setIsDeleting(false)
       setDeleteId(null)
     }
   }
 
-  const tCommon = useTranslations('common')
+  function applyFilters() {
+    startTransition(() => {
+      const next: AppliedTxFilters = { filter, dateFrom, dateTo, partyId }
+      const api = buildApiFilters(next)
+      if (Object.keys(api).length === 0) {
+        setAppliedFilters(null)
+        return
+      }
+      setAppliedFilters(next)
+    })
+  }
 
   function clearFilters() {
     setDateFrom('')
     setDateTo('')
     setPartyId('all')
     setFilter('all')
+    setAppliedFilters(null)
   }
 
   return (
@@ -269,7 +323,7 @@ export function ProjectTransactionsListClient({
         {projectBalance !== undefined && (
           <SummaryCard
             icon={TrendingUp}
-            label="Balance del proyecto:"
+            label={`${t('projectBalance')}:`}
             value={
               <span
                 className={
@@ -283,23 +337,27 @@ export function ProjectTransactionsListClient({
             }
             action={
               <Button variant="link" size="sm" className="h-auto p-0" asChild>
-                <Link href={`/projects/${projectId}/finance/cashflow`}>Ver Cashflow</Link>
+                <Link href={`/projects/${projectId}/finance/cashflow`}>{t('viewCashflow')}</Link>
               </Button>
             }
           />
         )}
         <div className="flex flex-wrap items-end justify-between gap-4">
-          <ListFiltersBar onClear={clearFilters} isPending={isLoadingFilters}>
+          <ListFiltersBar
+            onApply={applyFilters}
+            onClear={clearFilters}
+            isPending={isLoadingFilters}
+          >
             <Select value={filter} onValueChange={setFilter}>
               <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Tipo" />
+                <SelectValue placeholder={t('filterTypePlaceholder')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todas</SelectItem>
-                <SelectItem value="EXPENSE">Gastos</SelectItem>
-                <SelectItem value="INCOME">Ingresos</SelectItem>
-                <SelectItem value="PURCHASE">Compras</SelectItem>
-                <SelectItem value="SALE">Ventas</SelectItem>
+                <SelectItem value="all">{t('filterAllTypesShort')}</SelectItem>
+                <SelectItem value="EXPENSE">{t('transactionTypes.EXPENSE')}</SelectItem>
+                <SelectItem value="INCOME">{t('transactionTypes.INCOME')}</SelectItem>
+                <SelectItem value="PURCHASE">{t('transactionTypes.PURCHASE')}</SelectItem>
+                <SelectItem value="SALE">{t('transactionTypes.SALE')}</SelectItem>
               </SelectContent>
             </Select>
             <Input
@@ -307,24 +365,25 @@ export function ProjectTransactionsListClient({
               value={dateFrom}
               onChange={(e) => setDateFrom(e.target.value)}
               className="max-w-[140px]"
-              aria-label="Desde"
+              aria-label={tCommon('from')}
             />
             <Input
               type="date"
               value={dateTo}
               onChange={(e) => setDateTo(e.target.value)}
               className="max-w-[140px]"
-              aria-label="Hasta"
+              aria-label={tCommon('to')}
             />
             <Select value={partyId} onValueChange={setPartyId}>
               <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Proveedor/Cliente" />
+                <SelectValue placeholder={t('partyFilterPlaceholder')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="all">{tCommon('all')}</SelectItem>
                 {parties.map((p) => (
                   <SelectItem key={p.id} value={p.id}>
-                    {p.name} ({p.partyType === 'SUPPLIER' ? 'Proveedor' : 'Cliente'})
+                    {p.name} (
+                    {p.partyType === 'SUPPLIER' ? t('partyTypeSupplier') : t('partyTypeClient')})
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -338,7 +397,7 @@ export function ProjectTransactionsListClient({
             </Button>
             <Button onClick={() => setIsFormOpen(true)} disabled={isLoadingFilters}>
               <PlusIcon className="mr-2 h-4 w-4" />
-              Nueva Transacción
+              {t('newTransaction')}
             </Button>
           </div>
         </div>
@@ -347,18 +406,18 @@ export function ProjectTransactionsListClient({
       <ExportDialog
         open={showExportDialog}
         onOpenChange={setShowExportDialog}
-        title="Exportar transacciones del proyecto"
+        title={t('exportProjectTransactionsTitle')}
         columns={[
-          { field: 'issueDate', label: 'Fecha', defaultVisible: true },
-          { field: 'transactionNumber', label: 'Número', defaultVisible: true },
-          { field: 'type', label: 'Tipo', defaultVisible: true },
-          { field: 'description', label: 'Descripción', defaultVisible: true },
-          { field: 'partyName', label: 'Proveedor/Cliente', defaultVisible: true },
-          { field: 'total', label: 'Monto', defaultVisible: true },
-          { field: 'status', label: 'Estado', defaultVisible: true },
+          { field: 'issueDate', label: t('date'), defaultVisible: true },
+          { field: 'transactionNumber', label: t('transactionNumber'), defaultVisible: true },
+          { field: 'type', label: t('type'), defaultVisible: true },
+          { field: 'description', label: t('description'), defaultVisible: true },
+          { field: 'partyName', label: t('partyColumn'), defaultVisible: true },
+          { field: 'total', label: t('amount'), defaultVisible: true },
+          { field: 'status', label: t('status'), defaultVisible: true },
         ]}
         onExport={async (format, selectedColumns) => {
-          if (format !== 'excel') return { success: false, error: 'Solo Excel disponible' }
+          if (format !== 'excel') return { success: false, error: t('exportExcelOnlyError') }
           return exportProjectTransactionsToExcel(projectId, selectedColumns)
         }}
       />
@@ -367,23 +426,27 @@ export function ProjectTransactionsListClient({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Fecha</TableHead>
-              <TableHead>Número</TableHead>
-              <TableHead>Tipo</TableHead>
-              <TableHead>Descripción</TableHead>
-              <TableHead>Proveedor/Cliente</TableHead>
-              <TableHead className="whitespace-nowrap" title="Referencia (ej. número de OC)">OC</TableHead>
-              <TableHead className="text-right" title="En pesos argentinos">Monto ($)</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead className="whitespace-nowrap">Creado por</TableHead>
-              <TableHead className="w-28">Acciones</TableHead>
+              <TableHead>{t('date')}</TableHead>
+              <TableHead>{t('transactionNumber')}</TableHead>
+              <TableHead>{t('type')}</TableHead>
+              <TableHead>{t('description')}</TableHead>
+              <TableHead>{t('partyColumn')}</TableHead>
+              <TableHead className="whitespace-nowrap" title={t('ocColumnTooltip')}>
+                {t('ocColumn')}
+              </TableHead>
+              <TableHead className="text-right" title={t('amountArsTooltip')}>
+                {t('amountArsColumn')}
+              </TableHead>
+              <TableHead>{t('status')}</TableHead>
+              <TableHead className="whitespace-nowrap">{t('createdBy')}</TableHead>
+              <TableHead className="w-28">{tCommon('actions')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredTransactions.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
-                  No hay transacciones registradas
+                  {t('noProjectTransactions')}
                 </TableCell>
               </TableRow>
             ) : (
@@ -401,10 +464,17 @@ export function ProjectTransactionsListClient({
                   <TableCell>
                     <div className="flex items-center gap-1">
                       <Badge variant={tx.type === 'EXPENSE' ? 'danger' : 'default'} className={tx.deleted ? 'opacity-70' : ''}>
-                        {tx.type}
+                        {(
+                          {
+                            EXPENSE: t('transactionTypes.EXPENSE'),
+                            INCOME: t('transactionTypes.INCOME'),
+                            PURCHASE: t('transactionTypes.PURCHASE'),
+                            SALE: t('transactionTypes.SALE'),
+                          } as Record<string, string>
+                        )[tx.type] ?? tx.type}
                       </Badge>
                       {tx.deleted && (
-                        <Badge variant="neutral" className="text-muted-foreground">Anulada</Badge>
+                        <Badge variant="neutral" className="text-muted-foreground">{t('voided')}</Badge>
                       )}
                     </div>
                   </TableCell>
@@ -422,7 +492,9 @@ export function ProjectTransactionsListClient({
                   </TableCell>
                   <TableCell>
                     {tx.deleted ? (
-                      <Badge variant="neutral" className="text-muted-foreground">{STATUS_LABELS[tx.status] ?? tx.status}</Badge>
+                      <Badge variant="neutral" className="text-muted-foreground">
+                        {getStatusLabelI18n(tx.status, tx.type)}
+                      </Badge>
                     ) : (
                       <TransactionStatusDropdown
                         transactionId={tx.id}
@@ -451,11 +523,25 @@ export function ProjectTransactionsListClient({
                           setHistoryLogs([])
                           setHistoryLoading(true)
                           getTransactionAuditLogs(id)
-                            .then((logs) => setHistoryLogs(logs))
+                            .then((logs) =>
+                              setHistoryLogs(
+                                logs.map((l) => ({
+                                  ...l,
+                                  beforeSnapshot: l.beforeSnapshot as Record<string, unknown> | null | undefined,
+                                  afterSnapshot: l.afterSnapshot as Record<string, unknown> | null | undefined,
+                                  detailsJson:
+                                    l.detailsJson &&
+                                    typeof l.detailsJson === 'object' &&
+                                    !Array.isArray(l.detailsJson)
+                                      ? (l.detailsJson as { description?: string })
+                                      : undefined,
+                                }))
+                              )
+                            )
                             .catch(() => setHistoryLogs([]))
                             .finally(() => setHistoryLoading(false))
                         }}
-                        aria-label="Ver historial"
+                        aria-label={t('ariaViewHistory')}
                       >
                         <History className="h-4 w-4" />
                       </Button>
@@ -468,7 +554,7 @@ export function ProjectTransactionsListClient({
                               setEditingTransaction(tx)
                               setIsFormOpen(true)
                             }}
-                            aria-label="Editar"
+                            aria-label={t('ariaEditTransaction')}
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
@@ -476,7 +562,7 @@ export function ProjectTransactionsListClient({
                             variant="ghost"
                             size="icon"
                             onClick={() => setDeleteId(tx.id)}
-                            aria-label="Anular"
+                            aria-label={t('ariaVoidTransaction')}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -516,32 +602,30 @@ export function ProjectTransactionsListClient({
         open={!!deleteId}
         onOpenChange={(open) => !open && setDeleteId(null)}
         onConfirm={async () => { if (deleteId) await handleDelete(deleteId) }}
-        title="¿Anular transacción?"
-        description="La transacción quedará anulada y visible en gris. Esta acción no se puede deshacer."
-        confirmLabel="Anular"
+        title={t('voidTransactionTitle')}
+        description={t('voidTransactionDescription')}
+        confirmLabel={t('voidTransactionConfirm')}
         isLoading={isDeleting}
       />
 
       <Dialog open={!!historyTxId} onOpenChange={(open) => !open && setHistoryTxId(null)}>
         <DialogContent className="erp-form-modal max-w-2xl" aria-describedby="history-desc">
           <DialogHeader>
-            <DialogTitle>Historial de la transacción</DialogTitle>
-            <DialogDescription id="history-desc">
-              Quién creó, cambió estado o anuló esta transacción.
-            </DialogDescription>
+            <DialogTitle>{t('txHistoryTitle')}</DialogTitle>
+            <DialogDescription id="history-desc">{t('txHistoryDescription')}</DialogDescription>
           </DialogHeader>
           <div className="max-h-[60vh] overflow-y-auto">
             {historyLoading ? (
               <div className="flex items-center gap-2 py-6 text-muted-foreground">
                 <Loader2 className="h-5 w-5 animate-spin" />
-                Cargando historial...
+                {t('loadingHistory')}
               </div>
             ) : historyLogs.length === 0 ? (
-              <p className="py-4 text-sm text-muted-foreground">Sin registros de historial.</p>
+              <p className="py-4 text-sm text-muted-foreground">{t('noHistoryRecords')}</p>
             ) : (
               <ul className="space-y-2">
                 {historyLogs.map((log, idx) => {
-                  const detail = formatAuditLogDetail(log)
+                  const detail = formatProjectTxAuditDetail(log, historyTx?.type)
                   return (
                     <li
                       key={idx}

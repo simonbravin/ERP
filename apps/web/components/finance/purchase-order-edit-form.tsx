@@ -24,6 +24,7 @@ import {
 import { updatePurchaseOrder } from '@/app/actions/materials'
 import type { CommitmentDetailWithLines } from '@/app/actions/materials'
 import { formatCurrency } from '@/lib/format-utils'
+import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { Loader2, Plus, Trash2 } from 'lucide-react'
 
@@ -48,6 +49,8 @@ type EditLine = {
 }
 
 export function PurchaseOrderEditForm({ commitment, parties, wbsNodes }: Props) {
+  const tFin = useTranslations('finance')
+  const tCommon = useTranslations('common')
   const router = useRouter()
   const [submitting, setSubmitting] = useState(false)
   const [partyId, setPartyId] = useState(commitment.partyId)
@@ -96,14 +99,14 @@ export function PurchaseOrderEditForm({ commitment, parties, wbsNodes }: Props) 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!partyId) {
-      toast.error('Selecciona un proveedor')
+      toast.error(tFin('toast.poSelectSupplier'))
       return
     }
     const validLines = lines.filter(
       (l) => l.wbsNodeId && l.description.trim() && l.quantity > 0 && l.unitPrice >= 0
     )
     if (validLines.length === 0) {
-      toast.error('Debe incluir al menos una línea con descripción, cantidad y precio')
+      toast.error(tFin('toast.poLineValidationError'))
       return
     }
     setSubmitting(true)
@@ -121,8 +124,8 @@ export function PurchaseOrderEditForm({ commitment, parties, wbsNodes }: Props) 
       })),
     })
     setSubmitting(false)
-    if (result.success) {
-      toast.success('Orden de compra actualizada')
+    if (result.success === true) {
+      toast.success(tFin('toast.poUpdated'))
       router.push(`/projects/${commitment.projectId}/finance/purchase-orders/${commitment.id}`)
       router.refresh()
     } else {
@@ -136,7 +139,9 @@ export function PurchaseOrderEditForm({ commitment, parties, wbsNodes }: Props) 
     <form onSubmit={handleSubmit}>
       <Card className="border-border bg-card">
         <CardHeader>
-          <CardTitle className="text-foreground">Editar orden de compra {commitment.commitmentNumber}</CardTitle>
+          <CardTitle className="text-foreground">
+            {tFin('purchaseOrderEdit.title', { number: commitment.commitmentNumber })}
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -156,7 +161,7 @@ export function PurchaseOrderEditForm({ commitment, parties, wbsNodes }: Props) 
               </Select>
             </div>
             <div className="space-y-2">
-              <Label className="text-foreground">Fecha de emisión</Label>
+              <Label className="text-foreground">{tFin('purchaseOrderEdit.issueDate')}</Label>
               <Input
                 type="date"
                 value={issueDate}
@@ -166,33 +171,41 @@ export function PurchaseOrderEditForm({ commitment, parties, wbsNodes }: Props) 
             </div>
           </div>
           <div className="space-y-2">
-            <Label className="text-foreground">Descripción (opcional)</Label>
+            <Label className="text-foreground">{tFin('purchaseOrderEdit.descriptionOptional')}</Label>
             <Input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Descripción de la orden"
+              placeholder={tFin('purchaseOrderEdit.descriptionPlaceholder')}
               className={inputClassName}
             />
           </div>
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="text-foreground">Líneas</Label>
+              <Label className="text-foreground">{tFin('purchaseOrderEdit.lines')}</Label>
               <Button type="button" variant="outline" size="sm" onClick={addLine}>
                 <Plus className="mr-2 h-4 w-4" />
-                Añadir línea
+                {tFin('purchaseOrderEdit.addLine')}
               </Button>
             </div>
             <div className="overflow-x-auto rounded-md border border-border bg-card">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/50">
-                    <TableHead className="font-medium text-foreground">Descripción</TableHead>
-                    <TableHead className="font-medium text-foreground">WBS</TableHead>
-                    <TableHead className="font-medium text-foreground">Unidad</TableHead>
-                    <TableHead className="text-right font-medium text-foreground">Cantidad</TableHead>
-                    <TableHead className="text-right font-medium text-foreground">P. unit.</TableHead>
-                    <TableHead className="text-right font-medium text-foreground">Total</TableHead>
+                    <TableHead className="font-medium text-foreground">
+                      {tFin('purchaseOrderEdit.colDescription')}
+                    </TableHead>
+                    <TableHead className="font-medium text-foreground">{tFin('purchaseOrderEdit.colWbs')}</TableHead>
+                    <TableHead className="font-medium text-foreground">{tFin('purchaseOrderEdit.colUnit')}</TableHead>
+                    <TableHead className="text-right font-medium text-foreground">
+                      {tFin('purchaseOrderEdit.colQuantity')}
+                    </TableHead>
+                    <TableHead className="text-right font-medium text-foreground">
+                      {tFin('purchaseOrderEdit.colUnitPrice')}
+                    </TableHead>
+                    <TableHead className="text-right font-medium text-foreground">
+                      {tFin('purchaseOrderEdit.colTotal')}
+                    </TableHead>
                     <TableHead className="w-10" />
                   </TableRow>
                 </TableHeader>
@@ -203,7 +216,7 @@ export function PurchaseOrderEditForm({ commitment, parties, wbsNodes }: Props) 
                         <Input
                           value={line.description}
                           onChange={(e) => updateLine(index, 'description', e.target.value)}
-                          placeholder="Descripción"
+                          placeholder={tFin('purchaseOrderEdit.lineDescriptionPlaceholder')}
                           className="h-9 w-full max-w-full border-input bg-background text-sm"
                         />
                       </TableCell>
@@ -275,14 +288,15 @@ export function PurchaseOrderEditForm({ commitment, parties, wbsNodes }: Props) 
               </Table>
             </div>
             <p className="mt-2 text-right text-sm font-medium tabular-nums text-foreground">
-              Total: {formatCurrency(total, commitment.currency)}
+              {tFin('purchaseOrderEdit.totalLabel')}{' '}
+              {formatCurrency(total, commitment.currency)}
             </p>
           </div>
 
           <div className="flex flex-wrap gap-2 border-t border-border pt-4">
             <Button type="submit" disabled={submitting}>
               {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Guardar
+              {tFin('purchaseOrderEdit.save')}
             </Button>
             <Button
               type="button"
@@ -293,7 +307,7 @@ export function PurchaseOrderEditForm({ commitment, parties, wbsNodes }: Props) 
                 )
               }
             >
-              Cancelar
+              {tCommon('cancel')}
             </Button>
           </div>
         </CardContent>

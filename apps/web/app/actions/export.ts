@@ -5,10 +5,7 @@ import { getOrgContext } from '@/lib/org-context'
 import { prisma } from '@repo/database'
 import { exportToExcel } from '@/lib/export/excel-exporter'
 import type { ExcelConfig } from '@/lib/types/export'
-import { getFinanceExecutiveDashboard } from '@/app/actions/finance'
 import { getProject } from '@/app/actions/projects'
-import { getProjectDashboardData } from '@/app/actions/project-dashboard'
-import { formatCurrency } from '@/lib/format-utils'
 
 type OrgData = {
   name: string
@@ -825,7 +822,7 @@ export async function exportCompanyCashflowToExcel(
     const { getCompanyCashflowDetailed } = await import('./finance')
     const from = new Date(params.dateFrom)
     const to = new Date(params.dateTo)
-    const { timeline, breakdown } = await getCompanyCashflowDetailed({ from, to })
+    const { timeline } = await getCompanyCashflowDetailed({ from, to })
     const allColumns = [
       { field: 'month', label: 'Mes', type: 'text' as const, width: 12 },
       { field: 'income', label: 'Ingresos', type: 'currency' as const, width: 14, align: 'right' as const },

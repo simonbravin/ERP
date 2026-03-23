@@ -66,7 +66,7 @@ export function LocalClientForm() {
     resolver: zodResolver(schema),
   })
 
-  async function onSubmit(data: FormData, forceCreate = false) {
+  async function submitLocalClient(data: FormData, forceCreate = false) {
     try {
       const result = await createLocalClient({
         name: data.name,
@@ -84,7 +84,7 @@ export function LocalClientForm() {
         router.refresh()
         return
       }
-      if (result.duplicateName) {
+      if (!result.success) {
         setPendingData(data)
         setShowDuplicateDialog(true)
       }
@@ -99,7 +99,7 @@ export function LocalClientForm() {
     if (!pendingData) return
     setForceSubmitting(true)
     try {
-      await onSubmit(pendingData, true)
+      await submitLocalClient(pendingData, true)
       setShowDuplicateDialog(false)
       setPendingData(null)
     } finally {
@@ -109,7 +109,7 @@ export function LocalClientForm() {
 
   return (
     <form
-      onSubmit={handleSubmit(onSubmit)}
+      onSubmit={handleSubmit((data) => submitLocalClient(data))}
       className="erp-form-page space-y-4"
     >
       <div>

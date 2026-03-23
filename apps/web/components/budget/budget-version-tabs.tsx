@@ -13,7 +13,6 @@ import { useTranslations } from 'next-intl'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { BudgetLinesClient } from './budget-lines-client'
 import { BudgetVersionView } from './budget-version-view'
-import { ComputeSheetHierarchical } from './compute-sheet-hierarchical'
 import { APUDetailModal } from './apu-detail-modal'
 import { deleteBudgetLine } from '@/app/actions/budget'
 import type { BudgetLineRow } from './budget-line-table'
@@ -68,7 +67,7 @@ export function BudgetVersionTabs({
   lines,
   wbsTree,
   treeData,
-  computeSheetLines,
+  computeSheetLines: _computeSheetLines,
   versionTotal,
   wbsOptions,
   otherVersions,

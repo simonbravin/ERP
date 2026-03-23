@@ -3,6 +3,7 @@ import { getSession } from '@/lib/session'
 import { getOrgContext } from '@/lib/org-context'
 import { hasMinimumRole } from '@/lib/rbac'
 import { listProjects } from '@/app/actions/projects'
+import { unwrapListProjects } from '@/lib/list-projects-utils'
 import { listFolderContents } from '@/app/actions/documents'
 import { DocumentsPageClient } from '@/components/documents/documents-page-client'
 import { DocumentUploadModal } from '@/components/documents/document-upload-modal'
@@ -27,7 +28,7 @@ export default async function DocumentsPage({ searchParams }: PageProps) {
 
   const { folderId: effectiveFolderId, currentFolder, folderPath, subfolders, documents } =
     await listFolderContents(folderId ?? null, null)
-  const projectsList = await listProjects()
+  const projectsList = unwrapListProjects(await listProjects())
   const projects = projectsList.map((p) => ({
     id: p.id,
     name: p.name,

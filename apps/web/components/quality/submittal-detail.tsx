@@ -79,7 +79,7 @@ function StatusBadge({ status, label }: { status: string; label: string }) {
 
 export function SubmittalDetail({
   submittal,
-  projectId,
+  projectId: _projectId,
   canEdit,
 }: SubmittalDetailProps) {
   const t = useTranslations('quality')

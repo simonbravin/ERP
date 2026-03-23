@@ -6,20 +6,10 @@ import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { formatCurrency } from '@/lib/format-utils'
 import { ArrowRight, Minus, ArrowRightLeft, ShoppingCart } from 'lucide-react'
+import type { InventoryMovementClientRow } from '@/lib/types/inventory-dto'
 
 interface ItemMovementsHistoryProps {
-  movements: Array<{
-    id: string
-    movementType: string
-    quantity: unknown
-    unitCost: unknown
-    createdAt: Date
-    fromLocation?: { name: string } | null
-    toLocation?: { name: string } | null
-    project?: { name: string; projectNumber: string } | null
-    wbsNode?: { code: string; name: string } | null
-    createdBy?: { user?: { fullName: string } } | null
-  }>
+  movements: InventoryMovementClientRow[]
   unit: string
 }
 

@@ -81,10 +81,10 @@ export function DailyReportDetailClient({
       try {
         const { submitDailyReport } = await import('@/app/actions/daily-reports')
         await submitDailyReport(report.id)
-        toast.success('Reporte enviado.')
+        toast.success(t('toast.submitted'))
         router.refresh()
       } catch (e) {
-        toast.error(e instanceof Error ? e.message : 'Error al enviar.')
+        toast.error(e instanceof Error ? e.message : t('toast.submitError'))
       }
     })
   }
@@ -93,28 +93,28 @@ export function DailyReportDetailClient({
     startTransition(async () => {
       try {
         await onApprove(report.id)
-        toast.success('Reporte aprobado.')
+        toast.success(t('toast.approved'))
         router.refresh()
       } catch (e) {
-        toast.error(e instanceof Error ? e.message : 'Error al aprobar.')
+        toast.error(e instanceof Error ? e.message : t('toast.approveError'))
       }
     })
   }
 
   function handleReject() {
     if (!rejectReason.trim()) {
-      toast.error(t('rejectReason'))
+      toast.error(t('toast.rejectReasonRequired'))
       return
     }
     startTransition(async () => {
       try {
         await onReject(report.id, rejectReason.trim())
-        toast.success('Reporte rechazado.')
+        toast.success(t('toast.rejected'))
         setShowReject(false)
         setRejectReason('')
         router.refresh()
       } catch (e) {
-        toast.error(e instanceof Error ? e.message : 'Error al rechazar.')
+        toast.error(e instanceof Error ? e.message : t('toast.rejectError'))
       }
     })
   }
@@ -126,7 +126,7 @@ export function DailyReportDetailClient({
         toast.success(t('published'))
         router.refresh()
       } catch (e) {
-        toast.error(e instanceof Error ? e.message : 'Error al publicar.')
+        toast.error(e instanceof Error ? e.message : t('toast.publishError'))
       }
     })
   }
@@ -136,11 +136,11 @@ export function DailyReportDetailClient({
     startTransition(async () => {
       try {
         await onDelete(report.id)
-        toast.success('Reporte eliminado.')
+        toast.success(t('toast.deleted'))
         router.push(`/projects/${projectId}/daily-reports`)
         router.refresh()
       } catch (e) {
-        toast.error(e instanceof Error ? e.message : 'Error al eliminar.')
+        toast.error(e instanceof Error ? e.message : t('toast.deleteError'))
       }
     })
   }
@@ -149,7 +149,7 @@ export function DailyReportDetailClient({
     const files = e.target.files
     if (!files?.length) return
     if (report.photos.length + files.length > 10) {
-      toast.error('Máximo 10 archivos por reporte.')
+      toast.error(t('toast.maxFiles'))
       return
     }
     setUploading(true)
@@ -157,10 +157,10 @@ export function DailyReportDetailClient({
       const formData = new FormData()
       for (let i = 0; i < files.length; i++) formData.append('files', files[i])
       await uploadDailyReportFiles(report.id, projectId, formData)
-      toast.success('Archivos subidos.')
+      toast.success(t('toast.filesUploaded'))
       router.refresh()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al subir.')
+      toast.error(err instanceof Error ? err.message : t('toast.uploadError'))
     } finally {
       setUploading(false)
       e.target.value = ''
@@ -344,7 +344,7 @@ export function DailyReportDetailClient({
         {canEditReport && report.photos.length < 10 && (
           <div className="mt-6 rounded border border-dashed border-gray-300 p-4 dark:border-gray-600">
             <h2 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              {report.photos.length > 0 ? 'Agregar más fotos/documentos' : t('photosAndDocs')}
+              {report.photos.length > 0 ? t('addMoreAttachments') : t('photosAndDocs')}
             </h2>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t('dropzoneHint')}</p>
             <div className="mt-3 flex flex-wrap gap-2">

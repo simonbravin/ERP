@@ -23,6 +23,7 @@ import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { formatCurrency } from '@/lib/format-utils'
 import { TrendingUp, TrendingDown, AlertTriangle, Download } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import type { ProjectDashboardData } from '@/app/actions/project-dashboard'
 
@@ -47,6 +48,7 @@ interface Props {
 }
 
 export function ProjectDashboardClient({ project, data }: Props) {
+  const tProjects = useTranslations('projects')
   const router = useRouter()
   const [isExporting, setIsExporting] = useState(false)
 
@@ -62,7 +64,7 @@ export function ProjectDashboardClient({ project, data }: Props) {
       const res = await fetch(url, { credentials: 'include' })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        toast.error(data?.error ?? 'Error al generar el PDF')
+        toast.error(data?.error ?? tProjects('toast.dashboardPdfGenerateError'))
         return
       }
       const blob = await res.blob()
@@ -74,14 +76,14 @@ export function ProjectDashboardClient({ project, data }: Props) {
       link.download = filename
       link.click()
       URL.revokeObjectURL(link.href)
-      toast.success('PDF descargado')
+      toast.success(tProjects('toast.dashboardPdfOk'))
     } catch (err) {
       console.error(err)
-      toast.error('Error al exportar el dashboard')
+      toast.error(tProjects('toast.dashboardPdfError'))
     } finally {
       setIsExporting(false)
     }
-  }, [project.id])
+  }, [project.id, tProjects])
 
   const budgetUsagePct =
     data.budget.total === 0 ? 0 : (data.budget.spent / data.budget.total) * 100

@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label'
 import { formatCurrency } from '@/lib/format-utils'
 import { allocateOverhead } from '@/app/actions/finance'
 import { toast } from 'sonner'
+import { useTranslations } from 'next-intl'
 
 export type OverheadTransactionRow = {
   id: string
@@ -36,6 +37,7 @@ interface Props {
 }
 
 export function OverheadListClient({ initialTransactions, projects }: Props) {
+  const tFin = useTranslations('finance')
   const [transactions, setTransactions] = useState<OverheadTransactionRow[]>(initialTransactions)
   const [isPending, startTransition] = useTransition()
   const [allocatingTxId, setAllocatingTxId] = useState<string | null>(null)
@@ -84,20 +86,20 @@ export function OverheadListClient({ initialTransactions, projects }: Props) {
   function submitAllocation() {
     if (!allocatingTxId) return
     if (!isValidPct) {
-      toast.error('La suma de porcentajes debe ser 100%')
+      toast.error(tFin('toast.overheadPercentMust100'))
       return
     }
     const allocations = Object.entries(allocationPcts)
       .filter(([, pct]) => pct > 0)
       .map(([projectId, allocationPct]) => ({ projectId, allocationPct }))
     if (allocations.length === 0) {
-      toast.error('Asigná al menos un proyecto con porcentaje > 0')
+      toast.error(tFin('toast.overheadAtLeastOneProject'))
       return
     }
     startTransition(async () => {
       try {
         await allocateOverhead(allocatingTxId, allocations)
-        toast.success('Overhead asignado correctamente')
+        toast.success(tFin('toast.overheadAssignedSuccess'))
         closeAllocationDialog()
         const tx = transactions.find((t) => t.id === allocatingTxId)
         const totalAmount = tx?.amountBaseCurrency ?? tx?.total ?? 0

@@ -11,6 +11,7 @@ import { Card } from '@/components/ui/card'
 import { toast } from 'sonner'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { AlertTriangle } from 'lucide-react'
 
 const transferSchema = z
@@ -43,6 +44,7 @@ export function TransferForm({
   locations,
   initialItemId,
 }: TransferFormProps) {
+  const t = useTranslations('inventory')
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [selectedItem, setSelectedItem] = useState<
@@ -109,14 +111,14 @@ export function TransferForm({
       })
 
       if (result.success) {
-        toast.success('Transferencia registrada correctamente')
+        toast.success(t('toast.transferOk'))
         router.push('/inventory/movements')
         router.refresh()
       } else {
-        toast.error('Error al registrar transferencia')
+        toast.error(t('toast.transferError'))
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error inesperado')
+      toast.error(err instanceof Error ? err.message : t('errors.unexpectedError'))
     } finally {
       setIsSubmitting(false)
     }

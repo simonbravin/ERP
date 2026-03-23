@@ -1,4 +1,4 @@
-import type { DocumentTemplate, DocumentTemplateSession } from '@/lib/pdf/document-template'
+import type { DocumentTemplate } from '@/lib/pdf/document-template'
 
 export const gastosPorProveedorTemplate: DocumentTemplate = {
   id: 'gastos-por-proveedor',

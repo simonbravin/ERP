@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
-import { Link } from '@/i18n/navigation'
+import { Link, useRouter } from '@/i18n/navigation'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,6 +10,8 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Bell } from 'lucide-react'
 import { formatRelativeTime } from '@/lib/format-utils'
+import { NOTIFICATIONS_READ_EVENT } from '@/lib/notifications-events'
+import { NOTIFICATIONS_UI_LIMIT } from '@/lib/notifications-constants'
 import {
   getNotificationsPreview,
   getUnreadCount,
@@ -24,10 +26,11 @@ interface NotificationsDropdownProps {
 }
 
 /**
- * Notifications bell: badge only when unread, dropdown with last 3 + link to list.
+ * Notifications bell: badge only when unread; dropdown with last N + link to full page.
  */
 export function NotificationsDropdown({ label, triggerClassName }: NotificationsDropdownProps = {}) {
   const t = useTranslations('common')
+  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [preview, setPreview] = useState<NotificationItem[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
@@ -37,7 +40,7 @@ export function NotificationsDropdown({ label, triggerClassName }: Notifications
     setLoading(true)
     try {
       const [items, count] = await Promise.all([
-        getNotificationsPreview(3),
+        getNotificationsPreview(NOTIFICATIONS_UI_LIMIT),
         getUnreadCount(),
       ])
       setPreview(items)
@@ -55,13 +58,29 @@ export function NotificationsDropdown({ label, triggerClassName }: Notifications
     if (open) load()
   }, [open, load])
 
+  useEffect(() => {
+    const onRead = () => {
+      void load()
+    }
+    window.addEventListener(NOTIFICATIONS_READ_EVENT, onRead)
+    return () => window.removeEventListener(NOTIFICATIONS_READ_EVENT, onRead)
+  }, [load])
+
   async function handleSelectNotification(n: NotificationItem) {
-    if (!n.read) await markNotificationRead(n.id)
+    if (!n.read) {
+      await markNotificationRead(n.id)
+      setPreview((prev) => prev.map((i) => (i.id === n.id ? { ...i, read: true, readAt: new Date() } : i)))
+      const count = await getUnreadCount()
+      setUnreadCount(count)
+      router.refresh()
+    }
     setOpen(false)
-    if (n.link) window.location.href = n.link
+    if (n.link) router.push(n.link)
   }
 
   const triggerLabel = label ?? t('notifications', { defaultValue: 'Notificaciones' })
+  const rowUnread = 'border-l-[3px] border-l-primary bg-muted/40 pl-[10px]'
+
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger
@@ -71,7 +90,9 @@ export function NotificationsDropdown({ label, triggerClassName }: Notifications
         <Bell className="h-5 w-5 shrink-0 text-current" />
         {label && <span className="text-sm font-medium text-current">{triggerLabel}</span>}
         {unreadCount > 0 && (
-          <span className={`flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-medium text-destructive-foreground ${label ? 'ml-auto' : 'absolute right-1 top-1'}`}>
+          <span
+            className={`flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-medium text-destructive-foreground ${label ? 'ml-auto' : 'absolute right-1 top-1'}`}
+          >
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
@@ -82,7 +103,7 @@ export function NotificationsDropdown({ label, triggerClassName }: Notifications
             {t('notifications', { defaultValue: 'Notificaciones' })}
           </h3>
         </div>
-        <div className="max-h-[280px] overflow-y-auto">
+        <div className="max-h-[min(50vh,360px)] overflow-y-auto [scrollbar-width:thin]">
           {loading && preview.length === 0 ? (
             <div className="py-6 text-center text-sm text-muted-foreground">
               {t('loading', { defaultValue: 'Cargando…' })}
@@ -96,8 +117,8 @@ export function NotificationsDropdown({ label, triggerClassName }: Notifications
               <button
                 key={n.id}
                 type="button"
-                className="flex w-full flex-col gap-0.5 border-b border-border/50 px-3 py-2.5 text-left transition-colors hover:bg-muted/50"
-                onClick={() => handleSelectNotification(n)}
+                className={`flex w-full flex-col gap-0.5 border-b border-border/50 px-3 py-2.5 text-left transition-colors hover:bg-muted/50 last:border-b-0 ${!n.read ? rowUnread : ''}`}
+                onClick={() => void handleSelectNotification(n)}
               >
                 <p className={`text-sm ${n.read ? 'text-muted-foreground' : 'font-medium text-foreground'}`}>
                   {n.title}
@@ -107,7 +128,9 @@ export function NotificationsDropdown({ label, triggerClassName }: Notifications
                   {n.actorName && (
                     <>
                       <span>·</span>
-                      <span>{t('by', { defaultValue: 'Por' })} {n.actorName}</span>
+                      <span>
+                        {t('by', { defaultValue: 'Por' })} {n.actorName}
+                      </span>
                     </>
                   )}
                 </div>

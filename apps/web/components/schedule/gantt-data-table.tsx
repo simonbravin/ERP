@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { addWorkingDays, countWorkingDays } from '@/lib/schedule/working-days'
+import { addWorkingDays } from '@/lib/schedule/working-days'
 import {
   Table,
   TableBody,
@@ -66,9 +66,9 @@ export function GanttDataTable({
   onTaskDatesChange,
   canEdit,
   highlightedTask,
-  searchQuery = '',
+  searchQuery: _searchQuery = '',
   workingDaysPerWeek = 5,
-  groupBy = 'none',
+  groupBy: _groupBy = 'none',
 }: GanttDataTableProps) {
   const allTasks = allTasksProp ?? tasks
   const t = useTranslations('schedule')

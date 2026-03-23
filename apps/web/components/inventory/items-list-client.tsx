@@ -23,7 +23,7 @@ interface ItemRow {
   reorderQty?: unknown
   current_stock: unknown
   last_purchase_cost?: unknown
-  last_movement_date?: Date | null
+  last_movement_date?: string | Date | null
 }
 
 interface ItemsListClientProps {

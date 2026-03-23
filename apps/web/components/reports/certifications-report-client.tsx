@@ -1,8 +1,9 @@
 'use client'
 
+import { useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { ChartCard } from '@/components/charts/chart-card'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import {
   BarChart,
   Bar,
@@ -13,10 +14,13 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts'
-import { Download } from 'lucide-react'
 import { formatCurrency } from '@/lib/format-utils'
-import { ReportExportPdfButton } from '@/components/reports/report-export-pdf-button'
+import { ExportDropdown, type ExportFormat } from '@/components/list'
+import { downloadReportPdf } from '@/lib/reports/download-report-pdf'
+import { toast } from 'sonner'
 import type { CertificationsByProjectRow } from '@/app/actions/predefined-reports'
+
+const PDF_TEMPLATE = 'certifications-report'
 
 interface Props {
   data: CertificationsByProjectRow[]
@@ -44,6 +48,28 @@ function downloadCsv(data: CertificationsByProjectRow[]) {
 }
 
 export function CertificationsReportClient({ data }: Props) {
+  const tCommon = useTranslations('common')
+  const [exporting, setExporting] = useState(false)
+
+  async function handleExport(format: ExportFormat) {
+    if (format === 'csv') {
+      downloadCsv(data)
+      return
+    }
+    if (format !== 'pdf') return
+    setExporting(true)
+    try {
+      await downloadReportPdf(PDF_TEMPLATE, {}, {
+        success: tCommon('toast.pdfExportSuccess'),
+        errorFallback: tCommon('toast.pdfExportError'),
+      })
+    } catch {
+      toast.error(tCommon('toast.pdfExportError'))
+    } finally {
+      setExporting(false)
+    }
+  }
+
   const chartData = data.slice(0, 12).map((p) => ({
     name: p.projectNumber,
     Borrador: p.draft,
@@ -55,11 +81,11 @@ export function CertificationsReportClient({ data }: Props) {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-end gap-2">
-        <Button variant="outline" size="sm" onClick={() => downloadCsv(data)}>
-          <Download className="mr-2 h-4 w-4" />
-          Exportar CSV
-        </Button>
-        <ReportExportPdfButton templateId="certifications-report" />
+        <ExportDropdown
+          formats={['csv', 'pdf']}
+          onExport={handleExport}
+          isLoading={exporting}
+        />
       </div>
       <ChartCard
         title="Certificaciones por proyecto (apilado)"

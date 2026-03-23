@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from '@/i18n/navigation'
+import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { DailyReportForm } from './daily-report-form'
 import { createDailyReport, submitDailyReport } from '@/app/actions/daily-reports'
@@ -26,6 +27,7 @@ export function DailyReportFormWrapper({
   wbsOptions = [],
   onCancelHref,
 }: DailyReportFormWrapperProps) {
+  const t = useTranslations('dailyReports')
   const router = useRouter()
   const [isPending, setIsPending] = useState(false)
 
@@ -36,16 +38,16 @@ export function DailyReportFormWrapper({
       const reportId = report && typeof report === 'object' && 'id' in report ? String((report as { id: string }).id) : null
       if (action === 'submit' && reportId) {
         await submitDailyReport(reportId)
-        toast.success('Reporte creado y enviado.')
+        toast.success(t('toast.createdSent'))
       } else if (action === 'submit' && !reportId) {
-        toast.error('No se pudo enviar el reporte. Guardado como borrador.')
+        toast.error(t('toast.sendFailedDraft'))
       } else {
-        toast.success('Borrador guardado.')
+        toast.success(t('toast.draftSaved'))
       }
       router.push(`/projects/${projectId}/daily-reports`)
       router.refresh()
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Error al guardar.')
+      toast.error(e instanceof Error ? e.message : t('toast.saveError'))
       throw e
     } finally {
       setIsPending(false)
@@ -60,14 +62,14 @@ export function DailyReportFormWrapper({
       await updateDailyReport(reportId, data)
       if (action === 'submit') {
         await submitDailyReport(reportId)
-        toast.success('Reporte actualizado y enviado.')
+        toast.success(t('toast.updatedSent'))
       } else {
-        toast.success('Borrador actualizado.')
+        toast.success(t('toast.draftUpdated'))
       }
       router.push(`/projects/${projectId}/daily-reports/${reportId}`)
       router.refresh()
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Error al actualizar.')
+      toast.error(e instanceof Error ? e.message : t('toast.updateError'))
       throw e
     } finally {
       setIsPending(false)

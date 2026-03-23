@@ -60,7 +60,7 @@ export function TransactionEditClient({
   wbsOptions: initialWbs,
   updateTransaction,
   addLine,
-  updateLine,
+  updateLine: _updateLine,
   deleteLine,
   fetchWbs,
 }: TransactionEditClientProps) {

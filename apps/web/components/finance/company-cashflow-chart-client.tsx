@@ -51,7 +51,7 @@ function formatMonthLong(monthKey: string): string {
 
 export function CompanyCashflowChartClient({
   initialData,
-  breakdown,
+  breakdown: _breakdown,
   range,
 }: Props) {
   const router = useRouter()

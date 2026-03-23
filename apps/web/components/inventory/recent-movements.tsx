@@ -3,23 +3,10 @@
 import { Badge } from '@/components/ui/badge'
 import { Link } from '@/i18n/navigation'
 import { formatCurrency, formatDateShort } from '@/lib/format-utils'
-
-type MovementRow = {
-  id: string
-  movementType: string
-  quantity: unknown
-  totalCost: unknown
-  createdAt: Date
-  item: { id: string; sku: string; name: string; unit: string }
-  fromLocation: { name: string } | null
-  toLocation: { name: string } | null
-  createdBy?: {
-    user: { fullName: string } | null
-  } | null
-}
+import type { InventoryMovementClientRow } from '@/lib/types/inventory-dto'
 
 interface RecentMovementsProps {
-  movements: MovementRow[]
+  movements: InventoryMovementClientRow[]
 }
 
 function toNum(v: unknown): number {

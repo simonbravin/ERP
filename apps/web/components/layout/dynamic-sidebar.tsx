@@ -31,8 +31,6 @@ interface DynamicSidebarProps {
  * - URL matches /projects/[uuid] or /projects/[uuid]/*
  * - The ID is a valid UUID (not 'new' or other route names)
  */
-const SIDEBAR_WIDTH = 256
-const SIDEBAR_COLLAPSED_WIDTH = 64
 
 export function DynamicSidebar({
   orgName = 'Bloqer',

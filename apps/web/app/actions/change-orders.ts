@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { prisma, Prisma } from '@repo/database'
-import { requireRole, hasMinimumRole } from '@/lib/rbac'
+import { requireRole } from '@/lib/rbac'
 import { getAuthContext } from '@/lib/auth-helpers'
 import { assertProjectAccess, canEditProjectArea, PROJECT_AREAS } from '@/lib/project-permissions'
 import { type PrismaTransaction } from '@/lib/events/event-publisher'
@@ -20,6 +20,7 @@ import type {
   CreateChangeOrderLineInput,
   UpdateChangeOrderLineInput,
 } from '@repo/validators'
+import { notificationDeepLinkMetadata } from '@/lib/notification-deeplink'
 
 function ensureProjectInOrg(projectId: string, orgId: string) {
   return prisma.project.findFirst({
@@ -391,7 +392,12 @@ export async function updateChangeOrderWithLines(
   if (parsed.data.timeImpactDays !== undefined) headerPayload.timeImpactDays = parsed.data.timeImpactDays
   if (parsed.data.requestDate !== undefined) headerPayload.requestDate = parsed.data.requestDate
   if (parsed.data.implementedDate !== undefined) headerPayload.implementedDate = parsed.data.implementedDate
-  if (parsed.data.partyId !== undefined) headerPayload.partyId = parsed.data.partyId
+  if (parsed.data.partyId !== undefined) {
+    headerPayload.party =
+      parsed.data.partyId === null
+        ? { disconnect: true }
+        : { connect: { id: parsed.data.partyId } }
+  }
 
   await prisma.$transaction(async (tx) => {
     await tx.changeOrder.update({ where: { id: coId }, data: headerPayload })
@@ -476,7 +482,12 @@ export async function updateChangeOrder(coId: string, data: UpdateChangeOrderInp
   if (parsed.data.requestDate !== undefined) payload.requestDate = parsed.data.requestDate
   if (parsed.data.approvedDate !== undefined) payload.approvedDate = parsed.data.approvedDate
   if (parsed.data.implementedDate !== undefined) payload.implementedDate = parsed.data.implementedDate
-  if (parsed.data.partyId !== undefined) payload.partyId = parsed.data.partyId
+  if (parsed.data.partyId !== undefined) {
+    payload.party =
+      parsed.data.partyId === null
+        ? { disconnect: true }
+        : { connect: { id: parsed.data.partyId } }
+  }
 
   await prisma.$transaction(async (tx) => {
     await tx.changeOrder.update({ where: { id: coId }, data: payload })
@@ -535,7 +546,7 @@ export async function submitForApproval(coId: string) {
       category: 'APPROVAL_REQUEST',
       title: 'Orden de cambio pendiente de aprobación',
       message: `Orden de cambio #${co.number}: ${co.title ?? 'Sin título'}`,
-      metadata: { link: `/projects/${co.projectId}/change-orders/${coId}` },
+      metadata: notificationDeepLinkMetadata(`/projects/${co.projectId}/change-orders/${coId}`),
     })
   }
 

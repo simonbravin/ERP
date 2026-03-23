@@ -56,7 +56,7 @@ export async function getProjectDashboardData(projectId: string): Promise<Projec
   const sixMonthsAgo = new Date()
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
 
-  const [budgetVersion, actualExpenses, committedExpenses, certifications, wbsNodes, supplierParties, transactionsForCashflow, financeLinesForWbs, commitmentLinesByWbs] = await Promise.all([
+  const [budgetVersion, actualExpenses, committedExpenses, certifications, , supplierParties, transactionsForCashflow, financeLinesForWbs, commitmentLinesByWbs] = await Promise.all([
     (async () => {
       let version = await prisma.budgetVersion.findFirst({
         where: { projectId, orgId: org.orgId, status: { in: ['APPROVED', 'BASELINE'] } },

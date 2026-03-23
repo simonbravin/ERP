@@ -27,26 +27,19 @@ export class ExcelExporter {
 
   private buildRows(): unknown[][] {
     const rows: unknown[][] = []
-    let currentRow = 0
 
     if (this.config.includeCompanyHeader) {
       rows.push([this.config.metadata?.generatedBy || 'Empresa'])
-      currentRow++
       rows.push(['CUIT:', 'Dirección:', 'Teléfono:', 'Email:'])
       rows.push(['', '', '', ''])
-      currentRow += 2
       rows.push([])
-      currentRow++
     }
 
     rows.push([this.config.title])
-    currentRow++
     if (this.config.subtitle) {
       rows.push([this.config.subtitle])
-      currentRow++
     }
     rows.push([])
-    currentRow++
 
     if (this.config.project) {
       rows.push(['Proyecto:', this.config.project.name])
@@ -54,48 +47,38 @@ export class ExcelExporter {
       if (this.config.project.client) {
         rows.push(['Cliente:', this.config.project.client])
       }
-      currentRow += this.config.project.client ? 3 : 2
     }
     if (this.config.metadata?.version) {
       rows.push(['Versión:', this.config.metadata.version])
-      currentRow++
     }
     if (this.config.metadata?.date) {
       rows.push(['Fecha:', this.config.metadata.date.toLocaleDateString('es-AR')])
-      currentRow++
     }
     if (this.config.metadata?.filters && this.config.metadata.filters.length > 0) {
       rows.push(['Filtros aplicados:'])
       this.config.metadata.filters.forEach((filter) => {
         rows.push(['', filter])
       })
-      currentRow += 1 + this.config.metadata.filters.length
     }
     rows.push([])
-    currentRow++
 
     const visibleColumns = this.config.columns.filter((col) => col.visible !== false)
     const headerRow = visibleColumns.map((col) => col.label)
     rows.push(headerRow)
-    currentRow++
 
     if (this.config.groupBy) {
       const grouped = this.groupData(this.config.data, this.config.groupBy.field)
       for (const [groupValue, groupData] of Object.entries(grouped)) {
         rows.push([`${this.config.groupBy.label}: ${groupValue}`])
-        currentRow++
         ;(groupData as Record<string, unknown>[]).forEach((item) => {
           const row = visibleColumns.map((col) => this.formatValue(item[col.field], col))
           rows.push(row)
-          currentRow++
         })
         if (this.config.groupBy.showTotals) {
           const totalsRow = this.calculateTotals(groupData as Record<string, unknown>[], visibleColumns)
           rows.push(totalsRow)
-          currentRow++
         }
         rows.push([])
-        currentRow++
       }
     } else {
       this.config.data.forEach((item) => {

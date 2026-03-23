@@ -1,13 +1,10 @@
 'use client'
 
-import { useForm, useFieldArray } from 'react-hook-form'
+import { useForm, useFieldArray, type Path } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
-  createChangeOrderSchema,
-  updateChangeOrderSchema,
   changeOrderFormSchema,
   CHANGE_ORDER_LINE_TYPE,
-  BUDGET_IMPACT_TYPE,
 } from '@repo/validators'
 import type {
   CreateChangeOrderInput,
@@ -53,7 +50,7 @@ function toDateInputValue(d: Date | undefined | null): string {
 
 export function COForm({
   mode,
-  projectId,
+  projectId: _projectId,
   defaultValues,
   wbsOptions,
   onSubmit,
@@ -65,7 +62,6 @@ export function COForm({
   const router = useRouter()
   const isCreate = mode === 'create'
 
-  const schema = isCreate ? createChangeOrderSchema : changeOrderFormSchema
   const {
     register,
     control,
@@ -74,9 +70,9 @@ export function COForm({
     setValue,
     setError,
     formState: { errors, isSubmitting },
-  } = useForm<ChangeOrderFormInput | CreateChangeOrderInput>({
-    resolver: zodResolver(schema),
-    defaultValues: (defaultValues as ChangeOrderFormInput) ?? {
+  } = useForm<ChangeOrderFormInput>({
+    resolver: zodResolver(changeOrderFormSchema),
+    defaultValues: defaultValues ?? {
       title: '',
       reason: '',
       justification: '',
@@ -92,55 +88,58 @@ export function COForm({
 
   const { fields, append, remove } = useFieldArray({
     control,
-    name: 'lines' as keyof ChangeOrderFormInput,
+    name: 'lines',
   })
 
-  const lines = watch('lines' as keyof ChangeOrderFormInput) as ChangeOrderFormInput['lines'] | undefined
-  const costImpact = watch('costImpact' as keyof ChangeOrderFormInput)
+  const lines = watch('lines')
+  const costImpact = watch('costImpact')
   const linesSum =
     (Array.isArray(lines) ? lines : []).reduce((acc, row) => acc + (Number(row?.deltaCost) || 0), 0)
   const costMismatch = Array.isArray(lines) && lines.length > 0 && Math.abs(Number(costImpact) - linesSum) > 0.01
 
-  async function handleFormSubmit(data: ChangeOrderFormInput | CreateChangeOrderInput) {
+  function applyServerFieldErrors(error: Record<string, string[] | undefined>) {
+    if (error._form?.[0]) setError('root', { message: error._form[0] })
+    for (const [field, messages] of Object.entries(error)) {
+      if (field === '_form' || !messages?.[0]) continue
+      setError(field as Path<ChangeOrderFormInput>, { message: messages[0] })
+    }
+  }
+
+  async function handleFormSubmit(data: ChangeOrderFormInput) {
     if (isCreate && onSubmit) {
       const createData: CreateChangeOrderInput = {
         title: data.title,
         reason: data.reason,
         justification: data.justification ?? undefined,
         changeType: data.changeType ?? 'SCOPE',
-        budgetImpactType: (data as ChangeOrderFormInput).budgetImpactType ?? 'DEVIATION',
+        budgetImpactType: data.budgetImpactType ?? 'DEVIATION',
         costImpact: Number(data.costImpact ?? 0),
         timeImpactDays: Number(data.timeImpactDays ?? 0),
         requestDate: data.requestDate ?? undefined,
-        implementedDate: (data as ChangeOrderFormInput).implementedDate ?? undefined,
+        implementedDate: data.implementedDate ?? undefined,
       }
       const result = await onSubmit(createData)
       if (result && 'error' in result && result.error) {
-        if (result.error._form) setError('root', { message: result.error._form[0] })
-        Object.entries(result.error).forEach(([field, messages]) => {
-          if (field !== '_form' && messages?.[0])
-            setError(field as keyof CreateChangeOrderInput, { message: messages[0] })
-        })
+        applyServerFieldErrors(result.error as Record<string, string[] | undefined>)
       }
       return
     }
 
     if (!isCreate && coId) {
-      const formData = data as ChangeOrderFormInput
       const header: UpdateChangeOrderInput = {
-        title: formData.title,
-        reason: formData.reason,
-        justification: formData.justification ?? undefined,
-        changeType: formData.changeType,
-        budgetImpactType: formData.budgetImpactType,
-        costImpact: formData.lines?.length
-          ? formData.lines.reduce((a, l) => a + (Number(l.deltaCost) || 0), 0)
-          : Number(formData.costImpact ?? 0),
-        timeImpactDays: Number(formData.timeImpactDays ?? 0),
-        requestDate: formData.requestDate ?? undefined,
-        implementedDate: formData.implementedDate ?? undefined,
+        title: data.title,
+        reason: data.reason,
+        justification: data.justification ?? undefined,
+        changeType: data.changeType,
+        budgetImpactType: data.budgetImpactType,
+        costImpact: data.lines?.length
+          ? data.lines.reduce((a, l) => a + (Number(l.deltaCost) || 0), 0)
+          : Number(data.costImpact ?? 0),
+        timeImpactDays: Number(data.timeImpactDays ?? 0),
+        requestDate: data.requestDate ?? undefined,
+        implementedDate: data.implementedDate ?? undefined,
       }
-      const linePayload: ChangeOrderLineInput[] = (formData.lines ?? []).map((l) => ({
+      const linePayload: ChangeOrderLineInput[] = (data.lines ?? []).map((l) => ({
         wbsNodeId: l.wbsNodeId,
         changeType: l.changeType,
         justification: l.justification,
@@ -148,11 +147,7 @@ export function COForm({
       }))
       const result = await updateChangeOrderWithLines(coId, header, linePayload)
       if (result && 'error' in result && result.error) {
-        if (result.error._form) setError('root', { message: result.error._form[0] })
-        Object.entries(result.error).forEach(([field, messages]) => {
-          if (field !== '_form' && messages?.[0])
-            setError(field as keyof UpdateChangeOrderInput, { message: messages[0] } as any)
-        })
+        applyServerFieldErrors(result.error as Record<string, string[] | undefined>)
       } else if (result && 'success' in result) {
         router.refresh()
       }
@@ -161,7 +156,7 @@ export function COForm({
 
   return (
     <form
-      onSubmit={handleSubmit(handleFormSubmit as any)}
+      onSubmit={handleSubmit(handleFormSubmit)}
       className={`erp-form-page w-full max-w-4xl space-y-6 rounded-lg border border-border bg-card p-6 ${formClassName ?? ''}`.trim()}
     >
       <div className="space-y-4">
@@ -198,7 +193,7 @@ export function COForm({
                   <input
                     type="radio"
                     value="DEVIATION"
-                    {...register('budgetImpactType' as any)}
+                    {...register('budgetImpactType')}
                     className="border-input"
                   />
                   <span className="text-sm">{t('budgetImpactDeviation')}</span>
@@ -207,7 +202,7 @@ export function COForm({
                   <input
                     type="radio"
                     value="APPROVED_CHANGE"
-                    {...register('budgetImpactType' as any)}
+                    {...register('budgetImpactType')}
                     className="border-input"
                   />
                   <span className="text-sm">{t('budgetImpactApproved')}</span>
@@ -223,7 +218,7 @@ export function COForm({
                   <input
                     type="radio"
                     value="DEVIATION"
-                    {...register('budgetImpactType' as any)}
+                    {...register('budgetImpactType')}
                     className="border-input"
                   />
                   <span className="text-sm">{t('budgetImpactDeviation')}</span>
@@ -232,7 +227,7 @@ export function COForm({
                   <input
                     type="radio"
                     value="APPROVED_CHANGE"
-                    {...register('budgetImpactType' as any)}
+                    {...register('budgetImpactType')}
                     className="border-input"
                   />
                   <span className="text-sm">{t('budgetImpactApproved')}</span>
@@ -277,8 +272,10 @@ export function COForm({
               id="co-requestDate"
               type="date"
               {...register('requestDate')}
-              value={toDateInputValue(watch('requestDate' as any))}
-              onChange={(e) => setValue('requestDate' as any, e.target.value ? new Date(e.target.value + 'T12:00:00') : undefined)}
+              value={toDateInputValue(watch('requestDate'))}
+              onChange={(e) =>
+                setValue('requestDate', e.target.value ? new Date(e.target.value + 'T12:00:00') : undefined)
+              }
               className="mt-1 border-input bg-card dark:bg-background"
             />
           </div>
@@ -288,8 +285,10 @@ export function COForm({
               id="co-implementedDate"
               type="date"
               {...register('implementedDate')}
-              value={toDateInputValue(watch('implementedDate' as any))}
-              onChange={(e) => setValue('implementedDate' as any, e.target.value ? new Date(e.target.value + 'T12:00:00') : undefined)}
+              value={toDateInputValue(watch('implementedDate'))}
+              onChange={(e) =>
+                setValue('implementedDate', e.target.value ? new Date(e.target.value + 'T12:00:00') : undefined)
+              }
               className="mt-1 border-input bg-card dark:bg-background"
             />
           </div>

@@ -14,7 +14,6 @@ import {
   IconChevronLeft,
   IconChevronRight,
   IconChevronDown,
-  IconChevronUp,
 } from '@/components/ui/icons'
 
 const financeSubHrefs = [

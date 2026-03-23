@@ -12,7 +12,7 @@ type QualityDashboardProps = {
   }
 }
 
-export function QualityDashboard({ projectId, stats }: QualityDashboardProps) {
+export function QualityDashboard({ projectId: _projectId, stats }: QualityDashboardProps) {
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       <Card>

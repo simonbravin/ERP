@@ -1,7 +1,8 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { prisma, Prisma } from '@repo/database'
+import { prisma } from '@repo/database'
+import { toInputJson } from '@/lib/json-prisma'
 import { requireRole, hasMinimumRole } from '@/lib/rbac'
 import { getAuthContext } from '@/lib/auth-helpers'
 import { assertProjectAccess, canEditProjectArea, PROJECT_AREAS } from '@/lib/project-permissions'
@@ -37,7 +38,7 @@ async function auditDailyReport(params: {
       action: params.action,
       entityType: 'DailyReport',
       entityId: params.entityId,
-      detailsJson: params.detailsJson as Prisma.InputJsonValue,
+      detailsJson: toInputJson(params.detailsJson),
     },
   })
 }
@@ -213,6 +214,32 @@ const getDailyReportIncludeBase = {
   },
 } as const
 
+/** Shape after `toPlainObject` for getDailyReport (Decimals → numbers). */
+export type DailyReportForEdit = {
+  id: string
+  projectId: string
+  orgId: string
+  status: string
+  reportDate: Date | string
+  summary: string
+  workAccomplished: string | null
+  weather: string | null
+  observations: string | null
+  wbsNodeId: string | null
+  createdByOrgMemberId: string
+  labor: Array<{ id?: string; trade: string; workerCount: number; hoursWorked: number }>
+  wbsNodes?: Array<{ wbsNode: { id: string; code: string; name: string } }>
+  wbsNode?: { id: string; code: string; name: string } | null
+  createdBy?: { id: string; user: { fullName?: string; email?: string } }
+  approvedBy?: { id: string; user: { fullName?: string } } | null
+  photos?: Array<{
+    id?: string
+    caption?: string | null
+    document?: { versions?: Array<{ fileName?: string }> }
+  }>
+  equipment?: unknown[]
+}
+
 /** Prisma Decimal is not serializable to client; convert to number for RSC → Client. */
 function toPlainObject<T>(obj: T): T {
   if (obj === null || obj === undefined) return obj
@@ -228,31 +255,32 @@ function toPlainObject<T>(obj: T): T {
   return obj
 }
 
-export async function getDailyReport(reportId: string) {
+export async function getDailyReport(reportId: string): Promise<DailyReportForEdit | null> {
   const { org } = await getAuthContext()
-  let report: { projectId: string; [k: string]: unknown } | null = null
+  let report: Record<string, unknown> | null = null
   try {
-    report = await prisma.dailyReport.findFirst({
+    const row = await prisma.dailyReport.findFirst({
       where: { id: reportId, orgId: org.orgId },
       include: {
         ...getDailyReportIncludeBase,
         wbsNodes: { select: { wbsNode: { select: { id: true, code: true, name: true } } } },
       },
     })
+    report = row as unknown as Record<string, unknown>
   } catch {
-    report = await prisma.dailyReport.findFirst({
+    const fallback = await prisma.dailyReport.findFirst({
       where: { id: reportId, orgId: org.orgId },
       include: getDailyReportIncludeBase,
     })
-    if (report) (report as { wbsNodes?: unknown }).wbsNodes = []
+    report = fallback ? { ...(fallback as object), wbsNodes: [] } as Record<string, unknown> : null
   }
-  if (!report) return null
+  if (!report || typeof report.projectId !== 'string') return null
   try {
     await assertProjectAccess(report.projectId, org)
   } catch {
     return null
   }
-  return toPlainObject(report)
+  return toPlainObject(report) as DailyReportForEdit
 }
 
 export async function createDailyReport(projectId: string, data: CreateDailyReportInput) {

@@ -25,7 +25,6 @@ export default async function DailyReportDetailPage({ params }: PageProps) {
   const report = await getDailyReport(reportId)
   if (!report || report.projectId !== projectId) return notFound()
 
-  const canEdit = hasMinimumRole(org.role, 'EDITOR')
   const canApprove = hasMinimumRole(org.role, 'ADMIN')
   const isAuthor = report.createdByOrgMemberId === org.memberId
   const canEditReport = report.status === 'DRAFT' && (isAuthor || canApprove)

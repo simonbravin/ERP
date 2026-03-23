@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -33,18 +33,10 @@ import { getPartiesForProject } from '@/app/actions/finance'
 import { exportPurchaseOrderToExcel } from '@/app/actions/export'
 import { ExportDialog } from '@/components/export/export-dialog'
 import { formatCurrency } from '@/lib/format-utils'
+import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
 import type { MaterialLineForPO } from '@/lib/types/materials'
-
-const purchaseOrderExportColumns = [
-  { field: 'description', label: 'Descripción', defaultVisible: true },
-  { field: 'wbsCode', label: 'Código WBS', defaultVisible: false },
-  { field: 'unit', label: 'Unidad', defaultVisible: true },
-  { field: 'quantity', label: 'Cantidad', defaultVisible: true },
-  { field: 'unitPrice', label: 'P. Unit', defaultVisible: true },
-  { field: 'totalCost', label: 'Total', defaultVisible: true },
-]
 
 interface CreatePurchaseOrderDialogProps {
   open: boolean
@@ -61,6 +53,19 @@ export function CreatePurchaseOrderDialog({
   projectId,
   budgetVersionId,
 }: CreatePurchaseOrderDialogProps) {
+  const tMat = useTranslations('materials')
+  const tCommon = useTranslations('common')
+  const purchaseOrderExportColumns = useMemo(
+    () => [
+      { field: 'description', label: tMat('poExportColumn.description'), defaultVisible: true },
+      { field: 'wbsCode', label: tMat('poExportColumn.wbsCode'), defaultVisible: false },
+      { field: 'unit', label: tMat('poExportColumn.unit'), defaultVisible: true },
+      { field: 'quantity', label: tMat('poExportColumn.quantity'), defaultVisible: true },
+      { field: 'unitPrice', label: tMat('poExportColumn.unitPrice'), defaultVisible: true },
+      { field: 'totalCost', label: tMat('poExportColumn.totalCost'), defaultVisible: true },
+    ],
+    [tMat]
+  )
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [parties, setParties] = useState<{ id: string; name: string }[]>([])
@@ -92,7 +97,7 @@ export function CreatePurchaseOrderDialog({
         setPartyId('')
       })
       .catch(() => {
-        toast.error('Error al cargar datos')
+        toast.error(tMat('toast.loadDataError'))
       })
       .finally(() => setLoading(false))
   }, [open, budgetVersionId, projectId])
@@ -129,11 +134,11 @@ export function CreatePurchaseOrderDialog({
 
   async function handleSubmit() {
     if (!partyId.trim()) {
-      toast.error('Selecciona un proveedor')
+      toast.error(tMat('toast.selectSupplier'))
       return
     }
     if (selectedLines.length === 0) {
-      toast.error('Selecciona al menos una línea')
+      toast.error(tMat('toast.selectLine'))
       return
     }
     setSubmitting(true)
@@ -141,7 +146,7 @@ export function CreatePurchaseOrderDialog({
       projectId,
       partyId,
       issueDate,
-      description: `OC desde listado de materiales`,
+      description: tMat('poDescriptionFromMaterialsList'),
       lines: selectedLines.map(({ line, quantity }) => ({
         wbsNodeId: line.wbsNodeId,
         description: line.description,
@@ -151,8 +156,8 @@ export function CreatePurchaseOrderDialog({
       })),
     })
     setSubmitting(false)
-    if (result.success) {
-      toast.success(`Orden de compra ${result.commitmentNumber} creada`)
+    if (result.success === true) {
+      toast.success(tMat('toast.poCreated', { number: result.commitmentNumber }))
       setCreatedCommitmentId(result.commitmentId)
       setCreatedCommitmentNumber(result.commitmentNumber)
       onOpenChange(false)
@@ -167,7 +172,8 @@ export function CreatePurchaseOrderDialog({
     selectedColumns: string[],
     pdfOptions?: { showEmitidoPor: boolean; showFullCompanyData: boolean }
   ) {
-    if (!createdCommitmentId) return { success: false as const, error: 'No hay orden de compra' }
+    if (!createdCommitmentId)
+      return { success: false as const, error: tMat('toast.exportNoCommitment') }
     if (format === 'excel') {
       return await exportPurchaseOrderToExcel(createdCommitmentId, selectedColumns)
     }
@@ -184,7 +190,7 @@ export function CreatePurchaseOrderDialog({
     const res = await fetch(url, { credentials: 'include' })
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
-      const message = data?.detail ?? data?.error ?? 'No se pudo generar el PDF'
+      const message = data?.detail ?? data?.error ?? tCommon('toast.pdfExportError')
       return { success: false as const, error: message }
     }
     const blob = await res.blob()
@@ -212,10 +218,8 @@ export function CreatePurchaseOrderDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Emitir orden de compra</DialogTitle>
-          <DialogDescription>
-            Selecciona proveedor y las líneas (parcial o total) para crear la OC. Cada línea queda vinculada al ítem WBS para trazabilidad.
-          </DialogDescription>
+          <DialogTitle>{tMat('createPoDialog.title')}</DialogTitle>
+          <DialogDescription>{tMat('createPoDialog.description')}</DialogDescription>
         </DialogHeader>
 
         {loading ? (
@@ -226,10 +230,10 @@ export function CreatePurchaseOrderDialog({
           <div className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <Label>Proveedor</Label>
+                <Label>{tMat('createPoDialog.supplier')}</Label>
                 <Select value={partyId} onValueChange={setPartyId}>
                   <SelectTrigger className="mt-1">
-                    <SelectValue placeholder="Seleccionar proveedor" />
+                    <SelectValue placeholder={tMat('createPoDialog.selectSupplierPlaceholder')} />
                   </SelectTrigger>
                   <SelectContent>
                     {parties.map((p) => (
@@ -241,7 +245,7 @@ export function CreatePurchaseOrderDialog({
                 </Select>
               </div>
               <div>
-                <Label>Fecha de emisión</Label>
+                <Label>{tMat('createPoDialog.issueDate')}</Label>
                 <Input
                   type="date"
                   value={issueDate}
@@ -252,18 +256,18 @@ export function CreatePurchaseOrderDialog({
             </div>
 
             <div>
-              <Label>Líneas (marca y ajusta cantidad para parcial/total)</Label>
+              <Label>{tMat('createPoDialog.linesLabel')}</Label>
               <div className="mt-2 max-h-[320px] overflow-auto rounded-md border">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-10" />
-                      <TableHead>Descripción</TableHead>
-                      <TableHead>WBS</TableHead>
-                      <TableHead className="text-right">Cantidad</TableHead>
-                      <TableHead>Unidad</TableHead>
-                      <TableHead className="text-right">P. unit.</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
+                      <TableHead>{tMat('createPoDialog.colDescription')}</TableHead>
+                      <TableHead>{tMat('createPoDialog.colWbs')}</TableHead>
+                      <TableHead className="text-right">{tMat('createPoDialog.colQuantity')}</TableHead>
+                      <TableHead>{tMat('createPoDialog.colUnit')}</TableHead>
+                      <TableHead className="text-right">{tMat('createPoDialog.colUnitPrice')}</TableHead>
+                      <TableHead className="text-right">{tMat('createPoDialog.colTotal')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -318,7 +322,8 @@ export function CreatePurchaseOrderDialog({
 
             {selectedLines.length > 0 && (
               <p className="text-sm font-medium tabular-nums text-foreground">
-                Total: {formatCurrency(totalAmount)}
+                {tMat('createPoDialog.totalLabel')}{' '}
+                {formatCurrency(totalAmount)}
               </p>
             )}
           </div>
@@ -326,7 +331,7 @@ export function CreatePurchaseOrderDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancelar
+            {tCommon('cancel')}
           </Button>
           <Button
             onClick={handleSubmit}
@@ -335,7 +340,7 @@ export function CreatePurchaseOrderDialog({
             {submitting ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : null}
-            Crear orden de compra
+            {tMat('createPoDialog.createSubmit')}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -344,7 +349,11 @@ export function CreatePurchaseOrderDialog({
     <ExportDialog
       open={showExportDialog}
       onOpenChange={handleExportDialogClose}
-      title={createdCommitmentNumber ? `Orden de compra ${createdCommitmentNumber}` : 'Orden de compra'}
+      title={
+        createdCommitmentNumber
+          ? tMat('createPoDialog.exportTitleWithNumber', { number: createdCommitmentNumber })
+          : tMat('createPoDialog.exportTitle')
+      }
       columns={purchaseOrderExportColumns}
       onExport={handleExportPO}
       showPdfOptions

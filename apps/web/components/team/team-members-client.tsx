@@ -31,8 +31,9 @@ import { Link } from '@/i18n/navigation'
 import { InviteUserDialog } from './invite-user-dialog'
 import { updateMemberRole, toggleMemberStatus } from '@/app/actions/team'
 import { toast } from 'sonner'
+import { useTranslations } from 'next-intl'
 import { ROLE_DESCRIPTIONS } from '@/lib/permissions'
-import type { OrgRole } from '@prisma/client'
+import type { OrgRole } from '@repo/database'
 
 type Member = Awaited<ReturnType<typeof import('@/app/actions/team').getOrgMembers>>[number]
 
@@ -43,31 +44,32 @@ interface TeamMembersClientProps {
 }
 
 export function TeamMembersClient({ initialMembers, canInvite, currentUserId }: TeamMembersClientProps) {
+  const tTeam = useTranslations('team')
   const [members, setMembers] = useState(initialMembers)
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false)
 
   const handleRoleChange = async (memberId: string, newRole: OrgRole) => {
     const res = await updateMemberRole(memberId, newRole)
-    if (!res.success) {
-      toast.error(res.error ?? 'Error al actualizar rol')
+    if (res.success === false) {
+      toast.error(res.error)
       return
     }
     setMembers((prev) =>
       prev.map((m) => (m.id === memberId ? { ...m, role: newRole } : m))
     )
-    toast.success('Rol actualizado')
+    toast.success(tTeam('toast.roleUpdated'))
   }
 
   const handleToggleStatus = async (memberId: string) => {
     const res = await toggleMemberStatus(memberId)
-    if (!res?.success) {
-      toast.error(res?.error ?? 'Error al actualizar')
+    if (res.success === false) {
+      toast.error(res.error)
       return
     }
     setMembers((prev) =>
       prev.map((m) => (m.id === memberId ? { ...m, active: !m.active } : m))
     )
-    toast.success('Estado actualizado')
+    toast.success(tTeam('toast.statusUpdated'))
   }
 
   const getRoleBadgeVariant = (
@@ -147,7 +149,7 @@ export function TeamMembersClient({ initialMembers, canInvite, currentUserId }: 
                         {(
                           Object.entries(ROLE_DESCRIPTIONS) as [OrgRole, string][]
                         ).map(
-                          ([role, desc]) =>
+                          ([role]) =>
                             role !== 'OWNER' && (
                               <SelectItem key={role} value={role}>
                                 {role}
@@ -212,7 +214,7 @@ export function TeamMembersClient({ initialMembers, canInvite, currentUserId }: 
         onOpenChange={setIsInviteDialogOpen}
         onSuccess={() => {
           setIsInviteDialogOpen(false)
-          toast.success('Invitación enviada')
+          toast.success(tTeam('toast.invitationSent'))
         }}
       />
     </>

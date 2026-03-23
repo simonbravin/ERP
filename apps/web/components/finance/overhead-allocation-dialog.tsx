@@ -21,7 +21,6 @@ import {
 } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
 import {
   Table,
   TableBody,
@@ -33,6 +32,7 @@ import {
 import { formatCurrency } from '@/lib/format-utils'
 import { allocateOverhead, getApprovedBudgetTotalByProject } from '@/app/actions/finance'
 import { toast } from 'sonner'
+import { useTranslations } from 'next-intl'
 import { Plus, Trash2, AlertCircle, Scale, PieChart, Building2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -94,6 +94,7 @@ export function OverheadAllocationDialog({
   allProjects,
   onSuccess,
 }: Props) {
+  const tFin = useTranslations('finance')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [scope, setScope] = useState<'active' | 'all'>('active')
   const projectsList = scope === 'all' ? allProjects : activeProjects
@@ -139,9 +140,9 @@ export function OverheadAllocationDialog({
       form.reset({ allocations: [{ projectId: '', allocationPct: 0 }] })
       onOpenChange(false)
       onSuccess()
-      toast.success('Gastos generales dejados sin asignar a proyectos')
+      toast.success(tFin('toast.overheadUnassignedSuccess'))
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Error al actualizar')
+      toast.error(error instanceof Error ? error.message : tFin('toast.allocationUpdateError'))
     } finally {
       setIsSubmitting(false)
     }
@@ -160,44 +161,50 @@ export function OverheadAllocationDialog({
       allocationPct: i === 0 ? base + remainder : base,
     }))
     replace(allocations)
-    toast.success(`Repartido equitativamente entre ${n} proyectos`)
+    toast.success(tFin('toast.overheadSplitEqual', { count: n }))
   }
 
   const handleDistributeByBudget = async () => {
     if (projectsList.length === 0) {
-      toast.error(scope === 'active' ? 'No hay proyectos activos' : 'No hay proyectos')
+      toast.error(scope === 'active' ? tFin('toast.noActiveProjects') : tFin('toast.noProjects'))
       return
     }
     try {
       const totals = await getApprovedBudgetTotalByProject(projectsList.map((p) => p.id))
       const total = projectsList.reduce((sum, p) => sum + (totals[p.id] ?? 0), 0)
       if (total <= 0) {
-        toast.error('Ningún proyecto tiene presupuesto aprobado. Usá reparto equitativo.')
+        toast.error(tFin('toast.overheadNoApprovedBudget'))
         return
       }
-      const allocations = projectsList.map((p) => ({
+      const allocations: FormData['allocations'] = projectsList.map((p) => ({
         projectId: p.id,
         allocationPct: Math.round((((totals[p.id] ?? 0) / total) * 100) * 100) / 100,
       }))
       const sum = allocations.reduce((s, a) => s + a.allocationPct, 0)
       if (allocations.length > 0) allocations[0].allocationPct += 100 - sum
       replace(allocations)
-      toast.success('Repartido proporcional al presupuesto aprobado')
+      toast.success(tFin('toast.overheadSplitByBudgetSuccess'))
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Error al obtener presupuestos')
+      toast.error(error instanceof Error ? error.message : tFin('toast.budgetsFetchError'))
     }
   }
 
   const handleSubmit = async (data: FormData) => {
     setIsSubmitting(true)
     try {
-      await allocateOverhead(transaction.id, data.allocations)
+      await allocateOverhead(
+        transaction.id,
+        data.allocations.filter(
+          (a): a is { projectId: string; allocationPct: number } =>
+            Boolean(a.projectId) && typeof a.allocationPct === 'number'
+        )
+      )
       form.reset({ allocations: [{ projectId: '', allocationPct: 0 }] })
       onOpenChange(false)
       onSuccess()
-      toast.success('Gastos generales asignados correctamente')
+      toast.success(tFin('toast.overheadAssignedOk'))
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Error al asignar gastos generales')
+      toast.error(error instanceof Error ? error.message : tFin('toast.overheadAssignError'))
     } finally {
       setIsSubmitting(false)
     }
@@ -207,10 +214,11 @@ export function OverheadAllocationDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl w-[min(96vw,64rem)]" style={{ maxWidth: '64rem' }}>
         <DialogHeader>
-          <DialogTitle>Asignar gastos generales a proyectos</DialogTitle>
+          <DialogTitle>{tFin('overheadAllocationTitle')}</DialogTitle>
           <DialogDescription>
-            Distribuye {formatCurrency(transaction.remainingAmount, transaction.currency)} entre
-            proyectos activos. La suma debe ser 100%.
+            {tFin('overheadAllocationDescription', {
+              amount: formatCurrency(transaction.remainingAmount, transaction.currency),
+            })}
           </DialogDescription>
         </DialogHeader>
 

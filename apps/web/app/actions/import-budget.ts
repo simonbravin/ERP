@@ -39,7 +39,7 @@ export type ImportBudgetResult = {
 export async function importBudgetFromExcel(
   data: ImportBudgetInput
 ): Promise<ImportBudgetResult> {
-  const { session, org } = await getAuthContext()
+  const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
 
   try {

@@ -30,7 +30,7 @@ export function ApprovalTimeline({ approvals }: ApprovalTimelineProps) {
 
   return (
     <div className="space-y-3">
-      {approvals.map((entry, idx) => (
+      {approvals.map((entry) => (
         <div key={entry.id} className="flex gap-3">
           <div
             className={cn(

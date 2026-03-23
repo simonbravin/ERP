@@ -43,7 +43,7 @@ interface ConsolidatedMaterialsTableProps {
 export function ConsolidatedMaterialsTable({
   materials,
   budgetVersionId,
-  onExport,
+  onExport: _onExport,
 }: ConsolidatedMaterialsTableProps) {
   const t = useTranslations('materials')
   const locale = useLocale()
@@ -88,7 +88,7 @@ export function ConsolidatedMaterialsTable({
 
   const [searchQuery, setSearchQuery] = useState('')
   const [sortBy, setSortBy] = useState<'name' | 'quantity' | 'cost'>('name')
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+  const [sortOrder, _setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [expandedMaterials, setExpandedMaterials] = useState<Set<string>>(new Set())
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
   const [generatingPO, setGeneratingPO] = useState<string | null>(null)
@@ -147,7 +147,7 @@ export function ConsolidatedMaterialsTable({
     setGeneratingPO(supplierName)
     try {
       const result = await generatePurchaseOrder(budgetVersionId, supplierName)
-      if (result.success) {
+      if (result.success === true) {
         const exportResult = await exportMaterialsBySupplierToExcel(
           budgetVersionId,
           supplierName,

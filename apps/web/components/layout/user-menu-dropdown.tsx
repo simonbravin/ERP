@@ -22,7 +22,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { User, Settings, LogOut } from 'lucide-react'
+import { Settings, LogOut } from 'lucide-react'
 import { Link } from '@/i18n/navigation'
 
 interface UserMenuDropdownProps {

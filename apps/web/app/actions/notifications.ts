@@ -1,7 +1,8 @@
 'use server'
 
-import { prisma } from '@repo/database'
+import { prisma, type Prisma } from '@repo/database'
 import { getSession } from '@/lib/session'
+import { NOTIFICATIONS_UI_LIMIT } from '@/lib/notifications-constants'
 
 export type NotificationItem = {
   id: string
@@ -17,7 +18,7 @@ export type NotificationItem = {
 
 /**
  * Get notifications for the current user (recipient).
- * Used for dropdown (last 3) and list page (paginated).
+ * Used for dropdown preview and full notifications page.
  */
 export async function getNotifications(options?: {
   limit?: number
@@ -27,7 +28,7 @@ export async function getNotifications(options?: {
   const session = await getSession()
   if (!session?.user?.id) return { items: [], nextCursor: null }
 
-  const limit = options?.limit ?? 20
+  const limit = options?.limit ?? NOTIFICATIONS_UI_LIMIT
   const items = await prisma.notification.findMany({
     where: {
       userId: session.user.id,
@@ -78,9 +79,11 @@ export async function getNotifications(options?: {
 }
 
 /**
- * Last N notifications for the header dropdown.
+ * Last N notifications for the header dropdown (same limit as the list page).
  */
-export async function getNotificationsPreview(limit: number = 3): Promise<NotificationItem[]> {
+export async function getNotificationsPreview(
+  limit: number = NOTIFICATIONS_UI_LIMIT
+): Promise<NotificationItem[]> {
   const { items } = await getNotifications({ limit })
   return items
 }
@@ -143,7 +146,8 @@ export type CreateNotificationParams = {
   category: string
   title: string
   message: string
-  metadata?: { link?: string; [key: string]: unknown }
+  /** Stored as JSON; use only Prisma-serializable values (e.g. `{ link: "/projects/..." }`). */
+  metadata?: Prisma.JsonObject
 }
 
 /**

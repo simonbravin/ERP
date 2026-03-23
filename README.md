@@ -33,7 +33,21 @@ Bloqer — SaaS multi-tenant para gestión de construcción. Turborepo monorepo.
    pnpm format
    ```
 
-6. **Database** (after Prisma is set up in `packages/database`)
+6. **TypeScript**
+   ```bash
+   pnpm typecheck
+   ```
+   Runs Turbo `typecheck` across the repo: builds workspace dependencies that emit types (for example `@repo/validators` and Prisma client generation) and then runs `tsc --noEmit` in `apps/web` and `packages/validators`. To typecheck only the Next app with a manual validators build, use `pnpm typecheck:web`.
+
+   **Full gate before merge or release** (types + Next production compile, same as CI should run):
+
+   ```bash
+   pnpm verify
+   ```
+
+   This runs `typecheck` then `turbo build --filter=web`. `next build` also type-checks the app (`typescript.ignoreBuildErrors` is off).
+
+7. **Database** (after Prisma is set up in `packages/database`)
    ```bash
    pnpm db:generate   # Generate Prisma client
    pnpm db:push       # Push schema (dev)

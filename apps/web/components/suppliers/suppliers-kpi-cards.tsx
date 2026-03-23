@@ -1,7 +1,6 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { Link } from '@/i18n/navigation'
 import { Building2, Users, Globe, UserCircle } from 'lucide-react'
 
 const CARD_CLASS =

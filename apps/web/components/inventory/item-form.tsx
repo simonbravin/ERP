@@ -20,13 +20,14 @@ import { Card } from '@/components/ui/card'
 import { toast } from 'sonner'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import type { InventoryItem } from '@repo/database'
+import { useTranslations } from 'next-intl'
+import type { InventoryItemFormDto } from '@/lib/types/inventory-dto'
 
 type CategoryOption = { id: string; name: string; sortOrder: number }
 type SubcategoryOption = { id: string; categoryId: string; name: string; sortOrder: number }
 
 interface ItemFormProps {
-  item?: InventoryItem & { category?: { id: string; name: string }; subcategory?: { id: string; name: string } | null }
+  item?: InventoryItemFormDto
   categories: CategoryOption[]
   subcategories: SubcategoryOption[]
 }
@@ -51,6 +52,7 @@ function toNum(v: unknown): number | undefined {
 }
 
 export function ItemForm({ item, categories, subcategories }: ItemFormProps) {
+  const t = useTranslations('inventory')
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState('')
@@ -94,14 +96,14 @@ export function ItemForm({ item, categories, subcategories }: ItemFormProps) {
         : await createInventoryItem(data)
 
       if (result.success) {
-        toast.success(item ? 'Item actualizado' : 'Item creado correctamente')
+        toast.success(item ? t('success.itemUpdated') : t('success.itemCreated'))
         router.push('/inventory/items')
         router.refresh()
       } else {
-        toast.error(result.error ?? 'Error al guardar')
+        toast.error(result.error ?? t('toast.itemSaveError'))
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error inesperado')
+      toast.error(err instanceof Error ? err.message : t('errors.unexpectedError'))
     } finally {
       setIsSubmitting(false)
     }
@@ -114,13 +116,13 @@ export function ItemForm({ item, categories, subcategories }: ItemFormProps) {
     try {
       const res = await createInventoryCategory(name)
       if (res.success) {
-        toast.success('Categoría agregada')
+        toast.success(t('toast.categoryAdded'))
         setNewCategoryName('')
         setAddingCategory(false)
         router.refresh()
       }
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Error al agregar categoría')
+      toast.error(e instanceof Error ? e.message : t('toast.categoryAddError'))
     } finally {
       setAddingCategory(false)
     }
@@ -133,13 +135,13 @@ export function ItemForm({ item, categories, subcategories }: ItemFormProps) {
     try {
       const res = await createInventorySubcategory(selectedCategoryId, name)
       if (res.success) {
-        toast.success('Subcategoría agregada')
+        toast.success(t('toast.subcategoryAdded'))
         setNewSubcategoryName('')
         setAddingSubcategory(false)
         router.refresh()
       }
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Error al agregar subcategoría')
+      toast.error(e instanceof Error ? e.message : t('toast.subcategoryAddError'))
     } finally {
       setAddingSubcategory(false)
     }
@@ -172,7 +174,7 @@ export function ItemForm({ item, categories, subcategories }: ItemFormProps) {
             <select
               id="categoryId"
               {...register('categoryId', {
-                onChange: (e) => {
+                onChange: () => {
                   setValue('subcategoryId', '')
                 },
               })}

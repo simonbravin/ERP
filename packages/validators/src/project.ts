@@ -30,7 +30,15 @@ export const createProjectSchema = z.object({
 
 export type CreateProjectInput = z.infer<typeof createProjectSchema>
 
-const PROJECT_PHASE_ENUM = z.enum(['PRE_CONSTRUCTION', 'CONSTRUCTION', 'CLOSEOUT', 'COMPLETE'])
+export const PROJECT_PHASE = [
+  'PRE_CONSTRUCTION',
+  'CONSTRUCTION',
+  'CLOSEOUT',
+  'COMPLETE',
+] as const
+export type ProjectPhase = (typeof PROJECT_PHASE)[number]
+
+const PROJECT_PHASE_ENUM = z.enum(PROJECT_PHASE)
 
 export const updateProjectSchema = z.object({
   name: z.string().min(1).max(255).optional(),

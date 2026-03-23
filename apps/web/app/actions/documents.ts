@@ -5,7 +5,6 @@ import { prisma } from '@repo/database'
 import { requireRole } from '@/lib/rbac'
 import { getAuthContext } from '@/lib/auth-helpers'
 import { assertProjectAccess, canEditProjectArea, PROJECT_AREAS } from '@/lib/project-permissions'
-import { getVisibleProjectIds } from '@/lib/org-context'
 import { uploadToR2, getDownloadUrl, calculateChecksum } from '@/lib/r2-client'
 import { publishOutboxEvent } from '@/lib/events/event-publisher'
 import { parseCreateDocumentForm } from '@/lib/schemas/documents'
@@ -55,7 +54,7 @@ export async function createDocument(formData: FormData) {
     projectId: (formData.get('projectId') as string) ?? undefined,
     folderId: (formData.get('folderId') as string) ?? undefined,
   })
-  if (!parsed.success) {
+  if (parsed.success === false) {
     throw new Error(parsed.error)
   }
 

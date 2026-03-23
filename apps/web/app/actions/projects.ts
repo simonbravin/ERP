@@ -11,8 +11,9 @@ import { publishOutboxEvent } from '@/lib/events/event-publisher'
 import {
   createProjectSchema,
   updateProjectSchema,
+  PROJECT_PHASE,
 } from '@repo/validators'
-import type { CreateProjectInput, UpdateProjectInput } from '@repo/validators'
+import type { CreateProjectInput, UpdateProjectInput, ProjectPhase } from '@repo/validators'
 import { Prisma } from '@repo/database'
 
 function generateProjectNumber(orgId: string): Promise<string> {
@@ -49,6 +50,8 @@ export type ListProjectsResult = {
   page: number
   pageSize: number
 }
+
+export type ListProjectRow = ListProjectsResult['projects'][number]
 
 /** List projects with optional pagination. Returns array for backward compatibility when page/pageSize not used. */
 export async function listProjects(filters: ListProjectsFilters = {}): Promise<Prisma.ProjectGetPayload<{ select: { id: true; projectNumber: true; name: true; clientName: true; phase: true; status: true; totalBudget: true; location: true; startDate: true; createdAt: true } }>[] | ListProjectsResult> {
@@ -389,7 +392,10 @@ export async function updateProject(projectId: string, data: UpdateProjectInput)
   const raw = data as Record<string, unknown>
 
   const updatePayload: Prisma.ProjectUpdateInput = {}
-  const VALID_PHASES = ['PRE_CONSTRUCTION', 'CONSTRUCTION', 'CLOSEOUT', 'COMPLETE'] as const
+
+  function isProjectPhase(v: string): v is ProjectPhase {
+    return (PROJECT_PHASE as readonly string[]).includes(v)
+  }
 
   if (parsed.data.name !== undefined) updatePayload.name = parsed.data.name
   if (parsed.data.clientName !== undefined) updatePayload.clientName = parsed.data.clientName
@@ -398,11 +404,11 @@ export async function updateProject(projectId: string, data: UpdateProjectInput)
   if (parsed.data.m2 !== undefined) updatePayload.m2 = parsed.data.m2
   if (parsed.data.status !== undefined) updatePayload.status = parsed.data.status
   // Fase: mismo criterio que status — usar parsed.data.phase primero; si no, raw.phase (por si Zod no lo incluyó)
-  if (parsed.data.phase !== undefined && VALID_PHASES.includes(parsed.data.phase as (typeof VALID_PHASES)[number])) {
+  if (parsed.data.phase !== undefined && isProjectPhase(parsed.data.phase)) {
     updatePayload.phase = parsed.data.phase
   } else {
     const phaseFromRaw = raw.phase
-    if (typeof phaseFromRaw === 'string' && VALID_PHASES.includes(phaseFromRaw as (typeof VALID_PHASES)[number])) {
+    if (typeof phaseFromRaw === 'string' && isProjectPhase(phaseFromRaw)) {
       updatePayload.phase = phaseFromRaw
     }
   }

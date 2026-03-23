@@ -5,7 +5,7 @@ import { getOrgContext } from '@/lib/org-context'
 import { requireRole } from '@/lib/rbac'
 import { assertProjectAccess, canEditProjectArea, PROJECT_AREAS } from '@/lib/project-permissions'
 import type { OrgContext } from '@/lib/org-context'
-import { prisma } from '@repo/database'
+import { prisma, Prisma } from '@repo/database'
 
 /** Admin, Owner and Editor at org level can edit schedule; otherwise project role must allow it. */
 function canEditSchedule(org: OrgContext, projectRole: string | null): boolean {
@@ -15,7 +15,6 @@ function canEditSchedule(org: OrgContext, projectRole: string | null): boolean {
   )
 }
 import { revalidatePath } from 'next/cache'
-import { Decimal } from '@prisma/client/runtime/library'
 import { calculateCriticalPath } from '@/lib/schedule/critical-path'
 import { addWorkingDays, countWorkingDays } from '@/lib/schedule/working-days'
 import { validateTaskDatesAgainstDependencies } from '@/lib/schedule/validate-dependencies'
@@ -46,7 +45,7 @@ export async function createScheduleFromWBS(
   }
 ) {
   const parsed = parseProjectId(projectId)
-  if (!parsed.success) return { success: false, error: parsed.error }
+  if (parsed.success === false) return { success: false, error: parsed.error }
 
   const session = await getSession()
   if (!session?.user?.id) {
@@ -143,7 +142,7 @@ export async function createScheduleFromWBS(
           plannedStartDate: startDate,
           plannedEndDate: endDate,
           plannedDuration: duration,
-          progressPercent: new Decimal(0),
+          progressPercent: new Prisma.Decimal(0),
         },
       })
 
@@ -258,7 +257,7 @@ export async function updateTaskDates(
   }
 ) {
   const parsedTask = parseTaskId(taskId)
-  if (!parsedTask.success) return { success: false, error: parsedTask.error }
+  if (parsedTask.success === false) return { success: false, error: parsedTask.error }
 
   const session = await getSession()
   if (!session?.user?.id) {
@@ -386,7 +385,7 @@ export async function updateTaskDates(
         successors,
         task.schedule.workingDaysPerWeek
       )
-      if (!validation.valid) {
+      if (validation.valid === false) {
         return { success: false, error: validation.message }
       }
     }
@@ -453,7 +452,7 @@ export async function addTaskDependency(data: {
   lagDays?: number
 }) {
   const parsed = addTaskDependencySchema.safeParse(data)
-  if (!parsed.success) {
+  if (parsed.success === false) {
     const msg = parsed.error.flatten().formErrors[0]
     return { success: false, error: msg ?? 'Datos inválidos' }
   }
@@ -537,7 +536,7 @@ export async function addTaskDependency(data: {
  */
 export async function removeTaskDependency(dependencyId: string) {
   const parsed = parseDependencyId(dependencyId)
-  if (!parsed.success) return { success: false, error: parsed.error }
+  if (parsed.success === false) return { success: false, error: parsed.error }
 
   const session = await getSession()
   if (!session?.user?.id) {
@@ -597,7 +596,7 @@ export async function updateTaskProgress(
   }
 ) {
   const parsedTask = parseTaskId(taskId)
-  if (!parsedTask.success) return { success: false, error: parsedTask.error }
+  if (parsedTask.success === false) return { success: false, error: parsedTask.error }
 
   const session = await getSession()
   if (!session?.user?.id) {
@@ -633,12 +632,12 @@ export async function updateTaskProgress(
     }
 
     const updateData: {
-      progressPercent: Decimal
+      progressPercent: Prisma.Decimal
       actualStartDate?: Date
       actualEndDate?: Date
       actualDuration?: number
     } = {
-      progressPercent: new Decimal(data.progressPercent),
+      progressPercent: new Prisma.Decimal(data.progressPercent),
     }
     if (data.actualStartDate != null) updateData.actualStartDate = data.actualStartDate
     if (data.actualEndDate != null) updateData.actualEndDate = data.actualEndDate
@@ -835,7 +834,7 @@ async function checkForCycle(
  */
 export async function setScheduleAsBaseline(scheduleId: string) {
   const parsed = parseScheduleId(scheduleId)
-  if (!parsed.success) return { success: false, error: parsed.error }
+  if (parsed.success === false) return { success: false, error: parsed.error }
 
   const session = await getSession()
   if (!session?.user?.id) {
@@ -923,7 +922,7 @@ export async function setScheduleAsBaseline(scheduleId: string) {
  */
 export async function approveSchedule(scheduleId: string) {
   const parsed = parseScheduleId(scheduleId)
-  if (!parsed.success) return { success: false, error: parsed.error }
+  if (parsed.success === false) return { success: false, error: parsed.error }
 
   const session = await getSession()
   if (!session?.user?.id) {
@@ -990,7 +989,7 @@ export async function approveSchedule(scheduleId: string) {
  */
 export async function getScheduleForView(scheduleId: string) {
   const parsed = parseScheduleId(scheduleId)
-  if (!parsed.success) return null
+  if (parsed.success === false) return null
 
   const session = await getSession()
   if (!session?.user?.id) return null

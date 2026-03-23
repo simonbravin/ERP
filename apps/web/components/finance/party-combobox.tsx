@@ -116,6 +116,7 @@ export function PartyCombobox({
           >
             <li
               role="option"
+              aria-selected={value === null}
               className="relative cursor-pointer select-none px-3 py-2 text-sm outline-none hover:bg-muted focus:bg-muted"
               onMouseDown={(e) => {
                 e.preventDefault()
@@ -128,6 +129,7 @@ export function PartyCombobox({
             {showCreateOption && (
               <li
                 role="option"
+                aria-selected={false}
                 className="flex cursor-pointer select-none items-center gap-2 px-3 py-2 text-sm outline-none hover:bg-muted focus:bg-muted text-primary border-t"
                 onMouseDown={async (e) => {
                   e.preventDefault()
@@ -154,12 +156,15 @@ export function PartyCombobox({
               </li>
             )}
             {filtered.length === 0 && !showCreateOption ? (
-              <li className="px-3 py-2 text-sm text-muted-foreground">Sin resultados</li>
+              <li role="presentation" className="px-3 py-2 text-sm text-muted-foreground">
+                Sin resultados
+              </li>
             ) : (
               filtered.map((p) => (
                 <li
                   key={p.id}
                   role="option"
+                  aria-selected={value === p.id}
                   className={cn(
                     'relative cursor-pointer select-none px-3 py-2 text-sm outline-none hover:bg-muted focus:bg-muted',
                     value === p.id && 'bg-muted'

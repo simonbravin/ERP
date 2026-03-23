@@ -23,11 +23,12 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { formatCurrency, formatDate } from '@/lib/format-utils'
-import { Split, Eye, Trash2 } from 'lucide-react'
+import { Split, Eye } from 'lucide-react'
 import { OverheadAllocationDialog } from '@/components/finance/overhead-allocation-dialog'
 import { AllocationDetailsDialog } from '@/components/finance/allocation-details-dialog'
 import { deleteOverheadAllocation, getOverheadTransactions } from '@/app/actions/finance'
 import { toast } from 'sonner'
+import { useTranslations } from 'next-intl'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -56,6 +57,7 @@ export function OverheadTransactionsListClient({
   activeProjects,
   allProjects,
 }: Props) {
+  const tFin = useTranslations('finance')
   const router = useRouter()
   const [transactions, setTransactions] = useState(initialTransactions)
   const [filterStatus, setFilterStatus] = useState<string>('all')
@@ -124,9 +126,9 @@ export function OverheadTransactionsListClient({
         const tx = updated.find((t) => t.id === selectedTransaction.id)
         if (tx) setSelectedTransaction(tx)
       }
-      toast.success('Asignación eliminada')
+      toast.success(tFin('toast.overheadAllocationRemoved'))
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Error al eliminar')
+      toast.error(error instanceof Error ? error.message : tFin('toast.allocationDeleteError'))
     } finally {
       setDeleteAllocationId(null)
     }
@@ -138,12 +140,12 @@ export function OverheadTransactionsListClient({
       setTransactions(updated)
       router.refresh()
     } catch {
-      toast.error('Error al actualizar la lista')
+      toast.error(tFin('toast.overheadListRefreshError'))
     }
   }
 
   async function handleExport(format: 'excel' | 'pdf', selectedColumns: string[]) {
-    if (format === 'pdf') return { success: false, error: 'Exportación PDF no disponible para gastos generales' }
+    if (format === 'pdf') return { success: false, error: tFin('toast.overheadPdfExportUnavailable') }
     return exportOverheadToExcel(selectedColumns)
   }
 

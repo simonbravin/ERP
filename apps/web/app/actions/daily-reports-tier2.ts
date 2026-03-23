@@ -41,8 +41,15 @@ export async function submitDailyReportTier2(input: SubmitDailyReportTier2Input)
   const parsed = submitDailyReportTier2Schema.safeParse(input)
   if (!parsed.success) throw new Error(parsed.error.errors.map((e) => e.message).join(', '))
 
-  const { reportId, budgetLineId, laborCosts, materialCosts, otherCosts, consumptions, suppliers } =
-    parsed.data
+  const {
+    reportId,
+    budgetLineId,
+    laborCosts,
+    materialCosts,
+    otherCosts,
+    consumptions: _consumptions,
+    suppliers: _suppliers,
+  } = parsed.data
 
   const existing = await prisma.dailyReport.findFirst({
     where: { id: reportId, orgId: org.orgId },

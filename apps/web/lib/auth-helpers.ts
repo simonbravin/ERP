@@ -7,7 +7,6 @@ import {
   type Permission,
   type CustomPermissionsMap,
 } from '@/lib/permissions'
-import type { OrgRole } from '@/types/next-auth'
 import { prisma } from '@repo/database'
 import { getSession } from '@/lib/session'
 import { getOrgContext, isRestrictedToProjects, type OrgContext } from '@/lib/org-context'
@@ -44,9 +43,9 @@ export async function requirePermission(
     throw new Error('Miembro no encontrado')
   }
 
-  const module = MODULES[moduleKey] as Module
+  const moduleDef = MODULES[moduleKey] as Module
   const customPerms = (member.customPermissions as CustomPermissionsMap) ?? null
-  if (!hasPermission(member.role as OrgRole, module, permission, customPerms)) {
+  if (!hasPermission(member.role, moduleDef, permission, customPerms)) {
     throw new Error(`No tienes permiso para ${permission} en este módulo`)
   }
 
@@ -69,9 +68,9 @@ export async function requireAccess(moduleKey: ModuleKey) {
     throw new Error('Miembro no encontrado')
   }
 
-  const module = MODULES[moduleKey] as Module
+  const moduleDef = MODULES[moduleKey] as Module
   const customPerms = (member.customPermissions as CustomPermissionsMap) ?? null
-  if (!canAccess(member.role as OrgRole, module, customPerms)) {
+  if (!canAccess(member.role, moduleDef, customPerms)) {
     throw new Error('No tienes acceso a este módulo')
   }
 

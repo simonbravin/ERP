@@ -1,7 +1,10 @@
 import { inngest } from '@/inngest/client'
 import { prisma } from '@repo/database'
 import { buildWeeklyReportPayload } from '@/app/actions/finance-weekly-report'
-import { buildWeeklyReportHtml } from '@/lib/weekly-report-email'
+import {
+  buildWeeklyReportHtml,
+  type WeeklyReportPayloadForEmail,
+} from '@/lib/weekly-report-email'
 import { sendWeeklyReportEmail } from '@/lib/email'
 
 /**
@@ -53,14 +56,27 @@ export const weeklyReport = inngest.createFunction(
 
       if (!payload) continue
 
-      const contentHtml = buildWeeklyReportHtml(payload, appUrl)
+      const contentHtml = buildWeeklyReportHtml(
+        payload as unknown as WeeklyReportPayloadForEmail,
+        appUrl
+      )
 
       for (const to of owners) {
         const result = await step.run(`send-${orgId}-${to}`, async () => {
           return sendWeeklyReportEmail({ to, subject, contentHtml })
         })
-        if (result.success) sent += 1
-        else errors.push(`${orgId}:${to}: ${(result.error as { message?: string }).message ?? 'unknown'}`)
+        if (result.success === true) sent += 1
+        else {
+          const err =
+            result.success === false && 'error' in result && result.error
+              ? result.error
+              : { message: 'unknown' }
+          const msg =
+            typeof err === 'object' && err !== null && 'message' in err
+              ? String((err as { message?: string }).message ?? 'unknown')
+              : 'unknown'
+          errors.push(`${orgId}:${to}: ${msg}`)
+        }
       }
     }
 

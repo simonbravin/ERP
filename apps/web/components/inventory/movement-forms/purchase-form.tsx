@@ -4,6 +4,7 @@ import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useEffect, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { createInventoryMovement, getProjectWBSNodes } from '@/app/actions/inventory'
 import { Button } from '@/components/ui/button'
 import { CurrencyInput } from '@/components/ui/currency-input'
@@ -46,6 +47,7 @@ export function PurchaseForm({
   suppliers,
   initialItemId,
 }: PurchaseFormProps) {
+  const t = useTranslations('inventory')
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [wbsNodes, setWbsNodes] = useState<Array<{ id: string; code: string; name: string }>>([])
@@ -111,14 +113,14 @@ export function PurchaseForm({
       })
 
       if (result.success) {
-        toast.success('Compra registrada correctamente')
+        toast.success(t('toast.purchaseOk'))
         router.push('/inventory/movements')
         router.refresh()
       } else {
-        toast.error('Error al registrar compra')
+        toast.error(t('toast.purchaseError'))
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error inesperado')
+      toast.error(err instanceof Error ? err.message : t('errors.unexpectedError'))
     } finally {
       setIsSubmitting(false)
     }

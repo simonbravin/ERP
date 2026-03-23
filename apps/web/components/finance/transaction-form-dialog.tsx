@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useTranslations } from 'next-intl'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -50,26 +50,28 @@ import {
 } from '@repo/validators'
 import { Paperclip, FileDown } from 'lucide-react'
 
-const formSchema = z.object({
-  type: z.enum(PROJECT_TRANSACTION_TYPE),
-  documentType: z.enum(DOCUMENT_TYPE).optional().default('INVOICE'),
-  partyId: z.string().uuid().optional().nullable(),
-  description: z.string().min(3, 'Mínimo 3 caracteres'),
-  issueDate: z.coerce.date(),
-  dueDate: z.coerce.date().optional().nullable(),
-  currency: z.string().length(3).default('ARS'),
-  exchangeRate: z.number().positive().optional(),
-  subtotal: z.number().nonnegative(),
-  taxTotal: z.number().nonnegative().default(0),
-  total: z.number().nonnegative(),
-  reference: z.string().max(200).optional().nullable(),
-  retentionAmount: z.number().nonnegative().optional().default(0),
-  adjustmentAmount: z.number().optional().default(0),
-  adjustmentNotes: z.string().max(1000).optional().nullable(),
-  status: z.enum(TRANSACTION_STATUS).optional(),
-})
+function buildFormSchema(descriptionMinMsg: string) {
+  return z.object({
+    type: z.enum(PROJECT_TRANSACTION_TYPE),
+    documentType: z.enum(DOCUMENT_TYPE).optional().default('INVOICE'),
+    partyId: z.string().uuid().optional().nullable(),
+    description: z.string().min(3, descriptionMinMsg),
+    issueDate: z.coerce.date(),
+    dueDate: z.coerce.date().optional().nullable(),
+    currency: z.string().length(3).default('ARS'),
+    exchangeRate: z.number().positive().optional(),
+    subtotal: z.number().nonnegative(),
+    taxTotal: z.number().nonnegative().default(0),
+    total: z.number().nonnegative(),
+    reference: z.string().max(200).optional().nullable(),
+    retentionAmount: z.number().nonnegative().optional().default(0),
+    adjustmentAmount: z.number().optional().default(0),
+    adjustmentNotes: z.string().max(1000).optional().nullable(),
+    status: z.enum(TRANSACTION_STATUS).optional(),
+  })
+}
 
-type FormData = z.infer<typeof formSchema>
+type FormData = z.infer<ReturnType<typeof buildFormSchema>>
 
 export type TransactionForEdit = {
   id: string
@@ -81,10 +83,14 @@ export type TransactionForEdit = {
   currency: string
   partyId?: string | null
   party?: { id: string; name: string } | null
+  documentType?: string | null
   subtotal?: { toNumber?: () => number } | number
   taxTotal?: { toNumber?: () => number } | number
   total: { toNumber?: () => number } | number
   reference?: string | null
+  retentionAmount?: { toNumber?: () => number } | number | null
+  adjustmentAmount?: { toNumber?: () => number } | number | null
+  adjustmentNotes?: string | null
 }
 
 function toNum(v: { toNumber?: () => number } | number): number {
@@ -119,6 +125,8 @@ export function TransactionFormDialog({
   const [attachmentLoading, setAttachmentLoading] = useState(false)
   const [attachUploading, setAttachUploading] = useState(false)
   const t = useTranslations('common')
+  const tFin = useTranslations('finance')
+  const formSchema = useMemo(() => buildFormSchema(tFin('validationDescriptionMin')), [tFin])
   const isEditing = !!transaction
   const isCompanyLevel = projectId == null
   const canAttach = isEditing && transaction?.id && projectId != null
@@ -245,10 +253,10 @@ export function TransactionFormDialog({
         await linkDocumentToEntity(result.docId, FINANCE_TRANSACTION_ENTITY, transaction.id)
         const list = await listDocumentsForEntity(FINANCE_TRANSACTION_ENTITY, transaction.id)
         setAttachmentDocs(list)
-        toast.success('Documento adjuntado')
+        toast.success(tFin('toast.documentAttached'))
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'No se pudo adjuntar')
+      toast.error(err instanceof Error ? err.message : tFin('toast.attachUploadError'))
     } finally {
       setAttachUploading(false)
     }
@@ -259,7 +267,7 @@ export function TransactionFormDialog({
       const { url } = await getDocumentDownloadUrl(versionId)
       window.open(url, '_blank')
     } catch {
-      toast.error('No se pudo descargar')
+      toast.error(tFin('downloadAttachmentError'))
     }
   }
 
@@ -295,13 +303,13 @@ export function TransactionFormDialog({
         }
         const updated = result && 'transaction' in result ? result.transaction : null
         if (updated) {
-          toast.success('Transacción actualizada')
+          toast.success(tFin('toast.transactionUpdated'))
           onSuccess(updated as Record<string, unknown>)
         }
       } else if (isCompanyLevel) {
         const companyType = data.type as 'EXPENSE' | 'INCOME' | 'OVERHEAD'
         if (!['EXPENSE', 'INCOME', 'OVERHEAD'].includes(companyType)) {
-          toast.error('En nivel empresa solo se permiten Gasto, Ingreso o Generales.')
+          toast.error(tFin('toast.companyLevelTypesError'))
           return
         }
         const result = await createCompanyTransaction({
@@ -326,7 +334,7 @@ export function TransactionFormDialog({
         }
         const created = result && 'transaction' in result ? result.transaction : null
         if (created) {
-          toast.success('Transacción creada')
+          toast.success(tFin('toast.transactionCreated'))
           onSuccess(created as Record<string, unknown>)
         }
       } else {
@@ -360,13 +368,13 @@ export function TransactionFormDialog({
         }
         const created = result && 'transaction' in result ? result.transaction : null
         if (created) {
-          toast.success('Transacción creada')
+          toast.success(tFin('toast.transactionCreated'))
           onSuccess(created as Record<string, unknown>)
         }
       }
       onOpenChange(false)
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : 'Error al guardar')
+      toast.error(e instanceof Error ? e.message : tFin('toast.saveError'))
     } finally {
       setIsSubmitting(false)
     }
@@ -377,10 +385,10 @@ export function TransactionFormDialog({
       <DialogContent className="max-w-3xl" style={{ maxWidth: '52rem' }} aria-describedby="transaction-form-desc">
         <DialogHeader>
           <DialogTitle>
-            {isEditing ? 'Editar Transacción' : 'Nueva Transacción'}
+            {isEditing ? tFin('transactionFormEditTitle') : tFin('newTransaction')}
           </DialogTitle>
           <DialogDescription id="transaction-form-desc">
-            {isEditing ? 'Modifica los datos de la transacción.' : 'Completa los datos para registrar una nueva transacción. Selecciona Proveedor en gastos/compras y Cliente en ingresos/ventas.'}
+            {isEditing ? tFin('transactionFormEditDesc') : tFin('transactionFormNewDesc')}
           </DialogDescription>
         </DialogHeader>
 

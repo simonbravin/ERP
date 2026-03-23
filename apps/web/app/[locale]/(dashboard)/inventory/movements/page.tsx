@@ -1,8 +1,8 @@
 import { getSession } from '@/lib/session'
 import { getOrgContext, getVisibleProjectIds } from '@/lib/org-context'
 import { redirectToLogin } from '@/lib/i18n-redirect'
-import { prisma } from '@repo/database'
-import { serializeForClient } from '@/lib/utils/serialization'
+import { prisma, type Prisma } from '@repo/database'
+import { toInventoryMovementClientRows } from '@/lib/inventory-serialize'
 import { MovementsListClient } from '@/components/inventory/movements-list-client'
 import { Button } from '@/components/ui/button'
 import { Plus, Download } from 'lucide-react'
@@ -33,7 +33,7 @@ export default async function MovementsListPage({ searchParams }: PageProps) {
   const allowedProjectIds = await getVisibleProjectIds(org)
   const params = await searchParams
 
-  const where: Record<string, unknown> = { orgId: org.orgId }
+  const where: Prisma.InventoryMovementWhereInput = { orgId: org.orgId }
   if (Array.isArray(allowedProjectIds)) {
     where.OR =
       allowedProjectIds.length === 0
@@ -61,22 +61,23 @@ export default async function MovementsListPage({ searchParams }: PageProps) {
   }
 
   if (params.from || params.to) {
-    where.createdAt = {}
+    const createdAt: Prisma.DateTimeFilter = {}
     if (params.from) {
-      where.createdAt.gte = new Date(params.from)
+      createdAt.gte = new Date(params.from)
     }
     if (params.to) {
       const toDate = new Date(params.to)
       toDate.setHours(23, 59, 59, 999)
-      where.createdAt.lte = toDate
+      createdAt.lte = toDate
     }
+    where.createdAt = createdAt
   }
 
   const movements = await prisma.inventoryMovement.findMany({
     where,
     include: {
       item: {
-        select: { sku: true, name: true, unit: true },
+        select: { id: true, sku: true, name: true, unit: true },
       },
       fromLocation: {
         select: { name: true, type: true },
@@ -113,7 +114,7 @@ export default async function MovementsListPage({ searchParams }: PageProps) {
     }),
   ])
 
-  const movementsPlain = movements.map((m) => serializeForClient(m))
+  const movementsPlain = toInventoryMovementClientRows(movements)
 
   return (
     <div className="erp-view-container space-y-6 bg-background">

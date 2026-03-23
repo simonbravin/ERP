@@ -90,7 +90,7 @@ export async function sendPasswordResetEmail(params: {
     <p style="margin:0;color:#64748b;font-size:14px;">Este enlace expira en 1 hora. Si no solicitaste este cambio, ignora este correo.</p>
   `.trim()
   try {
-    const { data, error } = await resend.emails.send({
+    const { data: _data, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [to],
       subject: 'Restablecer contraseña',
@@ -135,7 +135,7 @@ export async function sendInvitationEmail(params: {
   `.trim()
 
   try {
-    const { data, error } = await resend.emails.send({
+    const { data: _data, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [to],
       subject: `Invitación a ${orgName}`,
@@ -147,7 +147,7 @@ export async function sendInvitationEmail(params: {
       return { success: false, error }
     }
 
-    return { success: true, data }
+    return { success: true, data: _data }
   } catch (error) {
     console.error('Email error:', error)
     return { success: false, error }
@@ -179,7 +179,7 @@ export async function sendAddedToOrgEmail(params: {
 
   const resend = new Resend(apiKey)
   try {
-    const { data, error } = await resend.emails.send({
+    const { data: _data, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [to],
       subject: `Te han añadido a ${orgName}`,
@@ -189,7 +189,7 @@ export async function sendAddedToOrgEmail(params: {
       console.error('Added-to-org email error:', error)
       return { success: false, error }
     }
-    return { success: true, data }
+    return { success: true, data: _data }
   } catch (error) {
     console.error('Added-to-org email error:', error)
     return { success: false, error }
@@ -212,7 +212,7 @@ export async function sendWeeklyReportEmail(params: {
   }
   const resend = new Resend(apiKey)
   try {
-    const { data, error } = await resend.emails.send({
+    const { data: _data, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [to],
       subject,
@@ -222,7 +222,7 @@ export async function sendWeeklyReportEmail(params: {
       console.error('Weekly report email error:', error)
       return { success: false, error }
     }
-    return { success: true, data }
+    return { success: true, data: _data }
   } catch (err) {
     console.error('Weekly report email error:', err)
     return { success: false, error: { message: String(err) } }

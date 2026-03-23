@@ -1,7 +1,7 @@
 import { prisma } from '@repo/database'
 import { AcceptInvitationClient } from '@/components/team/accept-invitation-client'
 import { notFound } from 'next/navigation'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { AlertCircle } from 'lucide-react'
 
 interface PageProps {

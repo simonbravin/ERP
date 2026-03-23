@@ -2,7 +2,7 @@ import { redirectToLogin } from '@/lib/i18n-redirect'
 import { getSession } from '@/lib/session'
 import { getOrgContext } from '@/lib/org-context'
 import { prisma } from '@repo/database'
-import { serializeForClient } from '@/lib/utils/serialization'
+import { toInventoryMovementClientRows } from '@/lib/inventory-serialize'
 import { InventoryKPICards } from '@/components/inventory/inventory-kpi-cards'
 import { LowStockAlerts } from '@/components/inventory/low-stock-alerts'
 import { RecentMovements } from '@/components/inventory/recent-movements'
@@ -141,10 +141,13 @@ export default async function InventoryDashboardPage() {
     }
   }
 
-  lowStockRows.sort((a: any, b: any) => a.current_stock - (a.minStockQty ?? 0) - (b.current_stock - (b.minStockQty ?? 0)))
+  lowStockRows.sort(
+    (a, b) =>
+      a.current_stock - (a.minStockQty ?? 0) - (b.current_stock - (b.minStockQty ?? 0))
+  )
   const lowStockItems = lowStockRows.slice(0, 10)
 
-  const recentMovementsPlain = recentMovements.map((m) => serializeForClient(m))
+  const recentMovementsPlain = toInventoryMovementClientRows(recentMovements)
 
   return (
     <div className="erp-view-container space-y-6 bg-background">

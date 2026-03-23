@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { Link } from '@/i18n/navigation'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -35,7 +36,6 @@ type SubmittalListProps = {
 }
 
 const STATUS_OPTIONS = [
-  '',
   'DRAFT',
   'SUBMITTED',
   'UNDER_REVIEW',
@@ -55,7 +55,18 @@ const STATUS_VARIANT: Record<string, 'neutral' | 'warning' | 'info' | 'success' 
   REVISE_AND_RESUBMIT: 'warning',
 }
 
+const SUBMITTAL_TYPE_KEYS = [
+  'MATERIAL',
+  'PRODUCT',
+  'SHOP_DRAWING',
+  'SAMPLES',
+  'CUT_SHEETS',
+  'OTHER',
+] as const
+
 export function SubmittalList({ submittals, projectId }: SubmittalListProps) {
+  const t = useTranslations('quality')
+  const tCommon = useTranslations('common')
   const [statusFilter, setStatusFilter] = useState('')
 
   const filtered =
@@ -63,10 +74,24 @@ export function SubmittalList({ submittals, projectId }: SubmittalListProps) {
       ? submittals
       : submittals.filter((s) => s.status === statusFilter)
 
+  function submittalStatusLabel(status: string): string {
+    if ((STATUS_OPTIONS as readonly string[]).includes(status)) {
+      return t(`status.${status}` as 'status.DRAFT')
+    }
+    return status.replace(/_/g, ' ')
+  }
+
+  function submittalTypeLabel(type: string): string {
+    if ((SUBMITTAL_TYPE_KEYS as readonly string[]).includes(type)) {
+      return t(`submittalType.${type}` as 'submittalType.MATERIAL')
+    }
+    return type.replace(/_/g, ' ')
+  }
+
   if (submittals.length === 0) {
     return (
       <div className="erp-card py-12 text-center text-muted-foreground">
-        No submittals yet. Create one to get started.
+        {t('listSubmittalEmpty')}
       </div>
     )
   }
@@ -78,14 +103,19 @@ export function SubmittalList({ submittals, projectId }: SubmittalListProps) {
   return (
     <div className="space-y-4">
       <ListFiltersBar onClear={clearFilters}>
-        <Select value={statusFilter || 'all'} onValueChange={(v) => setStatusFilter(v === 'all' ? '' : v)}>
+        <Select
+          value={statusFilter || 'all'}
+          onValueChange={(v) => setStatusFilter(v === 'all' ? '' : v)}
+        >
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Filter by status" />
+            <SelectValue placeholder={t('listFilterByStatus')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All</SelectItem>
-            {STATUS_OPTIONS.filter(Boolean).map((s) => (
-              <SelectItem key={s} value={s}>{s.replace(/_/g, ' ')}</SelectItem>
+            <SelectItem value="all">{tCommon('all')}</SelectItem>
+            {STATUS_OPTIONS.map((s) => (
+              <SelectItem key={s} value={s}>
+                {submittalStatusLabel(s)}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -96,11 +126,15 @@ export function SubmittalList({ submittals, projectId }: SubmittalListProps) {
           <thead>
             <tr className="erp-table-header">
               <th className="erp-table-cell font-medium text-muted-foreground">#</th>
-              <th className="erp-table-cell font-medium text-muted-foreground">Type</th>
-              <th className="erp-table-cell font-medium text-muted-foreground">Spec</th>
-              <th className="erp-table-cell font-medium text-muted-foreground">Status</th>
-              <th className="erp-table-cell font-medium text-muted-foreground">Revision</th>
-              <th className="erp-table-cell font-medium text-muted-foreground">Due</th>
+              <th className="erp-table-cell font-medium text-muted-foreground">{t('type')}</th>
+              <th className="erp-table-cell font-medium text-muted-foreground">
+                {t('specSection')}
+              </th>
+              <th className="erp-table-cell font-medium text-muted-foreground">
+                {t('listPlaceholderStatus')}
+              </th>
+              <th className="erp-table-cell font-medium text-muted-foreground">{t('revision')}</th>
+              <th className="erp-table-cell font-medium text-muted-foreground">{t('listColumnDue')}</th>
               <th className="erp-table-cell w-20" />
             </tr>
           </thead>
@@ -111,12 +145,12 @@ export function SubmittalList({ submittals, projectId }: SubmittalListProps) {
                   S-{String(s.number).padStart(3, '0')}
                 </td>
                 <td className="erp-table-cell font-medium text-foreground">
-                  {s.submittalType.replace(/_/g, ' ')}
+                  {submittalTypeLabel(s.submittalType)}
                 </td>
                 <td className="erp-table-cell text-muted-foreground">{s.specSection ?? '—'}</td>
                 <td className="erp-table-cell">
                   <Badge variant={STATUS_VARIANT[s.status] ?? 'neutral'}>
-                    {s.status.replace(/_/g, ' ')}
+                    {submittalStatusLabel(s.status)}
                   </Badge>
                 </td>
                 <td className="erp-table-cell font-mono tabular-nums text-muted-foreground">
@@ -128,7 +162,7 @@ export function SubmittalList({ submittals, projectId }: SubmittalListProps) {
                 <td className="erp-table-cell">
                   <Link href={`/projects/${projectId}/quality/submittals/${s.id}`}>
                     <Button type="button" variant="ghost" className="h-8 px-2 text-xs">
-                      View
+                      {tCommon('view')}
                     </Button>
                   </Link>
                 </td>

@@ -13,6 +13,7 @@ import {
 } from '@repo/validators'
 import { getDefaultUnitForCategory } from '@/lib/resource-utils'
 import { Button } from '@/components/ui/button'
+import { CurrencyInput } from '@/components/ui/currency-input'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
@@ -37,6 +38,7 @@ export function ResourceForm({
   const schema = isCreate ? createResourceSchema : updateResourceSchema
   const {
     register,
+    control,
     handleSubmit,
     setError,
     watch,

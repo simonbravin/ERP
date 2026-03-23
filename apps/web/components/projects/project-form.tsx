@@ -62,17 +62,6 @@ export function ProjectForm({
   })
 
   async function handleFormSubmit(data: CreateProjectInput | UpdateProjectInput) {
-    const submit =
-      onSubmitProp ??
-      (projectId != null
-        ? (id: string, d: UpdateProjectInput) => updateProject(id, d)
-        : null)
-
-    if (!submit) {
-      setError('root', { message: 'Missing submit handler' })
-      return
-    }
-
     // En modo edición: phase y status desde getValues() para no depender de data (evitar que serialización los omita)
     const payload: UpdateProjectInput =
       projectId != null
@@ -96,23 +85,32 @@ export function ProjectForm({
           }
         : (data as UpdateProjectInput)
 
-    const result =
-      projectId != null
-        ? await submit(projectId, payload)
-        : await submit(data)
-    if (result?.error) {
-      if (result.error._form) {
-        setError('root', { message: result.error._form[0] })
+    let result: { error?: Record<string, string[] | undefined> & { _form?: string[] }; success?: boolean } | void
+
+    if (projectId != null) {
+      const fn = onSubmitProp ?? ((id: string, d: UpdateProjectInput) => updateProject(id, d))
+      result = await fn(projectId, payload)
+    } else {
+      if (!onSubmitProp) {
+        setError('root', { message: 'Missing submit handler' })
+        return
       }
-      Object.entries(result.error).forEach(([field, messages]) => {
+      result = await onSubmitProp(data as CreateProjectInput)
+    }
+
+    if (result && typeof result === 'object' && 'error' in result && result.error) {
+      const err = result.error as Record<string, string[] | undefined> & { _form?: string[] }
+      if (err._form?.[0]) {
+        setError('root', { message: err._form[0] })
+      }
+      Object.entries(err).forEach(([field, messages]) => {
         if (field !== '_form' && messages?.[0]) {
           setError(field as keyof CreateProjectInput, { message: messages[0] })
         }
       })
       return
     }
-    // Navegar al resumen: refrescar caché y luego ir para que el resumen muestre datos actualizados (phase, estado)
-    if (projectId != null && result && 'success' in result && result.success) {
+    if (projectId != null && result && typeof result === 'object' && 'success' in result && result.success) {
       toast.success(t('saved', { defaultMessage: 'Guardado' }))
       router.refresh()
       router.push(`/projects/${projectId}`)

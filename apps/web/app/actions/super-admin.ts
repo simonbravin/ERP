@@ -2,7 +2,7 @@
 
 import { auth } from '@/lib/auth'
 import { prisma } from '@repo/database'
-import type { Prisma } from '@repo/database'
+import { toInputJson } from '@/lib/json-prisma'
 import { revalidatePath } from 'next/cache'
 import { headers } from 'next/headers'
 
@@ -30,7 +30,7 @@ async function createSuperAdminLog(
       action,
       targetType,
       targetId,
-      details: details ?? undefined,
+      details: details != null ? toInputJson(details) : undefined,
       ipAddress: ipAddress ?? undefined,
     },
   })
@@ -200,7 +200,7 @@ export async function updateOrganizationModules(
   try {
     const org = await prisma.organization.update({
       where: { id: orgId },
-      data: { enabledModules: enabledModules as Prisma.InputJsonValue },
+      data: { enabledModules: toInputJson(enabledModules) },
     })
     await createSuperAdminLog(
       superAdmin.id,
@@ -355,7 +355,7 @@ export async function updateUserModules(
     })
     await prisma.orgMember.update({
       where: { id: orgMember.id },
-      data: { customPermissions: customPermissions as Prisma.InputJsonValue },
+      data: { customPermissions: toInputJson(customPermissions) },
     })
     await createSuperAdminLog(
       superAdmin.id,

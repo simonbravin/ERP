@@ -14,6 +14,7 @@ import type {
   QueryFilter,
 } from '@/lib/types/reports'
 import type { CompanyTransactionsFilters } from './finance'
+import { toInputJson } from '@/lib/json-prisma'
 
 const WHITELIST_TABLES = [
   'finance_transactions',
@@ -371,12 +372,12 @@ export async function saveCustomReport(reportData: {
 // ==================== Ejecutar reporte guardado ====================
 
 export async function runCustomReport(reportId: string): Promise<ReportResult> {
-  const { session, org } = await getAuthForReports()
+  const { org } = await getAuthForReports()
   const report = await prisma.customReport.findFirst({
     where: { id: reportId, orgId: org.orgId },
   })
   if (!report) throw new Error('Reporte no encontrado')
-  const config = report.config as ReportConfig
+  const config = report.config as unknown as ReportConfig
   const result = await executeCustomQuery(config.query)
   await prisma.customReport.update({
     where: { id: reportId },
@@ -557,13 +558,13 @@ export async function createSavedReport(params: {
       description: params.description ?? null,
       category: params.entityType === 'FINANCE_TRANSACTION' ? 'FINANCE' : params.entityType === 'BUDGET_LINE' ? 'BUDGET' : 'CUSTOM',
       reportType: 'TABLE',
-      config: {
+      config: toInputJson({
         entityType: params.entityType,
         filtersJson: params.filtersJson,
         columnsJson: params.columnsJson,
         sortJson: params.sortJson ?? [],
         visibility: params.visibility,
-      },
+      }),
       isPublic: params.visibility === 'SHARED',
       createdByUserId: session.user.id,
     },

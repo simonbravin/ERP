@@ -72,7 +72,7 @@ interface ProjectsListClientProps {
 /**
  * Projects list with TanStack Table, filtering, sorting, and view toggle
  */
-export function ProjectsListClient({ projects, canEdit, showExport = false, total: totalFromServer, page: pageFromServer = 1, pageSize: pageSizeFromServer, searchParams: searchParamsFromPage }: ProjectsListClientProps) {
+export function ProjectsListClient({ projects, canEdit: _canEdit, showExport = false, total: totalFromServer, page: pageFromServer = 1, pageSize: pageSizeFromServer, searchParams: _searchParamsFromPage }: ProjectsListClientProps) {
   const t = useTranslations('projects')
   const tCommon = useTranslations('common')
   const router = useRouter()

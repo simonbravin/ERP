@@ -23,7 +23,6 @@ function formatCurrency(value: number): string {
 
 export function ResourceList({ data, canEdit, onDeactivate }: ResourceListProps) {
   const t = useTranslations('resources')
-  const tCommon = useTranslations('common')
 
   if (data.items.length === 0) {
     return (

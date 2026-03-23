@@ -67,7 +67,7 @@ export function WbsTree({
   onAddChild,
   onReorder,
   onInlineUpdate,
-  isPending,
+  isPending: _isPending,
 }: WbsTreeProps) {
   const draggingParentIdRef = useRef<string | null>(null)
 

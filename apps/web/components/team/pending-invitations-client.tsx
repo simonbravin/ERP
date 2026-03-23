@@ -14,6 +14,7 @@ import {
 import { formatDateShort } from '@/lib/format-utils'
 import { Mail, XCircle } from 'lucide-react'
 import { revokeInvitation, resendInvitationEmail } from '@/app/actions/team'
+import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 
 type Invitation = Awaited<
@@ -27,16 +28,17 @@ interface PendingInvitationsClientProps {
 export function PendingInvitationsClient({
   initialInvitations,
 }: PendingInvitationsClientProps) {
+  const tTeam = useTranslations('team')
   const [invitations, setInvitations] = useState(initialInvitations)
 
   const handleRevoke = async (invitationId: string) => {
     try {
       await revokeInvitation(invitationId)
       setInvitations((prev) => prev.filter((i) => i.id !== invitationId))
-      toast.success('Invitación revocada')
+      toast.success(tTeam('toast.invitationRevoked'))
     } catch (err: unknown) {
       toast.error(
-        err instanceof Error ? err.message : 'Error al revocar'
+        err instanceof Error ? err.message : tTeam('toast.invitationRevokeError')
       )
     }
   }
@@ -45,13 +47,13 @@ export function PendingInvitationsClient({
     try {
       const result = await resendInvitationEmail(invitationId)
       if (result.success) {
-        toast.success('Invitación reenviada por correo')
+        toast.success(tTeam('toast.invitationResent'))
       } else {
-        toast.error(result.error ?? 'Error al reenviar')
+        toast.error(result.error ?? tTeam('toast.invitationResendError'))
       }
     } catch (err: unknown) {
       toast.error(
-        err instanceof Error ? err.message : 'Error al reenviar'
+        err instanceof Error ? err.message : tTeam('toast.invitationResendError')
       )
     }
   }
@@ -59,7 +61,7 @@ export function PendingInvitationsClient({
   if (invitations.length === 0) {
     return (
       <Card className="p-8 text-center text-slate-500">
-        No hay invitaciones pendientes
+        {tTeam('pendingInvitationsEmpty')}
       </Card>
     )
   }
@@ -69,12 +71,12 @@ export function PendingInvitationsClient({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Email</TableHead>
-            <TableHead>Rol</TableHead>
-            <TableHead>Invitado por</TableHead>
-            <TableHead>Fecha</TableHead>
-            <TableHead>Expira</TableHead>
-            <TableHead className="w-[100px]">Acciones</TableHead>
+            <TableHead>{tTeam('pendingInvitations.colEmail')}</TableHead>
+            <TableHead>{tTeam('pendingInvitations.colRole')}</TableHead>
+            <TableHead>{tTeam('pendingInvitations.colInvitedBy')}</TableHead>
+            <TableHead>{tTeam('pendingInvitations.colDate')}</TableHead>
+            <TableHead>{tTeam('pendingInvitations.colExpires')}</TableHead>
+            <TableHead className="w-[100px]">{tTeam('pendingInvitations.colActions')}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -92,7 +94,7 @@ export function PendingInvitationsClient({
                   onClick={() => handleResend(inv.id)}
                 >
                   <Mail className="mr-1 h-4 w-4" />
-                  Reenviar
+                  {tTeam('pendingInvitations.resend')}
                 </Button>
                 <Button
                   variant="ghost"
@@ -100,7 +102,7 @@ export function PendingInvitationsClient({
                   onClick={() => handleRevoke(inv.id)}
                 >
                   <XCircle className="mr-1 h-4 w-4" />
-                  Revocar
+                  {tTeam('pendingInvitations.revoke')}
                 </Button>
               </TableCell>
             </TableRow>

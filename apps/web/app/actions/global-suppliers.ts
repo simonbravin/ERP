@@ -167,7 +167,7 @@ export async function searchGlobalSuppliers(
     verified?: boolean
   }
 ) {
-  const { org } = await getAuthContext()
+  await getAuthContext()
 
   return prisma.globalParty.findMany({
     where: {

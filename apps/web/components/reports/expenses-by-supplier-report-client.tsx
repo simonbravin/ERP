@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { ChartCard } from '@/components/charts/chart-card'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -15,6 +16,7 @@ import {
 import { formatCurrency } from '@/lib/format-utils'
 import { ExportDropdown, type ExportFormat } from '@/components/list'
 import { toast } from 'sonner'
+import { downloadReportPdf } from '@/lib/reports/download-report-pdf'
 import type { ExpensesBySupplierRow } from '@/app/actions/predefined-reports'
 
 interface Props {
@@ -48,6 +50,7 @@ function downloadCsv(data: ExpensesBySupplierRow[]) {
 const PDF_TEMPLATE = 'gastos-por-proveedor'
 
 export function ExpensesBySupplierReportClient({ data, pdfQueryParams }: Props) {
+  const tCommon = useTranslations('common')
   const [exporting, setExporting] = useState(false)
   const chartData = data.slice(0, 10).map((s) => ({
     name: s.supplierName.length > 20 ? s.supplierName.substring(0, 20) + '…' : s.supplierName,
@@ -65,32 +68,12 @@ export function ExpensesBySupplierReportClient({ data, pdfQueryParams }: Props) 
     {
       setExporting(true)
       try {
-        const locale = typeof document !== 'undefined' ? document.documentElement.lang || 'es' : 'es'
-        const params = new URLSearchParams({
-          template: PDF_TEMPLATE,
-          locale,
-          showEmitidoPor: '1',
-          showFullCompanyData: '1',
-          ...(pdfQueryParams ?? {}),
+        await downloadReportPdf(PDF_TEMPLATE, pdfQueryParams ?? {}, {
+          success: tCommon('toast.pdfExportSuccess'),
+          errorFallback: tCommon('toast.pdfExportError'),
         })
-        const res = await fetch(`/api/pdf?${params.toString()}`, { credentials: 'include' })
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}))
-          toast.error(body?.error ?? 'Error al exportar PDF')
-          return
-        }
-        const blob = await res.blob()
-        const disposition = res.headers.get('Content-Disposition')
-        const match = disposition?.match(/filename="?([^";]+)"?/)
-        const filename = match?.[1] ?? `${PDF_TEMPLATE}.pdf`
-        const link = document.createElement('a')
-        link.href = URL.createObjectURL(blob)
-        link.download = filename
-        link.click()
-        URL.revokeObjectURL(link.href)
-        toast.success('PDF exportado correctamente')
       } catch {
-        toast.error('Error al exportar PDF')
+        toast.error(tCommon('toast.pdfExportError'))
       } finally {
         setExporting(false)
       }

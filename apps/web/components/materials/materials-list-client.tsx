@@ -24,8 +24,8 @@ export function MaterialsListClient({
   suppliers,
   budgetVersionId,
   projectId,
-  projectName,
-  versionCode,
+  projectName: _projectName,
+  versionCode: _versionCode,
 }: MaterialsListClientProps) {
   const t = useTranslations('materials')
   const [showPODialog, setShowPODialog] = useState(false)

@@ -11,7 +11,7 @@ export function StockSummary({
   totalItems,
   totalLocations,
   lowStockCount,
-  stockByLocation,
+  stockByLocation: _stockByLocation,
 }: StockSummaryProps) {
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

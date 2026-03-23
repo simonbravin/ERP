@@ -26,11 +26,6 @@ export default async function EditResourcePage({ params }: PageProps) {
 
   if (!resource) return notFound()
 
-  async function onSubmit(data: Parameters<typeof updateResource>[1]) {
-    'use server'
-    return updateResource(id, data)
-  }
-
   return (
     <div className="p-6">
       <div className="mb-6 flex items-center gap-4">

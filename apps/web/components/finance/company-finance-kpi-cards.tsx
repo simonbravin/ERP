@@ -2,7 +2,7 @@
 
 import { cn } from '@/lib/utils'
 import { formatCurrency, formatCurrencyForDisplay } from '@/lib/format-utils'
-import { TrendingUp, TrendingDown, ArrowUpCircle, ArrowDownCircle } from 'lucide-react'
+import { TrendingUp, ArrowUpCircle, ArrowDownCircle } from 'lucide-react'
 
 interface CompanyFinanceKPICardsProps {
   data: {

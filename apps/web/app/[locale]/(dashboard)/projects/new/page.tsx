@@ -1,7 +1,6 @@
 import { getSession } from '@/lib/session'
 import { getOrgContext } from '@/lib/org-context'
 import { redirect } from 'next/navigation'
-import { getLocale } from 'next-intl/server'
 import { prisma } from '@repo/database'
 import { ProjectCreationWizard } from '@/components/projects/project-creation-wizard'
 

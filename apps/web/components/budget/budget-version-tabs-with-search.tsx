@@ -65,6 +65,11 @@ export function BudgetVersionTabsWithSearch({
   const [activeTab, setActiveTab] = useState<string>('breakdown')
   const [summaryViewMode, setSummaryViewMode] = useState<'admin' | 'client'>('client')
 
+  const wbsTemplatesForTable = wbsTemplates.map((w) => ({
+    ...w,
+    hasResources: w.hasResources ?? false,
+  }))
+
   async function handleReorder(parentId: string | null, orderedWbsNodeIds: string[]) {
     const result = await reorderWBSItems(projectId, parentId, orderedWbsNodeIds)
     if (result && 'error' in result) {
@@ -147,7 +152,7 @@ export function BudgetVersionTabsWithSearch({
               projectId={projectId}
               canEdit={false}
               markupMode={version.markupMode}
-              wbsTemplates={wbsTemplates}
+              wbsTemplates={wbsTemplatesForTable}
               searchQuery={searchQuery}
               columnView="totals"
               projectTotalSale={projectTotalSale}
@@ -184,7 +189,7 @@ export function BudgetVersionTabsWithSearch({
           projectId={projectId}
           canEdit={canEdit}
           markupMode={version.markupMode}
-          wbsTemplates={wbsTemplates}
+          wbsTemplates={wbsTemplatesForTable}
           searchQuery={searchQuery}
           columnView="totals"
           projectTotalSale={projectTotalSale}
@@ -211,7 +216,7 @@ export function BudgetVersionTabsWithSearch({
           projectId={projectId}
           canEdit={canEdit}
           markupMode={version.markupMode}
-          wbsTemplates={wbsTemplates}
+          wbsTemplates={wbsTemplatesForTable}
           searchQuery={searchQuery}
           columnView="breakdown"
           projectTotalSale={projectTotalSale}

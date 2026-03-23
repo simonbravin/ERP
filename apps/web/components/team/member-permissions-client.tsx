@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -35,42 +35,21 @@ import {
   addProjectMember,
   removeProjectMember,
 } from '@/app/actions/team'
+import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { AlertCircle, Trash2 } from 'lucide-react'
 import { Link } from '@/i18n/navigation'
-import type { OrgRole } from '@prisma/client'
-
-const PERMISSION_LABELS: Record<Permission, string> = {
-  view: 'Ver',
-  create: 'Crear',
-  edit: 'Editar',
-  delete: 'Eliminar',
-  export: 'Exportar',
-  approve: 'Aprobar',
-}
-
-const MODULE_LABELS: Record<Module, string> = {
-  dashboard: 'Dashboard',
-  projects: 'Proyectos',
-  budget: 'Presupuesto',
-  finance: 'Finanzas',
-  certifications: 'Certificaciones',
-  inventory: 'Inventario',
-  quality: 'Calidad',
-  documents: 'Documentos',
-  reports: 'Reportes',
-  suppliers: 'Proveedores y clientes',
-  team: 'Equipo',
-  settings: 'Configuración',
-}
+import type { OrgRole } from '@repo/database'
 
 const ALL_PERMISSIONS: Permission[] = ['view', 'create', 'edit', 'delete', 'export', 'approve']
 
-const PROJECT_ROLE_OPTIONS = [
-  { value: 'MANAGER', label: 'Jefe de proyecto' },
-  { value: 'SUPERINTENDENT', label: 'Jefe de obra' },
-  { value: 'VIEWER', label: 'Solo lectura' },
-] as const
+const PROJECT_ROLE_VALUES = ['MANAGER', 'SUPERINTENDENT', 'VIEWER'] as const
+
+function projectRoleLabelKey(role: string): 'projectRoleManager' | 'projectRoleSuperintendent' | 'projectRoleViewer' {
+  if (role === 'MANAGER') return 'projectRoleManager'
+  if (role === 'SUPERINTENDENT') return 'projectRoleSuperintendent'
+  return 'projectRoleViewer'
+}
 
 interface Props {
   member: {
@@ -104,6 +83,9 @@ export function MemberPermissionsClient({
   availableProjects = [],
   canManageRestricted = false,
 }: Props) {
+  const tTeam = useTranslations('team')
+  const tProjects = useTranslations('projects')
+  const tCommon = useTranslations('common')
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [roleUpdating, setRoleUpdating] = useState(false)
@@ -120,6 +102,10 @@ export function MemberPermissionsClient({
     (member.customPermissions as CustomPermissionsMap) ?? null
   )
   const skipNextSyncRef = useRef(false)
+  const memberCustomPermissionsKey = useMemo(
+    () => JSON.stringify(member.customPermissions ?? null),
+    [member.customPermissions]
+  )
 
   // Sincronizar estado local con los datos del servidor (p. ej. al navegar). No sobrescribir justo después de guardar.
   useEffect(() => {
@@ -128,9 +114,9 @@ export function MemberPermissionsClient({
       return
     }
     setCustomPermissions((member.customPermissions as CustomPermissionsMap) ?? null)
-  }, [member.id, JSON.stringify(member.customPermissions)])
+  }, [member.id, member.customPermissions, memberCustomPermissionsKey])
 
-  const effectivePermissions = getEffectivePermissions(role as any, customPermissions)
+  const effectivePermissions = getEffectivePermissions(role as OrgRole, customPermissions)
 
   const computeNextCustom = (
     prev: CustomPermissionsMap,
@@ -138,7 +124,7 @@ export function MemberPermissionsClient({
     permission: Permission
   ): CustomPermissionsMap => {
     const basePerms = basePermissions[module] ?? []
-    const currentEffective = getEffectivePermissions(role as any, prev)[module] ?? []
+    const currentEffective = getEffectivePermissions(role as OrgRole, prev)[module] ?? []
     const hasNow = currentEffective.includes(permission)
     const nextEffective = hasNow
       ? currentEffective.filter((p) => p !== permission)
@@ -170,7 +156,7 @@ export function MemberPermissionsClient({
     try {
       const result = await updateMemberPermissions(member.id, payload)
       if (!result || typeof result !== 'object') {
-        toast.error('Error de conexión. Intentá de nuevo.')
+        toast.error(tCommon('toast.connectionError'))
         setCustomPermissions(prev)
         return
       }
@@ -180,10 +166,10 @@ export function MemberPermissionsClient({
         return
       }
       skipNextSyncRef.current = true
-      toast.success('Permisos actualizados')
+      toast.success(tTeam('toast.permissionsUpdated'))
       router.refresh()
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Error al actualizar')
+      toast.error(err instanceof Error ? err.message : tTeam('toast.permissionsSaveFailed'))
       setCustomPermissions(prev)
     } finally {
       setIsSubmitting(false)
@@ -197,17 +183,17 @@ export function MemberPermissionsClient({
     try {
       const result = await updateMemberRole(member.id, newRole)
       if (!result || typeof result !== 'object') {
-        toast.error('Error de conexión. Intentá de nuevo.')
+        toast.error(tCommon('toast.connectionError'))
         return
       }
       if (!result.success && 'error' in result) {
         toast.error(result.error)
         return
       }
-      toast.success('Rol actualizado')
+      toast.success(tTeam('toast.roleUpdated'))
       router.refresh()
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Error al cambiar rol')
+      toast.error(err instanceof Error ? err.message : tTeam('toast.roleChangeFailed'))
     } finally {
       setRoleUpdating(false)
     }
@@ -218,7 +204,7 @@ export function MemberPermissionsClient({
     try {
       const result = await resetMemberPermissions(member.id)
       if (!result || typeof result !== 'object') {
-        toast.error('Error de conexión. Intentá de nuevo.')
+        toast.error(tCommon('toast.connectionError'))
         return
       }
       if (!result.success && 'error' in result) {
@@ -226,10 +212,10 @@ export function MemberPermissionsClient({
         return
       }
       setCustomPermissions(null)
-      toast.success('Permisos restaurados al rol base')
+      toast.success(tTeam('toast.permissionsRestored'))
       router.refresh()
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Error')
+      toast.error(err instanceof Error ? err.message : tCommon('error'))
     } finally {
       setIsSubmitting(false)
     }
@@ -241,17 +227,19 @@ export function MemberPermissionsClient({
     try {
       const result = await setMemberRestrictedToProjects(member.id, checked)
       if (!result || typeof result !== 'object') {
-        toast.error('Error de conexión. Intentá de nuevo.')
+        toast.error(tCommon('toast.connectionError'))
         return
       }
       if (!result.success && 'error' in result) {
         toast.error(result.error)
         return
       }
-      toast.success(checked ? 'Usuario restringido a proyectos asignados' : 'Restricción quitada')
+      toast.success(
+        checked ? tTeam('toast.restrictedToProjectsEnabled') : tTeam('toast.restrictedToProjectsDisabled')
+      )
       router.refresh()
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Error')
+      toast.error(err instanceof Error ? err.message : tCommon('error'))
     } finally {
       setRestrictedUpdating(false)
     }
@@ -265,12 +253,12 @@ export function MemberPermissionsClient({
         orgMemberId: member.id,
         role: addRole,
       })
-      toast.success('Agregado al proyecto')
+      toast.success(tTeam('toast.addedToProject'))
       setAddProjectId('')
       setAddRole('VIEWER')
       router.refresh()
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Error al agregar')
+      toast.error(err instanceof Error ? err.message : tTeam('toast.addProjectFailed'))
     }
   }
 
@@ -278,10 +266,10 @@ export function MemberPermissionsClient({
     setRemovingId(projectMemberId)
     try {
       await removeProjectMember(projectMemberId)
-      toast.success('Quitado del proyecto')
+      toast.success(tTeam('toast.removedFromProject'))
       router.refresh()
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Error al quitar')
+      toast.error(err instanceof Error ? err.message : tTeam('toast.removeProjectFailed'))
     } finally {
       setRemovingId(null)
     }
@@ -297,10 +285,10 @@ export function MemberPermissionsClient({
           <AlertCircle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-500" />
           <div>
             <p className="font-medium text-amber-800 dark:text-amber-200">
-              El OWNER tiene acceso total al sistema y no se puede modificar.
+              {tTeam('memberPermissions.ownerReadonlyMessage')}
             </p>
             <Button asChild variant="outline" className="mt-3">
-              <Link href="/team">Volver al equipo</Link>
+              <Link href="/team">{tTeam('memberPermissions.backToTeam')}</Link>
             </Button>
           </div>
         </div>
@@ -325,7 +313,7 @@ export function MemberPermissionsClient({
             disabled={roleUpdating}
           >
             <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Rol" />
+              <SelectValue placeholder={tTeam('memberPermissions.orgRolePlaceholder')} />
             </SelectTrigger>
             <SelectContent>
               {ROLE_OPTIONS.map((opt) => (
@@ -339,8 +327,7 @@ export function MemberPermissionsClient({
       </div>
 
       <p className="erp-section-desc">
-        Rol base: <strong>{member.role}</strong>. Marcá o desmarcá permisos; los cambios se guardan
-        al instante.
+        {tTeam('memberPermissions.baseRoleHint', { role: member.role })}
       </p>
 
       {showRestrictedSection && (
@@ -350,16 +337,16 @@ export function MemberPermissionsClient({
             checked={restrictedToProjects}
             disabled={restrictedUpdating}
             onCheckedChange={(checked) => handleRestrictedChange(checked === true)}
-            aria-label="Restringido a proyectos asignados"
+            aria-label={tTeam('memberPermissions.restrictedAria')}
           />
           <label
             htmlFor="restricted-to-projects"
             className="cursor-pointer text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
           >
-            Restringido a proyectos asignados
+            {tTeam('memberPermissions.restrictedLabel')}
           </label>
           <span className="text-xs text-muted-foreground">
-            Si está marcado, el usuario solo ve los proyectos en los que está asignado y no accede a Finanzas de empresa.
+            {tTeam('memberPermissions.restrictedHint')}
           </span>
         </div>
       )}
@@ -368,10 +355,12 @@ export function MemberPermissionsClient({
         <Table>
           <TableHeader>
             <TableRow className="border-b bg-muted/50">
-              <TableHead className="w-[120px] py-2 text-xs font-medium">Módulo</TableHead>
+              <TableHead className="w-[120px] py-2 text-xs font-medium">
+                {tTeam('memberPermissions.colModule')}
+              </TableHead>
               {ALL_PERMISSIONS.map((p) => (
                 <TableHead key={p} className="w-[72px] py-2 text-center text-xs font-medium">
-                  {PERMISSION_LABELS[p]}
+                  {tTeam(`permission.${p}` as 'permission.view')}
                 </TableHead>
               ))}
             </TableRow>
@@ -385,7 +374,7 @@ export function MemberPermissionsClient({
               return (
                 <TableRow key={module} className={hasCustom ? 'bg-muted/20' : ''}>
                   <TableCell className="py-1.5 text-sm font-medium">
-                    {MODULE_LABELS[module]}
+                    {tTeam(`module.${module}` as 'module.dashboard')}
                     {hasCustom && (
                       <span className="ml-1 text-[10px] text-muted-foreground">*</span>
                     )}
@@ -399,7 +388,7 @@ export function MemberPermissionsClient({
                           disabled={isSubmitting}
                           onCheckedChange={() => handleTogglePermission(module, permission)}
                           className="mx-auto"
-                          aria-label={`${MODULE_LABELS[module]} - ${PERMISSION_LABELS[permission]}`}
+                          aria-label={`${tTeam(`module.${module}` as 'module.dashboard')} — ${tTeam(`permission.${permission}` as 'permission.view')}`}
                         />
                       </TableCell>
                     )
@@ -411,23 +400,25 @@ export function MemberPermissionsClient({
         </Table>
       </div>
 
-      <p className="text-[10px] text-muted-foreground">
-        * = módulo con permisos personalizados (diferente del rol base)
-      </p>
+      <p className="text-[10px] text-muted-foreground">{tTeam('memberPermissions.customPermissionsFootnote')}</p>
 
       {canManageRestricted && (
         <div className="space-y-3 rounded-lg border border-border p-4">
-          <h3 className="text-sm font-semibold">Proyectos asignados</h3>
-          <p className="text-xs text-muted-foreground">
-            Proyectos en los que este miembro participa y su rol dentro del proyecto. Si está restringido, solo verá estos proyectos.
-          </p>
+          <h3 className="text-sm font-semibold">{tTeam('memberPermissions.assignedProjectsTitle')}</h3>
+          <p className="text-xs text-muted-foreground">{tTeam('memberPermissions.assignedProjectsDesc')}</p>
           {projectAssignments.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow className="border-b bg-muted/50">
-                  <TableHead className="py-2 text-xs font-medium">Proyecto</TableHead>
-                  <TableHead className="py-2 text-xs font-medium">Rol</TableHead>
-                  <TableHead className="w-[80px] py-2 text-right text-xs font-medium">Acción</TableHead>
+                  <TableHead className="py-2 text-xs font-medium">
+                    {tTeam('memberPermissions.colProject')}
+                  </TableHead>
+                  <TableHead className="py-2 text-xs font-medium">
+                    {tTeam('memberPermissions.colProjectRole')}
+                  </TableHead>
+                  <TableHead className="w-[80px] py-2 text-right text-xs font-medium">
+                    {tTeam('memberPermissions.colAction')}
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -437,7 +428,11 @@ export function MemberPermissionsClient({
                       {a.projectName} ({a.projectNumber})
                     </TableCell>
                     <TableCell className="py-2 text-sm">
-                      {PROJECT_ROLE_OPTIONS.find((r) => r.value === a.projectRole)?.label ?? a.projectRole}
+                      {PROJECT_ROLE_VALUES.includes(
+                        a.projectRole as (typeof PROJECT_ROLE_VALUES)[number]
+                      )
+                        ? tProjects(projectRoleLabelKey(a.projectRole))
+                        : a.projectRole}
                     </TableCell>
                     <TableCell className="py-2 text-right">
                       <Button
@@ -447,7 +442,7 @@ export function MemberPermissionsClient({
                         className="h-8 w-8 text-destructive hover:bg-destructive/10"
                         onClick={() => handleRemoveAssignment(a.id)}
                         disabled={removingId === a.id}
-                        aria-label="Quitar del proyecto"
+                        aria-label={tTeam('memberPermissions.removeFromProjectAria')}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -457,12 +452,12 @@ export function MemberPermissionsClient({
               </TableBody>
             </Table>
           ) : (
-            <p className="text-sm text-muted-foreground">Ningún proyecto asignado.</p>
+            <p className="text-sm text-muted-foreground">{tTeam('memberPermissions.noProjectsAssigned')}</p>
           )}
           <div className="flex flex-wrap items-end gap-2">
             <Select value={addProjectId} onValueChange={setAddProjectId}>
               <SelectTrigger className="w-[240px]">
-                <SelectValue placeholder="Agregar a proyecto..." />
+                <SelectValue placeholder={tTeam('memberPermissions.addToProjectPlaceholder')} />
               </SelectTrigger>
               <SelectContent>
                 {availableProjects.map((p) => (
@@ -477,9 +472,9 @@ export function MemberPermissionsClient({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {PROJECT_ROLE_OPTIONS.map((r) => (
-                  <SelectItem key={r.value} value={r.value}>
-                    {r.label}
+                {PROJECT_ROLE_VALUES.map((r) => (
+                  <SelectItem key={r} value={r}>
+                    {tProjects(projectRoleLabelKey(r))}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -490,7 +485,7 @@ export function MemberPermissionsClient({
               onClick={handleAddProject}
               disabled={!addProjectId || availableProjects.length === 0}
             >
-              Agregar
+              {tTeam('memberPermissions.addButton')}
             </Button>
           </div>
         </div>
@@ -498,7 +493,7 @@ export function MemberPermissionsClient({
 
       <div className="flex flex-wrap items-center gap-2">
         <Button asChild variant="outline" size="sm">
-          <Link href="/team">Volver al equipo</Link>
+          <Link href="/team">{tTeam('memberPermissions.backToTeam')}</Link>
         </Button>
         {hasCustomPermissions && (
           <Button
@@ -507,7 +502,7 @@ export function MemberPermissionsClient({
             onClick={handleReset}
             disabled={isSubmitting}
           >
-            Restaurar a rol base
+            {tTeam('memberPermissions.restoreBaseRole')}
           </Button>
         )}
       </div>

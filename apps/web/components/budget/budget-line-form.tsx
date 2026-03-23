@@ -23,7 +23,7 @@ type BudgetLineFormProps = {
 }
 
 export function BudgetLineForm({
-  versionId,
+  versionId: _versionId,
   wbsOptions,
   defaultIndirectPct = 0,
   onSubmit,
@@ -44,6 +44,7 @@ export function BudgetLineForm({
 
   const {
     register,
+    control,
     handleSubmit,
     setError,
     reset,

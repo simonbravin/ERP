@@ -61,7 +61,7 @@ function BudgetImpactBadge({ type, label }: { type: string; label: string }) {
   )
 }
 
-export function COList({ projectId, orders, canEdit }: COListProps) {
+export function COList({ projectId, orders, canEdit: _canEdit }: COListProps) {
   const t = useTranslations('changeOrders')
   const tCommon = useTranslations('common')
 

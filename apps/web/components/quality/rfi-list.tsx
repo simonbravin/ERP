@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { Link } from '@/i18n/navigation'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -32,8 +33,8 @@ type RfiListProps = {
   projectId: string
 }
 
-const STATUS_OPTIONS = ['', 'OPEN', 'ANSWERED', 'CLOSED'] as const
-const PRIORITY_OPTIONS = ['', 'LOW', 'MEDIUM', 'HIGH'] as const
+const STATUS_OPTIONS = ['OPEN', 'ANSWERED', 'CLOSED'] as const
+const PRIORITY_OPTIONS = ['LOW', 'MEDIUM', 'HIGH'] as const
 
 const STATUS_VARIANT: Record<string, 'warning' | 'info' | 'neutral'> = {
   OPEN: 'warning',
@@ -48,6 +49,22 @@ const PRIORITY_VARIANT: Record<string, 'neutral' | 'info' | 'danger'> = {
 }
 
 export function RfiList({ rfis, projectId }: RfiListProps) {
+  const t = useTranslations('quality')
+  const tCommon = useTranslations('common')
+
+  function rfiStatusLabel(status: string): string {
+    if (status === 'OPEN' || status === 'ANSWERED' || status === 'CLOSED') {
+      return t(`status.${status}`)
+    }
+    return status
+  }
+
+  function rfiPriorityLabel(priority: string): string {
+    if (priority === 'LOW' || priority === 'MEDIUM' || priority === 'HIGH') {
+      return t(`priority.${priority}`)
+    }
+    return priority
+  }
   const [statusFilter, setStatusFilter] = useState('')
   const [priorityFilter, setPriorityFilter] = useState('')
 
@@ -60,7 +77,7 @@ export function RfiList({ rfis, projectId }: RfiListProps) {
   if (rfis.length === 0) {
     return (
       <div className="erp-card py-12 text-center text-muted-foreground">
-        No RFIs yet. Create one to get started.
+        {t('listRfiEmpty')}
       </div>
     )
   }
@@ -73,25 +90,35 @@ export function RfiList({ rfis, projectId }: RfiListProps) {
   return (
     <div className="space-y-4">
       <ListFiltersBar onClear={clearFilters}>
-        <Select value={statusFilter || 'all'} onValueChange={(v) => setStatusFilter(v === 'all' ? '' : v)}>
+        <Select
+          value={statusFilter || 'all'}
+          onValueChange={(v) => setStatusFilter(v === 'all' ? '' : v)}
+        >
           <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="Status" />
+            <SelectValue placeholder={t('listPlaceholderStatus')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All</SelectItem>
-            {STATUS_OPTIONS.filter(Boolean).map((s) => (
-              <SelectItem key={s} value={s}>{s}</SelectItem>
+            <SelectItem value="all">{tCommon('all')}</SelectItem>
+            {STATUS_OPTIONS.map((s) => (
+              <SelectItem key={s} value={s}>
+                {t(`status.${s}`)}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
-        <Select value={priorityFilter || 'all'} onValueChange={(v) => setPriorityFilter(v === 'all' ? '' : v)}>
+        <Select
+          value={priorityFilter || 'all'}
+          onValueChange={(v) => setPriorityFilter(v === 'all' ? '' : v)}
+        >
           <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="Priority" />
+            <SelectValue placeholder={t('listPlaceholderPriority')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All</SelectItem>
-            {PRIORITY_OPTIONS.filter(Boolean).map((p) => (
-              <SelectItem key={p} value={p}>{p}</SelectItem>
+            <SelectItem value="all">{tCommon('all')}</SelectItem>
+            {PRIORITY_OPTIONS.map((p) => (
+              <SelectItem key={p} value={p}>
+                {t(`priority.${p}`)}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -102,13 +129,19 @@ export function RfiList({ rfis, projectId }: RfiListProps) {
           <thead>
             <tr className="erp-table-header">
               <th className="erp-table-cell font-medium text-muted-foreground">#</th>
-              <th className="erp-table-cell font-medium text-muted-foreground">Subject</th>
-              <th className="erp-table-cell font-medium text-muted-foreground">Status</th>
-              <th className="erp-table-cell font-medium text-muted-foreground">Priority</th>
-              <th className="erp-table-cell font-medium text-muted-foreground">Raised By</th>
-              <th className="erp-table-cell font-medium text-muted-foreground">Assigned To</th>
-              <th className="erp-table-cell font-medium text-muted-foreground">Due</th>
-              <th className="erp-table-cell font-medium text-center text-muted-foreground">Comments</th>
+              <th className="erp-table-cell font-medium text-muted-foreground">{t('subject')}</th>
+              <th className="erp-table-cell font-medium text-muted-foreground">
+                {t('listPlaceholderStatus')}
+              </th>
+              <th className="erp-table-cell font-medium text-muted-foreground">
+                {t('priorityLabel')}
+              </th>
+              <th className="erp-table-cell font-medium text-muted-foreground">{t('raisedBy')}</th>
+              <th className="erp-table-cell font-medium text-muted-foreground">{t('listColumnAssignee')}</th>
+              <th className="erp-table-cell font-medium text-muted-foreground">{t('listColumnDue')}</th>
+              <th className="erp-table-cell font-medium text-center text-muted-foreground">
+                {t('comments')}
+              </th>
               <th className="erp-table-cell w-20" />
             </tr>
           </thead>
@@ -120,14 +153,20 @@ export function RfiList({ rfis, projectId }: RfiListProps) {
                 </td>
                 <td className="erp-table-cell font-medium text-foreground">{rfi.subject}</td>
                 <td className="erp-table-cell">
-                  <Badge variant={STATUS_VARIANT[rfi.status] ?? 'neutral'}>{rfi.status}</Badge>
+                  <Badge variant={STATUS_VARIANT[rfi.status] ?? 'neutral'}>
+                    {rfiStatusLabel(rfi.status)}
+                  </Badge>
                 </td>
                 <td className="erp-table-cell">
-                  <Badge variant={PRIORITY_VARIANT[rfi.priority] ?? 'neutral'}>{rfi.priority}</Badge>
+                  <Badge variant={PRIORITY_VARIANT[rfi.priority] ?? 'neutral'}>
+                    {rfiPriorityLabel(rfi.priority)}
+                  </Badge>
                 </td>
                 <td className="erp-table-cell text-muted-foreground">{rfi.raisedBy.user.fullName}</td>
-                <td className="erp-table-cell text-muted-foreground">{rfi.assignedTo?.user.fullName ?? '—'}</td>
-                <td className="erp-table-cell text-muted-foreground font-mono tabular-nums">
+                <td className="erp-table-cell text-muted-foreground">
+                  {rfi.assignedTo?.user.fullName ?? '—'}
+                </td>
+                <td className="erp-table-cell font-mono tabular-nums text-muted-foreground">
                   {formatDateShort(rfi.dueDate)}
                 </td>
                 <td className="erp-table-cell text-center font-mono tabular-nums text-muted-foreground">
@@ -136,7 +175,7 @@ export function RfiList({ rfis, projectId }: RfiListProps) {
                 <td className="erp-table-cell">
                   <Link href={`/projects/${projectId}/quality/rfis/${rfi.id}`}>
                     <Button type="button" variant="ghost" className="h-8 px-2 text-xs">
-                      View
+                      {tCommon('view')}
                     </Button>
                   </Link>
                 </td>

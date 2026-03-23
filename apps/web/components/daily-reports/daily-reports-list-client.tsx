@@ -1,7 +1,6 @@
 'use client'
 
 import { useRouter } from '@/i18n/navigation'
-import { useSearchParams } from 'next/navigation'
 import { Link } from '@/i18n/navigation'
 import { useCallback, useState } from 'react'
 import { useTranslations } from 'next-intl'
@@ -52,7 +51,6 @@ export function DailyReportsListClient({
   subtitle,
 }: DailyReportsListClientProps) {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const t = useTranslations('dailyReports')
   const tCommon = useTranslations('common')
 
@@ -80,13 +78,6 @@ export function DailyReportsListClient({
     p.delete('page')
     router.push(`/projects/${projectId}/daily-reports?${p.toString()}`)
     router.refresh()
-  }
-
-  const toggleStatus = (s: string) => {
-    setStatuses((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]))
-  }
-  const toggleAuthor = (id: string) => {
-    setAuthorIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
   }
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize))

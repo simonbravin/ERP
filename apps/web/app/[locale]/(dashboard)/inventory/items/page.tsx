@@ -68,8 +68,8 @@ export default async function InventoryItemsListPage({
     }),
   ])
 
-  const itemIds = items.map((i: any) => i.id)
-  const movementsByItem = movements.filter((m: any) => itemIds.includes(m.itemId))
+  const itemIds = items.map((i) => i.id)
+  const movementsByItem = movements.filter((m) => itemIds.includes(m.itemId))
 
   const currentStockByItem = new Map<string, number>()
   const lastPurchaseByItem = new Map<string, { unitCost: number; createdAt: Date }>()
@@ -103,13 +103,22 @@ export default async function InventoryItemsListPage({
     }
   }
 
-  type ItemWithComputed = (typeof items)[0] & {
+  function minStockToNumber(
+    minStockQty: (typeof items)[number]['minStockQty']
+  ): number {
+    if (minStockQty == null) return 0
+    return typeof minStockQty === 'number'
+      ? minStockQty
+      : minStockQty.toNumber?.() ?? 0
+  }
+
+  type ItemWithComputed = (typeof items)[number] & {
     current_stock: number
     last_purchase_cost: number | null
     last_movement_date: Date | null
   }
 
-  const itemsWithComputed: ItemWithComputed[] = items.map((item: any) => ({
+  const itemsWithComputed: ItemWithComputed[] = items.map((item) => ({
     ...item,
     current_stock: currentStockByItem.get(item.id) ?? 0,
     last_purchase_cost: lastPurchaseByItem.get(item.id)?.unitCost ?? null,
@@ -119,21 +128,21 @@ export default async function InventoryItemsListPage({
   let filteredItems = itemsWithComputed
   if (params.stock === 'low') {
     filteredItems = itemsWithComputed.filter(
-      (item: any) => item.minStockQty != null && item.current_stock < (typeof item.minStockQty === 'number' ? item.minStockQty : item.minStockQty?.toNumber?.() ?? 0)
+      (item) =>
+        item.minStockQty != null && item.current_stock < minStockToNumber(item.minStockQty)
     )
   } else if (params.stock === 'zero') {
-    filteredItems = itemsWithComputed.filter((item: any) => item.current_stock === 0)
+    filteredItems = itemsWithComputed.filter((item) => item.current_stock === 0)
   } else if (params.stock === 'ok') {
-    filteredItems = itemsWithComputed.filter((item: any) => {
+    filteredItems = itemsWithComputed.filter((item) => {
       if (item.minStockQty == null) return true
-      const min = typeof item.minStockQty === 'number' ? item.minStockQty : item.minStockQty?.toNumber?.() ?? 0
-      return item.current_stock >= min
+      return item.current_stock >= minStockToNumber(item.minStockQty)
     })
   }
 
-  const categoryOptions = categories.map((c: any) => ({ id: c.id, name: c.name }))
+  const categoryOptions = categories.map((c) => ({ id: c.id, name: c.name }))
 
-  const itemsPlain = filteredItems.map((item: any) => serializeForClient(item))
+  const itemsPlain = filteredItems.map((item) => serializeForClient(item))
 
   return (
     <div className="erp-view-container space-y-6 bg-background">

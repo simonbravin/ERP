@@ -50,6 +50,10 @@ export const createFinanceTransactionSchema = z.object({
   currencyCode: z.string().length(3, 'Currency code must be 3 characters').default('USD'),
   exchangeRateSnapshot: z.coerce.number().positive('Exchange rate must be positive').default(1),
   reference: z.string().max(200).optional().nullable(),
+  documentType: z.enum(DOCUMENT_TYPE).optional().default('INVOICE'),
+  retentionAmount: z.coerce.number().nonnegative().optional().default(0),
+  adjustmentAmount: z.coerce.number().optional().default(0),
+  adjustmentNotes: z.string().max(1000).optional().nullable(),
 })
 export type CreateFinanceTransactionInput = z.infer<typeof createFinanceTransactionSchema>
 

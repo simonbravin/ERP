@@ -35,9 +35,9 @@ export function TransactionLineForm({
 }: TransactionLineFormProps) {
   const t = useTranslations('finance')
   const [description, setDescription] = useState('')
-  const [amount, setAmount] = useState('')
+  const [amount, setAmount] = useState<number | null>(null)
   const [wbsNodeId, setWbsNodeId] = useState<string>('')
-  const [unit, setUnit] = useState('ea')
+  const [unit] = useState('ea')
   const [wbsBudgetConsumed, setWbsBudgetConsumed] = useState<{
     budgeted: number
     consumed: number
@@ -56,8 +56,8 @@ export function TransactionLineForm({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    const amt = parseFloat(amount)
-    if (!description.trim() || isNaN(amt) || amt < 0) return
+    const amt = amount
+    if (!description.trim() || amt == null || amt < 0) return
     onAdd({
       description: description.trim(),
       amount: amt,
@@ -66,7 +66,7 @@ export function TransactionLineForm({
       quantity: 1,
     })
     setDescription('')
-    setAmount('')
+    setAmount(null)
     setWbsNodeId('')
   }
 
@@ -130,7 +130,7 @@ export function TransactionLineForm({
               {t('available', { defaultValue: 'Disponible' })}: {formatCurrency(wbsBudgetConsumed.available, 'ARS')}
             </p>
           )}
-          {wbsBudgetConsumed != null && amount !== '' && !isNaN(parseFloat(amount)) && parseFloat(amount) > wbsBudgetConsumed.available && (
+          {wbsBudgetConsumed != null && amount != null && amount > wbsBudgetConsumed.available && (
             <p className="mt-1 text-xs font-medium text-amber-600 dark:text-amber-500">
               {t('lineExceedsAvailable', { defaultValue: 'Esta línea supera el disponible del ítem.' })}
             </p>

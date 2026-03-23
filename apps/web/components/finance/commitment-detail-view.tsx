@@ -22,29 +22,29 @@ import { exportPurchaseOrderToExcel } from '@/app/actions/export'
 import type { CommitmentDetailWithLines } from '@/app/actions/materials'
 import { toast } from 'sonner'
 import { FileDown, FileSpreadsheet, Pencil, ShoppingCart } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 
 const PO_EXPORT_COLUMNS = ['description', 'wbsCode', 'unit', 'quantity', 'unitPrice', 'totalCost']
 
-const STATUS_LABELS: Record<string, string> = {
-  DRAFT: 'Borrador',
-  PENDING: 'Pendiente',
-  SUBMITTED: 'Enviado',
-  APPROVED: 'Aprobada',
-}
-
 const CAN_APPROVE_STATUSES = ['DRAFT', 'PENDING', 'SUBMITTED']
 const CAN_EDIT_STATUSES = ['DRAFT']
+
+const PO_COMMITMENT_STATUSES = ['DRAFT', 'PENDING', 'SUBMITTED', 'APPROVED'] as const
+type PoCommitmentStatus = (typeof PO_COMMITMENT_STATUSES)[number]
 
 interface Props {
   commitment: CommitmentDetailWithLines
 }
 
 export function CommitmentDetailView({ commitment }: Props) {
+  const t = useTranslations('finance')
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [downloadingPdf, setDownloadingPdf] = useState(false)
   const [downloadingExcel, setDownloadingExcel] = useState(false)
-  const statusLabel = STATUS_LABELS[commitment.status] ?? commitment.status
+  const statusLabel = PO_COMMITMENT_STATUSES.includes(commitment.status as PoCommitmentStatus)
+    ? t(`purchaseOrderCommitmentStatus.${commitment.status as PoCommitmentStatus}`)
+    : commitment.status
   const canApprove = CAN_APPROVE_STATUSES.includes(commitment.status)
   const canEdit = CAN_EDIT_STATUSES.includes(commitment.status)
   const isApproved = commitment.status === 'APPROVED'
@@ -54,8 +54,8 @@ export function CommitmentDetailView({ commitment }: Props) {
   function handleApprove() {
     startTransition(async () => {
       const result = await approvePurchaseOrder(commitment.id)
-      if (result.success) {
-        toast.success('Orden de compra aprobada')
+      if (result.success === true) {
+        toast.success(t('toast.poApproved'))
         router.refresh()
       } else {
         toast.error(result.error)
@@ -77,7 +77,7 @@ export function CommitmentDetailView({ commitment }: Props) {
       const res = await fetch(`/api/pdf?${params.toString()}`, { credentials: 'include' })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        toast.error(data?.detail ?? data?.error ?? 'No se pudo generar el PDF')
+        toast.error(data?.detail ?? data?.error ?? t('toast.commitmentPdfError'))
         return
       }
       const blob = await res.blob()
@@ -98,8 +98,12 @@ export function CommitmentDetailView({ commitment }: Props) {
     setRegisteringPurchase(true)
     try {
       const result = await createPurchaseFromCommitment(commitment.id)
-      if (result.success) {
-        toast.success(result.alreadyExists ? 'Compra ya registrada' : 'Compra registrada')
+      if (result.success === true) {
+        toast.success(
+          result.alreadyExists
+            ? t('toast.purchaseFromCommitmentAlreadyRegistered')
+            : t('toast.purchaseFromCommitmentRegistered')
+        )
         router.push(`/finance/transactions/${result.transactionId}`)
         router.refresh()
       } else {
@@ -143,7 +147,10 @@ export function CommitmentDetailView({ commitment }: Props) {
           <div>
             <CardTitle className="text-xl font-mono">{commitment.commitmentNumber}</CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">
-              Fecha: {formatDateShort(commitment.issueDate)} · Proveedor: {commitment.partyName}
+              {t('purchaseOrderDetail.meta', {
+                date: formatDateShort(commitment.issueDate),
+                supplier: commitment.partyName,
+              })}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -154,7 +161,7 @@ export function CommitmentDetailView({ commitment }: Props) {
               disabled={downloadingPdf}
             >
               <FileDown className="mr-2 h-4 w-4" />
-              {downloadingPdf ? '…' : 'Descargar PDF'}
+              {downloadingPdf ? '…' : t('purchaseOrderDetail.downloadPdf')}
             </Button>
             <Button
               variant="outline"
@@ -163,13 +170,13 @@ export function CommitmentDetailView({ commitment }: Props) {
               disabled={downloadingExcel}
             >
               <FileSpreadsheet className="mr-2 h-4 w-4" />
-              {downloadingExcel ? '…' : 'Descargar Excel'}
+              {downloadingExcel ? '…' : t('purchaseOrderDetail.downloadExcel')}
             </Button>
             {canEdit && (
               <Button variant="outline" size="sm" asChild>
                 <Link href={`/projects/${commitment.projectId}/finance/purchase-orders/${commitment.id}/edit`}>
                   <Pencil className="mr-2 h-4 w-4" />
-                  Editar
+                  {t('purchaseOrderDetail.edit')}
                 </Link>
               </Button>
             )}
@@ -178,7 +185,7 @@ export function CommitmentDetailView({ commitment }: Props) {
                 <Button variant="outline" size="sm" asChild>
                   <Link href={`/finance/transactions/${commitment.linkedTransactionId}`}>
                     <ShoppingCart className="mr-2 h-4 w-4" />
-                    Ver compra
+                    {t('purchaseOrderDetail.viewPurchase')}
                   </Link>
                 </Button>
               ) : (
@@ -189,7 +196,7 @@ export function CommitmentDetailView({ commitment }: Props) {
                   disabled={registeringPurchase}
                 >
                   <ShoppingCart className="mr-2 h-4 w-4" />
-                  {registeringPurchase ? '…' : 'Registrar como compra'}
+                  {registeringPurchase ? '…' : t('purchaseOrderDetail.registerAsPurchase')}
                 </Button>
               )
             )}
@@ -208,33 +215,34 @@ export function CommitmentDetailView({ commitment }: Props) {
             <p className="text-sm text-muted-foreground">{commitment.description}</p>
           )}
           <p className="text-right text-lg font-semibold tabular-nums">
-            Total: {formatCurrency(commitment.total, commitment.currency)}
+            {t('purchaseOrderDetail.totalLabel')}{' '}
+            {formatCurrency(commitment.total, commitment.currency)}
           </p>
         </CardContent>
       </Card>
 
       <Card className="border-border bg-card">
         <CardHeader>
-          <CardTitle className="text-foreground">Líneas</CardTitle>
+          <CardTitle className="text-foreground">{t('purchaseOrderDetail.linesTitle')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto rounded-md border border-border">
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50">
-                  <TableHead className="font-medium">Descripción</TableHead>
-                  <TableHead className="font-medium">WBS</TableHead>
-                  <TableHead className="font-medium">Unidad</TableHead>
-                  <TableHead className="text-right font-medium">Cantidad</TableHead>
-                  <TableHead className="text-right font-medium">Precio unit.</TableHead>
-                  <TableHead className="text-right font-medium">Total</TableHead>
+                  <TableHead className="font-medium">{t('purchaseOrderDetail.colDescription')}</TableHead>
+                  <TableHead className="font-medium">{t('purchaseOrderDetail.colWbs')}</TableHead>
+                  <TableHead className="font-medium">{t('purchaseOrderDetail.colUnit')}</TableHead>
+                  <TableHead className="text-right font-medium">{t('purchaseOrderDetail.colQuantity')}</TableHead>
+                  <TableHead className="text-right font-medium">{t('purchaseOrderDetail.colUnitPrice')}</TableHead>
+                  <TableHead className="text-right font-medium">{t('purchaseOrderDetail.colTotal')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {commitment.lines.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
-                      Sin líneas.
+                      {t('purchaseOrderDetail.linesEmpty')}
                     </TableCell>
                   </TableRow>
                 ) : (

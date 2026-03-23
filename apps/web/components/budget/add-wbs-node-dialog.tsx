@@ -128,7 +128,7 @@ export function AddWbsNodeDialog({
     if (selectedTemplate) {
       setUnit(selectedTemplate.unit)
     }
-  }, [selectedTemplate?.id])
+  }, [selectedTemplate])
 
   function handleSelectTemplate(tm: WbsTemplateForLibrary) {
     setSelectedId(tm.id)

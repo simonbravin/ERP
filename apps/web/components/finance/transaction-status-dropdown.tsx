@@ -21,9 +21,9 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ChevronDown, Loader2 } from 'lucide-react'
 import { updateProjectTransaction } from '@/app/actions/finance'
-import { getStatusLabel } from '@/lib/finance-labels'
 import { toast } from 'sonner'
 import { TRANSACTION_STATUS } from '@repo/validators'
+import { useTranslations } from 'next-intl'
 
 interface TransactionStatusDropdownProps {
   transactionId: string
@@ -38,9 +38,23 @@ export function TransactionStatusDropdown({
   transactionType,
   onSuccess,
 }: TransactionStatusDropdownProps) {
+  const t = useTranslations('finance')
+  const tCommon = useTranslations('common')
   const [isPending, setIsPending] = useState(false)
   const [showPaidConfirm, setShowPaidConfirm] = useState(false)
   const [pendingStatus, setPendingStatus] = useState<string | null>(null)
+
+  function getStatusLabelI18n(status: string): string {
+    if (status === 'PAID' && (transactionType === 'INCOME' || transactionType === 'SALE')) {
+      return t('statusPaidCollected')
+    }
+    if (status === 'DRAFT') return t('statuses.DRAFT')
+    if (status === 'SUBMITTED') return t('statuses.SUBMITTED')
+    if (status === 'APPROVED') return t('statuses.APPROVED')
+    if (status === 'PAID') return t('statuses.PAID')
+    if (status === 'VOIDED') return t('statuses.VOIDED')
+    return status
+  }
 
   async function handleStatusChange(newStatus: string) {
     if (newStatus === currentStatus) return
@@ -51,15 +65,17 @@ export function TransactionStatusDropdown({
       })
       if (result && 'error' in result && result.error) {
         const err = result.error as Record<string, string[]>
-        toast.error(err._form?.[0] ?? 'No se pudo cambiar el estado')
+        toast.error(err._form?.[0] ?? t('toast.statusChangeFailed'))
         return
       }
       if (result && 'transaction' in result && result.transaction) {
-        toast.success(`Estado actualizado a ${getStatusLabel(newStatus, transactionType)}`)
+        toast.success(
+          t('toast.statusUpdated', { status: getStatusLabelI18n(newStatus) })
+        )
         onSuccess(result.transaction as { status: string })
       }
     } catch {
-      toast.error('Error al actualizar el estado')
+      toast.error(t('toast.statusUpdateError'))
     } finally {
       setIsPending(false)
       setShowPaidConfirm(false)
@@ -77,13 +93,13 @@ export function TransactionStatusDropdown({
     handleStatusChange(status)
   }
 
-  const paidLabel = getStatusLabel('PAID', transactionType)
+  const paidLabel = getStatusLabelI18n('PAID')
   const isPaid = currentStatus === 'PAID'
 
   if (isPaid) {
     return (
       <Badge variant="neutral" className="font-normal">
-        {getStatusLabel(currentStatus, transactionType)}
+        {getStatusLabelI18n(currentStatus)}
       </Badge>
     )
   }
@@ -102,7 +118,7 @@ export function TransactionStatusDropdown({
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : (
               <Badge variant="neutral" className="font-normal">
-                {getStatusLabel(currentStatus, transactionType)}
+                {getStatusLabelI18n(currentStatus)}
               </Badge>
             )}
             <ChevronDown className="h-3.5 w-3.5 opacity-50" />
@@ -115,7 +131,7 @@ export function TransactionStatusDropdown({
               onClick={() => onStatusClick(status)}
               disabled={status === currentStatus}
             >
-              {getStatusLabel(status, transactionType)}
+              {getStatusLabelI18n(status)}
             </DropdownMenuItem>
           ))}
         </DropdownMenuContent>
@@ -125,14 +141,14 @@ export function TransactionStatusDropdown({
         <AlertDialogContent className="max-w-2xl min-w-[min(28rem,95vw)]">
           <AlertDialogHeader>
             <AlertDialogTitle>
-              ¿Confirmar que esta transacción está {paidLabel.toLowerCase()}?
+              {t('confirmPaidTitle', { status: paidLabel.toLowerCase() })}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Este cambio no se puede deshacer. La transacción quedará marcada como {paidLabel}.
+              {t('confirmPaidDescription', { status: paidLabel })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={isPending}>{tCommon('cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => pendingStatus && handleStatusChange(pendingStatus)}
               disabled={isPending}
@@ -141,10 +157,10 @@ export function TransactionStatusDropdown({
               {isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Procesando...
+                  {t('processing')}
                 </>
               ) : (
-                'Confirmar'
+                tCommon('confirm')
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

@@ -67,7 +67,7 @@ export function LocalSupplierForm() {
     resolver: zodResolver(schema),
   })
 
-  async function onSubmit(data: FormData, forceCreate = false) {
+  async function submitLocalSupplier(data: FormData, forceCreate = false) {
     try {
       const result = await createLocalSupplier({
         name: data.name,
@@ -86,7 +86,7 @@ export function LocalSupplierForm() {
         router.refresh()
         return
       }
-      if (result.duplicateName) {
+      if (!result.success) {
         setPendingData(data)
         setShowDuplicateDialog(true)
       }
@@ -101,7 +101,7 @@ export function LocalSupplierForm() {
     if (!pendingData) return
     setForceSubmitting(true)
     try {
-      await onSubmit(pendingData, true)
+      await submitLocalSupplier(pendingData, true)
       setShowDuplicateDialog(false)
       setPendingData(null)
     } finally {
@@ -111,7 +111,7 @@ export function LocalSupplierForm() {
 
   return (
     <form
-      onSubmit={handleSubmit(onSubmit)}
+      onSubmit={handleSubmit((data) => submitLocalSupplier(data))}
       className="space-y-4"
     >
       <div>

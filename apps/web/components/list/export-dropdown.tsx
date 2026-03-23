@@ -57,7 +57,6 @@ export function ExportDropdown({
 
   if (formats.length === 1) {
     const format = formats[0]!
-    const Icon = formatIcons[format]
     return (
       <Button
         type="button"

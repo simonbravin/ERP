@@ -27,7 +27,7 @@ function toNum(v: unknown): number {
   return Number(v) || 0
 }
 
-export function BudgetTreeTableClient({ data, versionId }: BudgetTreeTableClientProps) {
+export function BudgetTreeTableClient({ data, versionId: _versionId }: BudgetTreeTableClientProps) {
   const t = useTranslations('budget')
   const router = useRouter()
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())

@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
@@ -34,12 +35,6 @@ import {
 } from '@/app/actions/team'
 import { toast } from 'sonner'
 
-const PROJECT_ROLES = [
-  { value: 'MANAGER', label: 'Gestor de proyecto' },
-  { value: 'SUPERINTENDENT', label: 'Jefe de obra' },
-  { value: 'VIEWER', label: 'Solo lectura' },
-] as const
-
 type ProjectMemberRow = Awaited<
   ReturnType<typeof import('@/app/actions/team').getProjectMembers>
 >[number]
@@ -61,6 +56,8 @@ export function ProjectTeamClient({
   orgMembers,
   canManageTeam = true,
 }: ProjectTeamClientProps) {
+  const t = useTranslations('projects')
+  const tCommon = useTranslations('common')
   const [projectMembers, setProjectMembers] = useState(initialProjectMembers)
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [selectedOrgMemberId, setSelectedOrgMemberId] = useState('')
@@ -74,9 +71,19 @@ export function ProjectTeamClient({
     (m) => m.active && !alreadyInProject.has(m.id)
   )
 
+  const projectRoles = useMemo(
+    () =>
+      [
+        { value: 'MANAGER' as const, label: t('projectRoleManager') },
+        { value: 'SUPERINTENDENT' as const, label: t('projectRoleSuperintendent') },
+        { value: 'VIEWER' as const, label: t('projectRoleViewer') },
+      ],
+    [t]
+  )
+
   const handleAdd = async () => {
     if (!selectedOrgMemberId) {
-      toast.error('Selecciona un miembro')
+      toast.error(t('toast.selectMember'))
       return
     }
     setIsSubmitting(true)
@@ -113,10 +120,10 @@ export function ProjectTeamClient({
       setAddDialogOpen(false)
       setSelectedOrgMemberId('')
       setSelectedRole('VIEWER')
-      toast.success('Miembro agregado')
+      toast.success(t('toast.memberAdded'))
     } catch (err: unknown) {
       toast.error(
-        err instanceof Error ? err.message : 'Error al agregar'
+        err instanceof Error ? err.message : t('toast.memberAddError')
       )
     } finally {
       setIsSubmitting(false)
@@ -129,16 +136,16 @@ export function ProjectTeamClient({
       setProjectMembers((prev) =>
         prev.filter((pm) => pm.id !== projectMemberId)
       )
-      toast.success('Miembro quitado del proyecto')
+      toast.success(t('toast.memberRemoved'))
     } catch (err: unknown) {
       toast.error(
-        err instanceof Error ? err.message : 'Error al quitar'
+        err instanceof Error ? err.message : t('toast.memberRemoveError')
       )
     }
   }
 
   const getRoleLabel = (role: string) =>
-    PROJECT_ROLES.find((r) => r.value === role)?.label ?? role
+    projectRoles.find((r) => r.value === role)?.label ?? role
 
   return (
     <>
@@ -150,7 +157,7 @@ export function ProjectTeamClient({
               disabled={availableOrgMembers.length === 0}
             >
               <UserPlus className="mr-2 h-4 w-4" />
-              Agregar miembro
+              {t('projectTeamAddMember')}
             </Button>
           </div>
         )}
@@ -158,11 +165,11 @@ export function ProjectTeamClient({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Nombre</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Rol en el proyecto</TableHead>
+              <TableHead>{t('projectTeamColName')}</TableHead>
+              <TableHead>{t('projectTeamColEmail')}</TableHead>
+              <TableHead>{t('projectTeamColRole')}</TableHead>
               {canManageTeam && (
-                <TableHead className="w-[80px]">Acciones</TableHead>
+                <TableHead className="w-[80px]">{tCommon('actions')}</TableHead>
               )}
             </TableRow>
           </TableHeader>
@@ -194,7 +201,7 @@ export function ProjectTeamClient({
 
         {projectMembers.length === 0 && (
           <p className="py-8 text-center text-slate-500">
-            No hay miembros asignados. Agrega miembros de tu organización.
+            {t('projectTeamEmpty')}
           </p>
         )}
       </Card>
@@ -202,11 +209,8 @@ export function ProjectTeamClient({
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
         <DialogContent className="erp-form-modal max-w-xl gap-6 py-6">
           <DialogHeader>
-            <DialogTitle>Agregar miembro al proyecto</DialogTitle>
-            <DialogDescription>
-              Elige un miembro de la organización y su rol en este proyecto.
-              Agrega miembros que ya pertenecen a tu organización.
-            </DialogDescription>
+            <DialogTitle>{t('addMemberDialogTitle')}</DialogTitle>
+            <DialogDescription>{t('addMemberDialogDesc')}</DialogDescription>
           </DialogHeader>
           <div className="rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-900">
             <div className="space-y-6">
@@ -217,7 +221,7 @@ export function ProjectTeamClient({
                   onValueChange={setSelectedOrgMemberId}
                 >
                   <SelectTrigger id="add-member-org" className="mt-1 w-full">
-                    <SelectValue placeholder="Seleccionar..." />
+                    <SelectValue placeholder={t('selectPlaceholder')} />
                   </SelectTrigger>
                   <SelectContent>
                     {availableOrgMembers.map((m) => (
@@ -229,7 +233,7 @@ export function ProjectTeamClient({
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="add-member-role">Rol en el proyecto</Label>
+                <Label htmlFor="add-member-role">{t('labelProjectRole')}</Label>
                 <Select
                   value={selectedRole}
                   onValueChange={setSelectedRole}
@@ -238,7 +242,7 @@ export function ProjectTeamClient({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {PROJECT_ROLES.map((r) => (
+                    {projectRoles.map((r) => (
                       <SelectItem key={r.value} value={r.value}>
                         {r.label}
                       </SelectItem>

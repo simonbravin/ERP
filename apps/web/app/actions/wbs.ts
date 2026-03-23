@@ -20,7 +20,6 @@ import { publishOutboxEvent, type PrismaTransaction } from '@/lib/events/event-p
 import {
   createWBSItemSchema,
   updateWBSItemSchema,
-  wbsNodeSchema,
 } from '@repo/validators'
 import type { CreateWBSItemInput, UpdateWBSItemInput } from '@repo/validators'
 import {
@@ -571,7 +570,7 @@ export async function reorderWBSItems(
 
 function buildUpdateData(
   payload: UpdateWBSItemInput,
-  existing: { category: string; quantity: Prisma.Decimal | null }
+  _existing: { category: string; quantity: Prisma.Decimal | null }
 ): Record<string, unknown> {
   const data: Record<string, unknown> = {}
   if (payload.name !== undefined) data.name = payload.name
@@ -607,7 +606,7 @@ export async function deleteWBSItem(id: string, projectId: string) {
   })
   if (!node) throw new Error('WBS item not found')
 
-  async function softDeleteRecursive(tx: any, nodeId: string) {
+  async function softDeleteRecursive(tx: Prisma.TransactionClient, nodeId: string) {
     const children = await tx.wbsNode.findMany({
       where: { parentId: nodeId, active: true },
       select: { id: true },

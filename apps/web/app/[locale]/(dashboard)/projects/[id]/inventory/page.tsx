@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Building2, Package, Plus } from 'lucide-react'
 import { Link } from '@/i18n/navigation'
-import { serializeForClient } from '@/lib/utils/serialization'
+import { toInventoryMovementClientRows } from '@/lib/inventory-serialize'
 
 type PageProps = {
   params: Promise<{ id: string }>
@@ -109,7 +109,7 @@ export default async function ProjectInventoryPage({ params }: PageProps) {
         })
       : []
 
-  const movementsPlain = recentMovements.map((m) => serializeForClient(m))
+  const movementsPlain = toInventoryMovementClientRows(recentMovements)
   const statsByLocId = new Map(
     locationsWithStats.map((row) => [
       row.id,
@@ -212,7 +212,7 @@ export default async function ProjectInventoryPage({ params }: PageProps) {
                       </tr>
                     </thead>
                     <tbody>
-                      {movementsPlain.map((m: any) => (
+                      {movementsPlain.map((m) => (
                         <tr key={m.id} className="border-b border-border last:border-0">
                           <td className="py-2 pr-4">
                             {m.createdAt

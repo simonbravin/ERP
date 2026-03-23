@@ -1,0 +1,29 @@
+name: i18n message keys parity
+
+on:
+  pull_request:
+    paths:
+      - "apps/web/messages/**"
+      - "scripts/check-i18n-keys.mjs"
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/web/messages/**"
+      - "scripts/check-i18n-keys.mjs"
+
+jobs:
+  check-keys:
+    name: Compare es.json vs en.json keys
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Verify i18n key parity
+        run: node scripts/check-i18n-keys.mjs
