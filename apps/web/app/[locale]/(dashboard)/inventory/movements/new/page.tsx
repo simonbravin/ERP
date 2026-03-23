@@ -68,8 +68,9 @@ export default async function NewMovementPage({ searchParams }: PageProps) {
   })
 
   return (
-    <div className="h-full">
+    <div className="erp-view-container space-y-6 bg-background">
       <PageHeader
+        variant="embedded"
         title="Nuevo Movimiento de Inventario"
         subtitle="Registra compras, transferencias, consumos o ajustes"
         breadcrumbs={[
@@ -78,18 +79,15 @@ export default async function NewMovementPage({ searchParams }: PageProps) {
           { label: 'Nuevo' },
         ]}
       />
-
-      <div className="p-6">
-        <div className="mx-auto max-w-4xl">
-          <MovementWizard
-            items={items}
-            locations={locations}
-            projects={projects}
-            suppliers={suppliers}
-            initialType={params.type}
-            initialItemId={params.itemId}
-          />
-        </div>
+      <div className="mx-auto w-full max-w-4xl min-w-0">
+        <MovementWizard
+          items={items}
+          locations={locations}
+          projects={projects}
+          suppliers={suppliers}
+          initialType={params.type}
+          initialItemId={params.itemId}
+        />
       </div>
     </div>
   )

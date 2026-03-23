@@ -94,8 +94,9 @@ export default async function ProjectSuppliersPage({ params }: PageProps) {
   })
 
   return (
-    <div className="h-full">
+    <div className="erp-view-container space-y-6 bg-background">
       <PageHeader
+        variant="embedded"
         title={tNav('projectSuppliers')}
         subtitle={`${project.name}${project.projectNumber ? ` • ${project.projectNumber}` : ''}`}
         breadcrumbs={[
@@ -104,8 +105,7 @@ export default async function ProjectSuppliersPage({ params }: PageProps) {
           { label: tNav('projectSuppliers') },
         ]}
       />
-
-      <div className="space-y-6 p-6">
+      <div className="space-y-6">
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <Card>
             <CardContent className="flex items-center gap-4 p-6">

@@ -77,8 +77,9 @@ export default async function ItemDetailPage({ params }: PageProps) {
   const movementsPlain = toInventoryMovementClientRows(movements)
 
   return (
-    <div className="h-full">
+    <div className="erp-view-container space-y-6 bg-background">
       <PageHeader
+        variant="embedded"
         title={item.name}
         subtitle={`SKU: ${item.sku}`}
         breadcrumbs={[
@@ -118,8 +119,7 @@ export default async function ItemDetailPage({ params }: PageProps) {
           </div>
         }
       />
-
-      <div className="space-y-6 p-6">
+      <div className="space-y-6">
         <ItemDetailInfo item={itemWithStock} />
 
         <ItemStockByLocation

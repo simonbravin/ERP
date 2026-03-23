@@ -12,19 +12,18 @@ export default async function SubscriptionSettingsPage() {
   const t = await getTranslations('settings')
 
   return (
-    <div className="h-full">
+    <div className="erp-view-container space-y-6 bg-background">
       <PageHeader
+        variant="embedded"
         title={t('subscription')}
         subtitle={t('subscriptionSubtitle', {
           defaultValue: 'Gestiona tu suscripción y facturación',
         })}
       />
-      <div className="p-6">
-        <div className="rounded-lg border border-slate-200 bg-white p-12 text-center">
-          <p className="text-slate-500">
-            {t('comingSoon', { defaultValue: 'Próximamente' })}
-          </p>
-        </div>
+      <div className="rounded-lg border border-border bg-card p-12 text-center">
+        <p className="text-muted-foreground">
+          {t('comingSoon', { defaultValue: 'Próximamente' })}
+        </p>
       </div>
     </div>
   )

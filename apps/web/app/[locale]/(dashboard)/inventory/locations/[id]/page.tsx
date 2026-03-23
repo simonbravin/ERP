@@ -105,8 +105,9 @@ export default async function LocationDetailPage({ params }: PageProps) {
   const movementsPlain = toInventoryMovementClientRows(recentMovements)
 
   return (
-    <div className="h-full">
+    <div className="erp-view-container space-y-6 bg-background">
       <PageHeader
+        variant="embedded"
         title={location.name}
         subtitle={typeLabel}
         breadcrumbs={[
@@ -120,8 +121,7 @@ export default async function LocationDetailPage({ params }: PageProps) {
           </Button>
         }
       />
-
-      <div className="space-y-6 p-6">
+      <div className="space-y-6">
         <Card className="p-6">
           <div className="flex items-start gap-4">
             <div className="rounded-lg bg-primary/10 p-3">

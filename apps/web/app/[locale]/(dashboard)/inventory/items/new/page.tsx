@@ -18,8 +18,9 @@ export default async function NewItemPage() {
   ])
 
   return (
-    <div className="h-full">
+    <div className="erp-view-container space-y-6 bg-background">
       <PageHeader
+        variant="embedded"
         title="Nuevo Item de Inventario"
         subtitle="Registra un nuevo material, equipo o insumo. Después de crear el item podrás registrar compras o ajustes para dar de alta el stock."
         breadcrumbs={[
@@ -28,11 +29,8 @@ export default async function NewItemPage() {
           { label: 'Nuevo' },
         ]}
       />
-
-      <div className="p-6">
-        <div className="mx-auto max-w-5xl">
-          <ItemForm categories={categories} subcategories={subcategories} />
-        </div>
+      <div className="mx-auto w-full max-w-5xl min-w-0">
+        <ItemForm categories={categories} subcategories={subcategories} />
       </div>
     </div>
   )

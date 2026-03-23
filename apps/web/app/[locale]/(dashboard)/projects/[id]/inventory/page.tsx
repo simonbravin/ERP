@@ -118,8 +118,9 @@ export default async function ProjectInventoryPage({ params }: PageProps) {
   )
 
   return (
-    <div className="h-full">
+    <div className="erp-view-container space-y-6 bg-background">
       <PageHeader
+        variant="embedded"
         title="Inventario del Proyecto"
         subtitle={`Stock en ubicaciones de ${project.name}`}
         breadcrumbs={[
@@ -136,8 +137,7 @@ export default async function ProjectInventoryPage({ params }: PageProps) {
           </Button>
         }
       />
-
-      <div className="mx-auto max-w-6xl w-full space-y-6 p-6">
+      <div className="space-y-6">
         {projectLocations.length === 0 ? (
           <Card className="p-8 text-center">
             <Package className="mx-auto h-12 w-12 text-muted-foreground" />

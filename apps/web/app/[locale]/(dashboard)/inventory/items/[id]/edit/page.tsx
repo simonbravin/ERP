@@ -35,8 +35,9 @@ export default async function EditItemPage({ params }: PageProps) {
   const itemPlain = toInventoryItemFormDto(item)
 
   return (
-    <div className="h-full">
+    <div className="erp-view-container space-y-6 bg-background">
       <PageHeader
+        variant="embedded"
         title="Editar Item"
         subtitle={item.name}
         breadcrumbs={[
@@ -46,11 +47,8 @@ export default async function EditItemPage({ params }: PageProps) {
           { label: 'Editar' },
         ]}
       />
-
-      <div className="p-6">
-        <div className="mx-auto max-w-5xl">
-          <ItemForm item={itemPlain} categories={categories} subcategories={subcategories} />
-        </div>
+      <div className="mx-auto w-full max-w-5xl min-w-0">
+        <ItemForm item={itemPlain} categories={categories} subcategories={subcategories} />
       </div>
     </div>
   )

@@ -22,8 +22,9 @@ export default async function NewLocationPage() {
   })
 
   return (
-    <div className="h-full">
+    <div className="erp-view-container space-y-6 bg-background">
       <PageHeader
+        variant="embedded"
         title="Nueva Ubicación"
         subtitle="Registra un almacén, obra o punto de entrega"
         breadcrumbs={[
@@ -32,8 +33,7 @@ export default async function NewLocationPage() {
           { label: 'Nueva' },
         ]}
       />
-
-      <div className="mx-auto max-w-5xl w-full space-y-6 p-6">
+      <div className="mx-auto w-full max-w-5xl min-w-0">
         <LocationForm projects={projects} />
       </div>
     </div>

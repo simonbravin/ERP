@@ -23,8 +23,9 @@ export default async function GlobalSuppliersPage() {
   })
 
   return (
-    <div className="h-full">
+    <div className="erp-view-container space-y-6 bg-background">
       <PageHeader
+        variant="embedded"
         title={t('global')}
         subtitle={t('subtitle')}
         breadcrumbs={[
@@ -32,9 +33,7 @@ export default async function GlobalSuppliersPage() {
           { label: t('global') },
         ]}
       />
-      <div className="space-y-6 p-6">
-        <SupplierSearch initialResults={suppliers} />
-      </div>
+      <SupplierSearch initialResults={suppliers} />
     </div>
   )
 }
