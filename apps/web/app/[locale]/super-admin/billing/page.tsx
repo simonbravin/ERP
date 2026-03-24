@@ -5,8 +5,9 @@ import {
   adminListPromoCodesAction,
   adminListRecentBillingEventsAction,
 } from '@/app/actions/super-admin-billing'
+import { BillingLoadError } from '@/components/super-admin/billing-load-error'
 import { BillingSchemaMissingNotice } from '@/components/super-admin/billing-schema-missing'
-import { isPrismaSchemaDriftError } from '@/lib/prisma/schema-migration-error'
+import { billingCoreTablesExist } from '@/lib/prisma/billing-schema-exists'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -37,6 +38,22 @@ export default async function SuperAdminBillingPage({
   const status = sp.status?.trim() || undefined
   const planCode = sp.plan?.trim() || undefined
 
+  let tablesOk: boolean
+  try {
+    tablesOk = await billingCoreTablesExist()
+  } catch (err) {
+    console.error('[super-admin/billing] billingCoreTablesExist failed:', err)
+    return (
+      <BillingLoadError
+        context="No se pudo comprobar en la base de datos si existen las tablas de billing."
+        error={err}
+      />
+    )
+  }
+  if (!tablesOk) {
+    return <BillingSchemaMissingNotice />
+  }
+
   let orgs: Awaited<ReturnType<typeof adminListOrganizationsBillingAction>>
   let promos: Awaited<ReturnType<typeof adminListPromoCodesAction>>
   let events: Awaited<ReturnType<typeof adminListRecentBillingEventsAction>>
@@ -47,11 +64,13 @@ export default async function SuperAdminBillingPage({
       adminListRecentBillingEventsAction(60),
     ])
   } catch (err) {
-    if (isPrismaSchemaDriftError(err)) {
-      console.error('[super-admin/billing] Prisma billing schema not deployed:', err)
-      return <BillingSchemaMissingNotice />
-    }
-    throw err
+    console.error('[super-admin/billing] data load failed:', err)
+    return (
+      <BillingLoadError
+        context="Las tablas de billing están creadas, pero falló cargar listados (orgs / promos / eventos)."
+        error={err}
+      />
+    )
   }
 
   return (

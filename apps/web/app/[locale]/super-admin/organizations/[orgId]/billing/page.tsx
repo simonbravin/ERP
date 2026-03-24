@@ -1,7 +1,8 @@
 import { notFound } from 'next/navigation'
 import { adminGetOrganizationBillingSnapshotAction } from '@/app/actions/super-admin-billing'
+import { BillingLoadError } from '@/components/super-admin/billing-load-error'
 import { BillingSchemaMissingNotice } from '@/components/super-admin/billing-schema-missing'
-import { isPrismaSchemaDriftError } from '@/lib/prisma/schema-migration-error'
+import { billingCoreTablesExist } from '@/lib/prisma/billing-schema-exists'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Link } from '@/i18n/navigation'
@@ -12,15 +13,34 @@ export default async function SuperAdminOrganizationBillingDetailPage({
   params: Promise<{ orgId: string }>
 }) {
   const { orgId } = await params
+
+  let tablesOk: boolean
+  try {
+    tablesOk = await billingCoreTablesExist()
+  } catch (err) {
+    console.error('[super-admin/org/billing] billingCoreTablesExist failed:', err)
+    return (
+      <BillingLoadError
+        context="No se pudo comprobar en la base de datos si existen las tablas de billing."
+        error={err}
+      />
+    )
+  }
+  if (!tablesOk) {
+    return <BillingSchemaMissingNotice />
+  }
+
   let snapshot: Awaited<ReturnType<typeof adminGetOrganizationBillingSnapshotAction>>
   try {
     snapshot = await adminGetOrganizationBillingSnapshotAction(orgId)
   } catch (err) {
-    if (isPrismaSchemaDriftError(err)) {
-      console.error('[super-admin/org/billing] Prisma billing schema not deployed:', err)
-      return <BillingSchemaMissingNotice />
-    }
-    throw err
+    console.error('[super-admin/org/billing] snapshot load failed:', err)
+    return (
+      <BillingLoadError
+        context="No se pudo cargar el detalle de billing de la organización."
+        error={err}
+      />
+    )
   }
   if (!snapshot) notFound()
 
