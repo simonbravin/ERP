@@ -18,6 +18,28 @@ This document defines Bloqer's subscription billing architecture using Paddle as
 - `BillingEventLog`, `SubscriptionStatusHistory`
 - `ManualBillingOverride`, `BillingDocument`
 
+## Super Admin: acceso manual (sin UI dispersa)
+
+En **`/super-admin/organizations/[orgId]/billing`** hay un panel **“Control manual de acceso (billing)”** que llama a las server actions:
+
+- **Acceso gratis / contrato:** crea `ManualBillingOverride` en modo `MANUAL_ACTIVE` o `ENTERPRISE_BYPASS` (acceso completo aunque Paddle no cobre). Podés poner fecha de fin o dejarlo abierto hasta revocar.
+- **Solo lectura:** `MANUAL_LOCK` (la org entra pero no puede mutar datos hasta quitar el lock).
+- **Extender trial:** requiere fila `OrganizationSubscription`; actualiza `trialEnd` y estado `TRIALING`.
+- **Revocar:** por override individual o “quitar todos” de un modo.
+
+Bloqueo total de la organización (sin login) sigue siendo **Block** en la ficha de organización (`isBlocked`), no es lo mismo que `MANUAL_LOCK`.
+
+## Checklist de integración Paddle (qué necesitás)
+
+1. **Cuenta Paddle Billing** (sandbox primero, luego live).
+2. **API key** del entorno correcto → `PADDLE_API_KEY`.
+3. **Webhook signing secret** del destination que apunte a `https://<tu-dominio>/api/payments/paddle/webhook` → `PADDLE_WEBHOOK_SECRET`.
+4. **`PADDLE_ENV`**: `sandbox` o `live` según corresponda.
+5. **Precios en Paddle** (trimestral / anual, etc.) y sus **Price IDs** (`pri_...`).
+6. En Bloqer: filas **`BillingPlan`** + **`BillingPlanPrice`** con `paddlePriceId` (seed por env `BILLING_SEED_*` o insert manual).
+7. Opcional: **client-side token** si usás Paddle.js → `NEXT_PUBLIC_PADDLE_CLIENT_TOKEN`.
+8. Tras backfill/checkout: **`BILLING_ENFORCEMENT_ENABLED=true`** cuando quieras exigir suscripción/estado para escribir (antes, dejar `false` si hay orgs sin fila nueva).
+
 ## Runtime flow
 
 1. Org admin starts checkout from `/settings/subscription`.

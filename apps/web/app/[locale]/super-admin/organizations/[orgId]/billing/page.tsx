@@ -6,6 +6,7 @@ import { billingCoreTablesExist } from '@/lib/prisma/billing-schema-exists'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Link } from '@/i18n/navigation'
+import { SuperAdminOrgBillingControls } from '@/components/super-admin/super-admin-org-billing-controls'
 
 export default async function SuperAdminOrganizationBillingDetailPage({
   params,
@@ -45,6 +46,14 @@ export default async function SuperAdminOrganizationBillingDetailPage({
   if (!snapshot) notFound()
 
   const { org, subscription, events, overrides, documents, statusHistory } = snapshot
+
+  const serializedOverrides = overrides.map((o) => ({
+    id: o.id,
+    mode: o.mode,
+    reason: o.reason,
+    endsAt: o.endsAt?.toISOString() ?? null,
+    createdAt: o.createdAt.toISOString(),
+  }))
 
   return (
     <div className="space-y-6 p-6">
@@ -135,26 +144,12 @@ export default async function SuperAdminOrganizationBillingDetailPage({
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Overrides activos</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {overrides.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Ninguno</p>
-          ) : (
-            <ul className="space-y-2 text-sm">
-              {overrides.map((o) => (
-                <li key={o.id} className="flex flex-wrap gap-2 border-b border-border/60 pb-2">
-                  <Badge variant="outline">{o.mode}</Badge>
-                  <span>{o.reason ?? '—'}</span>
-                  <span className="text-muted-foreground">hasta {o.endsAt?.toISOString() ?? '∞'}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+      <SuperAdminOrgBillingControls
+        orgId={orgId}
+        orgName={org.name}
+        hasSubscription={!!subscription}
+        overrides={serializedOverrides}
+      />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>

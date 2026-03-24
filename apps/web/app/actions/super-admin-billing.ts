@@ -12,6 +12,13 @@ async function requireSuperAdmin() {
   return session.user
 }
 
+function revalidateSuperAdminBilling(orgId?: string) {
+  revalidatePath('/super-admin/billing')
+  if (orgId) {
+    revalidatePath(`/super-admin/organizations/${orgId}/billing`)
+  }
+}
+
 export async function adminListOrganizationsBillingAction(filters?: {
   status?: string
   planCode?: string
@@ -76,7 +83,7 @@ export async function adminExtendTrialAction(orgId: string, newTrialEnd: Date, r
       },
     })
   })
-  revalidatePath('/super-admin/billing')
+  revalidateSuperAdminBilling(orgId)
   return { success: true }
 }
 
@@ -104,7 +111,19 @@ export async function adminSetManualBillingOverrideAction(input: {
       data: { active: false },
     })
   }
-  revalidatePath('/super-admin/billing')
+  revalidateSuperAdminBilling(input.orgId)
+  return { success: true }
+}
+
+export async function adminRevokeManualOverrideAction(overrideId: string) {
+  await requireSuperAdmin()
+  const row = await prisma.manualBillingOverride.findUnique({ where: { id: overrideId } })
+  if (!row) throw new Error('Override not found')
+  await prisma.manualBillingOverride.update({
+    where: { id: overrideId },
+    data: { active: false },
+  })
+  revalidateSuperAdminBilling(row.orgId)
   return { success: true }
 }
 
@@ -121,7 +140,7 @@ export async function adminAssignCustomPlanAction(input: {
       interval: input.interval ?? 'MONTHLY',
     },
   })
-  revalidatePath('/super-admin/billing')
+  revalidateSuperAdminBilling(input.orgId)
   return { success: true }
 }
 
