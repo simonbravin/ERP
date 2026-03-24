@@ -7,6 +7,7 @@ import { DashboardLayout } from '@/components/layouts/dashboard-layout'
 import { SignOutConfirmButton } from '@/components/auth/sign-out-confirm-button'
 import { prisma } from '@repo/database'
 import { resolveLogoUrl, resolveAvatarUrl } from '@/lib/media-urls'
+import { BillingAccessBanner } from '@/components/billing/billing-access-banner'
 
 export const dynamic = 'force-dynamic'
 
@@ -93,6 +94,7 @@ export default async function DashboardLayoutPage({
         }}
         restrictedToProjects={isRestrictedToProjects(orgContext)}
       >
+        <BillingAccessBanner orgId={orgContext.orgId} />
         {children}
       </DashboardLayout>
     )

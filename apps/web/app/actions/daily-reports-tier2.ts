@@ -1,5 +1,7 @@
 'use server'
 
+import { assertBillingWriteAllowed } from '@/lib/billing/guards'
+
 /**
  * Tier 2 - Libro de Obra integration with WBS, Inventory, Suppliers, Budget, Finance.
  * These actions complement (do not replace) the existing daily-reports actions.
@@ -99,6 +101,7 @@ function calculateWbsHealthStatus(
 export async function submitDailyReportTier2(input: SubmitDailyReportTier2Input) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'dailyReports.tier2Update')
 
   const parsed = submitDailyReportTier2Schema.safeParse(input)
   if (!parsed.success) throw new Error(parsed.error.errors.map((e) => e.message).join(', '))

@@ -1,0 +1,19 @@
+erDiagram
+  Organization ||--o| OrganizationSubscription : owns
+  Organization ||--o{ BillingEventLog : receives
+  Organization ||--o{ ManualBillingOverride : has
+  Organization ||--o{ BillingDocument : has
+  Organization ||--o{ PromoCodeRedemption : redeems
+
+  BillingPlan ||--o{ BillingPlanPrice : has
+  BillingPlan ||--o{ PlanEntitlement : has
+  BillingPlan ||--o{ OrganizationSubscription : assigned
+
+  BillingCustomer ||--o{ OrganizationSubscription : linked
+
+  OrganizationSubscription ||--o{ SubscriptionStatusHistory : tracks
+  OrganizationSubscription ||--o{ BillingDocument : emits
+  OrganizationSubscription ||--o{ PromoCodeRedemption : applies
+
+  PromoCode ||--o{ PromoCodePlanRestriction : restricts
+  PromoCode ||--o{ PromoCodeRedemption : usage

@@ -28,6 +28,7 @@ import type {
 } from '@repo/validators'
 import { toBaseAmount } from '@/lib/currency-utils'
 import { isEditableStatus, serializeTransaction } from './finance-helpers'
+import { assertBillingWriteAllowed } from '@/lib/billing/guards'
 
 /** DB may store types outside TRANSACTION_TYPE (e.g. PURCHASE from commitments). */
 export async function getNextTransactionNumber(
@@ -202,6 +203,7 @@ export async function createFinanceTransaction(data: CreateFinanceTransactionInp
   await requirePermission('FINANCE', 'create')
   const { org } = await requireOrgFinanceAccess()
   requireRole(org.role, 'ACCOUNTANT')
+  await assertBillingWriteAllowed(org.orgId, 'finance.createTransaction')
 
   const parsed = createFinanceTransactionSchema.safeParse(data)
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
@@ -271,6 +273,7 @@ export async function createFinanceTransactionWithLines(
   await requirePermission('FINANCE', 'create')
   const { org } = await requireOrgFinanceAccess()
   requireRole(org.role, 'ACCOUNTANT')
+  await assertBillingWriteAllowed(org.orgId, 'finance.createTransaction')
 
   const parsed = createFinanceTransactionSchema.safeParse(data)
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
@@ -381,6 +384,7 @@ export async function createPurchaseFromCommitment(commitmentId: string): Promis
 > {
   const { org } = await requireOrgFinanceAccess()
   requireRole(org.role, 'ACCOUNTANT')
+  await assertBillingWriteAllowed(org.orgId, 'finance.createPurchaseFromCommitment')
 
   const commitment = await prisma.commitment.findFirst({
     where: {
@@ -470,6 +474,7 @@ export async function updateFinanceTransaction(id: string, data: UpdateFinanceTr
   await requirePermission('FINANCE', 'edit')
   const { org } = await requireOrgFinanceAccess()
   requireRole(org.role, 'ACCOUNTANT')
+  await assertBillingWriteAllowed(org.orgId, 'finance.updateTransaction')
 
   const existing = await prisma.financeTransaction.findFirst({
     where: { id, orgId: org.orgId, deleted: false },
@@ -537,6 +542,7 @@ export async function updateFinanceTransaction(id: string, data: UpdateFinanceTr
 export async function addFinanceLine(transactionId: string, data: CreateFinanceLineInput) {
   const { org } = await requireOrgFinanceAccess()
   requireRole(org.role, 'ACCOUNTANT')
+  await assertBillingWriteAllowed(org.orgId, 'finance.addLine')
 
   const tx = await prisma.financeTransaction.findFirst({
     where: { id: transactionId, orgId: org.orgId, deleted: false },
@@ -600,6 +606,7 @@ export async function addFinanceLine(transactionId: string, data: CreateFinanceL
 export async function updateFinanceLine(lineId: string, data: UpdateFinanceLineInput) {
   const { org } = await requireOrgFinanceAccess()
   requireRole(org.role, 'ACCOUNTANT')
+  await assertBillingWriteAllowed(org.orgId, 'finance.updateLine')
 
   const line = await prisma.financeLine.findFirst({
     where: { id: lineId, orgId: org.orgId },
@@ -650,6 +657,7 @@ export async function deleteFinanceLine(lineId: string) {
   await requirePermission('FINANCE', 'delete')
   const { org } = await requireOrgFinanceAccess()
   requireRole(org.role, 'ACCOUNTANT')
+  await assertBillingWriteAllowed(org.orgId, 'finance.deleteLine')
 
   const line = await prisma.financeLine.findFirst({
     where: { id: lineId, orgId: org.orgId },
@@ -684,6 +692,7 @@ export async function deleteFinanceLine(lineId: string) {
 export async function submitFinanceTransaction(id: string) {
   const { org } = await requireOrgFinanceAccess()
   requireRole(org.role, 'ACCOUNTANT')
+  await assertBillingWriteAllowed(org.orgId, 'finance.submitTransaction')
 
   const tx = await prisma.financeTransaction.findFirst({
     where: { id, orgId: org.orgId, deleted: false },
@@ -714,6 +723,7 @@ export async function submitFinanceTransaction(id: string) {
 export async function approveFinanceTransaction(id: string) {
   const { org } = await requireOrgFinanceAccess()
   requireRole(org.role, 'ADMIN')
+  await assertBillingWriteAllowed(org.orgId, 'finance.approveTransaction')
 
   const tx = await prisma.financeTransaction.findFirst({
     where: { id, orgId: org.orgId, deleted: false },
@@ -744,6 +754,7 @@ export async function approveFinanceTransaction(id: string) {
 export async function rejectFinanceTransaction(id: string, reason: string) {
   const { org } = await requireOrgFinanceAccess()
   requireRole(org.role, 'ADMIN')
+  await assertBillingWriteAllowed(org.orgId, 'finance.rejectTransaction')
 
   const tx = await prisma.financeTransaction.findFirst({
     where: { id, orgId: org.orgId, deleted: false },
@@ -774,6 +785,7 @@ export async function rejectFinanceTransaction(id: string, reason: string) {
 export async function markFinanceTransactionPaid(id: string, paymentDate: Date) {
   const { org } = await requireOrgFinanceAccess()
   requireRole(org.role, 'ACCOUNTANT')
+  await assertBillingWriteAllowed(org.orgId, 'finance.markPaid')
 
   const tx = await prisma.financeTransaction.findFirst({
     where: { id, orgId: org.orgId, deleted: false },
@@ -804,6 +816,7 @@ export async function markFinanceTransactionPaid(id: string, paymentDate: Date) 
 export async function voidFinanceTransaction(id: string, reason: string) {
   const { org } = await requireOrgFinanceAccess()
   requireRole(org.role, 'ADMIN')
+  await assertBillingWriteAllowed(org.orgId, 'finance.voidTransaction')
 
   const tx = await prisma.financeTransaction.findFirst({
     where: { id, orgId: org.orgId, deleted: false },
@@ -974,6 +987,7 @@ export async function createPartyForTransaction(
   await requirePermission('FINANCE', 'create')
   const { org } = await requireOrgFinanceAccess()
   requireRole(org.role, 'ACCOUNTANT')
+  await assertBillingWriteAllowed(org.orgId, 'finance.createParty')
 
   const trimmed = name.trim()
   if (!trimmed || trimmed.length < 2) {
@@ -1016,6 +1030,7 @@ export async function createProjectTransaction(
   await requirePermission('FINANCE', 'create')
   const { org, session } = await getAuthContext()
   requireRole(org.role, 'ACCOUNTANT')
+  await assertBillingWriteAllowed(org.orgId, 'finance.createProjectTransaction')
 
   const parsed = projectTransactionCreateSchema.safeParse(data)
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
@@ -1142,6 +1157,7 @@ export async function updateProjectTransaction(id: string, data: ProjectTransact
   await requirePermission('FINANCE', 'edit')
   const { org, session } = await getAuthContext()
   requireRole(org.role, 'ACCOUNTANT')
+  await assertBillingWriteAllowed(org.orgId, 'finance.updateProjectTransaction')
 
   const existing = await prisma.financeTransaction.findFirst({
     where: { id, orgId: org.orgId, deleted: false },
@@ -1246,6 +1262,7 @@ export async function deleteProjectTransaction(id: string): Promise<{ success: t
     await requirePermission('FINANCE', 'delete')
     const { org, session } = await getAuthContext()
     requireRole(org.role, 'ACCOUNTANT')
+    await assertBillingWriteAllowed(org.orgId, 'finance.deleteProjectTransaction')
 
     const existing = await prisma.financeTransaction.findFirst({
       where: { id, orgId: org.orgId, deleted: false },

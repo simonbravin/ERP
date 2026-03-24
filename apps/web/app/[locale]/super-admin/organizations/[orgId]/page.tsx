@@ -29,7 +29,13 @@ export default async function SuperAdminOrgDetailPage({
           </h1>
           <p className="mt-1 text-sm text-slate-500">{org.slug}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href={`/super-admin/organizations/${orgId}/billing`}
+            className="rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent"
+          >
+            Billing detail
+          </Link>
           {org.isBlocked && (
             <Badge variant="destructive">Blocked</Badge>
           )}

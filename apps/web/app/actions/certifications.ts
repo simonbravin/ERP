@@ -9,6 +9,7 @@ import { parseUuidOrThrow } from '@/lib/schemas/ids'
 import crypto from 'crypto'
 import { publishOutboxEvent } from '@/lib/events/event-publisher'
 import { notificationDeepLinkMetadata } from '@/lib/notification-deeplink'
+import { assertBillingWriteAllowed } from '@/lib/billing/guards'
 
 async function generateCertNumber(projectId: string): Promise<number> {
   const lastCert = await prisma.certification.findFirst({
@@ -68,6 +69,7 @@ export async function createCertification(
   await requirePermission('CERTIFICATIONS', 'create')
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'certifications.create')
 
   const project = await prisma.project.findFirst({
     where: { id: validProjectId, orgId: org.orgId },
@@ -126,6 +128,7 @@ export async function addCertificationLine(
   const validCertId = parseUuidOrThrow(certId, 'ID de certificación')
 
   const { org } = await getAuthContext()
+  await assertBillingWriteAllowed(org.orgId, 'certifications.addLine')
 
   const cert = await prisma.certification.findFirst({
     where: { id: validCertId, orgId: org.orgId, status: 'DRAFT' },
@@ -205,6 +208,7 @@ export async function deleteCertificationLine(lineId: string) {
   const validLineId = parseUuidOrThrow(lineId, 'ID de línea')
 
   const { org } = await getAuthContext()
+  await assertBillingWriteAllowed(org.orgId, 'certifications.deleteLine')
 
   const line = await prisma.certificationLine.findFirst({
     where: { id: validLineId, orgId: org.orgId },
@@ -250,6 +254,7 @@ export async function deleteCertification(certId: string) {
   await requirePermission('CERTIFICATIONS', 'delete')
   const { org } = await getAuthContext()
   requireRole(org.role, 'ADMIN')
+  await assertBillingWriteAllowed(org.orgId, 'certifications.delete')
 
   const cert = await prisma.certification.findFirst({
     where: { id: certId, orgId: org.orgId },
@@ -283,6 +288,7 @@ export async function updateCertification(
 ) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'certifications.update')
 
   const cert = await prisma.certification.findFirst({
     where: { id: certId, orgId: org.orgId, status: 'DRAFT' },
@@ -343,6 +349,7 @@ async function getNextCertTransactionNumber(orgId: string): Promise<string> {
 export async function issueCertification(certId: string) {
   const { session, org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'certifications.issue')
 
   const cert = await prisma.certification.findFirst({
     where: { id: certId, orgId: org.orgId, status: 'DRAFT' },
@@ -538,6 +545,7 @@ export async function approveCertification(certId: string) {
   await requirePermission('CERTIFICATIONS', 'approve')
   const { session, org } = await getAuthContext()
   requireRole(org.role, 'ADMIN')
+  await assertBillingWriteAllowed(org.orgId, 'certifications.approve')
 
   const cert = await prisma.certification.findFirst({
     where: { id: certId, orgId: org.orgId, status: 'ISSUED' },
@@ -614,6 +622,7 @@ export async function approveCertification(certId: string) {
 export async function rejectCertification(certId: string, notes?: string) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'ADMIN')
+  await assertBillingWriteAllowed(org.orgId, 'certifications.reject')
 
   const cert = await prisma.certification.findFirst({
     where: { id: certId, orgId: org.orgId, status: 'ISSUED' },

@@ -1,0 +1,4 @@
+-- Migration scaffold created without database connectivity.
+-- Generate SQL with:
+--   npm run db:migrate -- --name add_paddle_billing_foundation
+-- once DATABASE_URL credentials are available.

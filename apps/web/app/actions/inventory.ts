@@ -10,6 +10,7 @@ import { publishOutboxEvent } from '@/lib/events/event-publisher'
 import { calculateTotalStock, calculateStockBalance } from '@/lib/inventory-utils'
 import { createInAppNotificationsForUsers } from '@/app/actions/notifications'
 import { notificationDeepLinkMetadata } from '@/lib/notification-deeplink'
+import { assertBillingWriteAllowed } from '@/lib/billing/guards'
 
 /** List all inventory categories (for dropdowns). */
 export async function getInventoryCategories() {
@@ -34,6 +35,7 @@ export async function getInventorySubcategories(categoryId?: string | null) {
 export async function createInventoryCategory(name: string) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'inventory.createCategory')
   const maxOrder = await prisma.inventoryCategory.findFirst({
     orderBy: { sortOrder: 'desc' },
     select: { sortOrder: true },
@@ -60,6 +62,7 @@ export async function createInventoryCategory(name: string) {
 export async function createInventorySubcategory(categoryId: string, name: string) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'inventory.createSubcategory')
   const parsedCat = parseUuid(categoryId, 'ID de categoría')
   if (parsedCat.success === false) {
     return { success: false as const, error: parsedCat.error }
@@ -101,6 +104,7 @@ export async function createInventoryItem(data: {
   await requirePermission('INVENTORY', 'create')
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'inventory.createItem')
 
   const existing = await prisma.inventoryItem.findUnique({
     where: { orgId_sku: { orgId: org.orgId, sku: data.sku } },
@@ -156,6 +160,7 @@ export async function updateInventoryItem(
   await requirePermission('INVENTORY', 'edit')
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'inventory.updateItem')
 
   const item = await prisma.inventoryItem.findFirst({
     where: { id: parsedItem.value, orgId: org.orgId },
@@ -205,6 +210,7 @@ export async function deleteInventoryItem(itemId: string) {
   await requirePermission('INVENTORY', 'delete')
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'inventory.deleteItem')
 
   const item = await prisma.inventoryItem.findFirst({
     where: { id: parsedItem.value, orgId: org.orgId },
@@ -239,6 +245,7 @@ export async function createInventoryLocation(data: {
 }) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'inventory.createLocation')
 
   if (data.type === 'PROJECT_SITE' && !data.projectId) {
     throw new Error('Project is required for project site locations')
@@ -284,6 +291,7 @@ export async function createInventoryMovement(data: {
 }) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'inventory.createMovement')
 
   const existing = await prisma.inventoryMovement.findUnique({
     where: { idempotencyKey: data.idempotencyKey },

@@ -79,6 +79,16 @@ model Organization {
   notifications       Notification[]
   webhookEndpoints    WebhookEndpoint[]
   outboxEvents        OutboxEvent[]
+  billingCustomers    BillingCustomer[]
+  billingPlans        BillingPlan[]
+  billingPlanPrices   BillingPlanPrice[]
+  planEntitlements    PlanEntitlement[]
+  organizationSubscriptions OrganizationSubscription[]
+  promoCodeRedemptions PromoCodeRedemption[]
+  billingEventLogs    BillingEventLog[]
+  subscriptionStatusHistory SubscriptionStatusHistory[]
+  manualBillingOverrides ManualBillingOverride[]
+  billingDocuments    BillingDocument[]
   orgPartyLinks       OrgPartyLink[]
   resources           Resource[]
   customReports       CustomReport[]
@@ -193,6 +203,58 @@ enum OrgRole {
   EDITOR
   ACCOUNTANT
   VIEWER
+
+  @@schema("public")
+}
+
+enum BillingProvider {
+  PADDLE
+
+  @@schema("public")
+}
+
+enum BillingSubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  UNPAID
+  CANCELED
+  EXPIRED
+  PAUSED
+  MANUAL_ACTIVE
+  MANUAL_LOCKED
+
+  @@schema("public")
+}
+
+enum BillingInterval {
+  MONTHLY
+  YEARLY
+
+  @@schema("public")
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED
+
+  @@schema("public")
+}
+
+enum BillingEventProcessStatus {
+  PENDING
+  PROCESSED
+  FAILED
+  IGNORED
+
+  @@schema("public")
+}
+
+enum ManualBillingOverrideMode {
+  TRIAL_EXTENSION
+  MANUAL_ACTIVE
+  MANUAL_LOCK
+  ENTERPRISE_BYPASS
 
   @@schema("public")
 }
@@ -2548,6 +2610,289 @@ model Notification {
   @@index([userId, read])
   @@index([createdAt])
   @@map("notifications")
+  @@schema("public")
+}
+
+// ============================================================
+// BILLING (PADDLE)
+// ============================================================
+
+model BillingPlan {
+  id                   String   @id @default(uuid())
+  orgId                String?  @map("org_id")
+  code                 String   @unique
+  name                 String
+  description          String?
+  active               Boolean  @default(true)
+  isCustom             Boolean  @default(false) @map("is_custom")
+  trialDaysDefault     Int      @default(0) @map("trial_days_default")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  organization         Organization?           @relation(fields: [orgId], references: [id], onDelete: SetNull)
+  prices               BillingPlanPrice[]
+  entitlements         PlanEntitlement[]
+  subscriptions        OrganizationSubscription[]
+  promoRestrictions    PromoCodePlanRestriction[]
+
+  @@index([orgId])
+  @@index([active])
+  @@map("billing_plans")
+  @@schema("public")
+}
+
+model BillingPlanPrice {
+  id                   String          @id @default(uuid())
+  orgId                String?         @map("org_id")
+  billingPlanId        String          @map("billing_plan_id")
+  provider             BillingProvider @default(PADDLE)
+  interval             BillingInterval
+  currency             String          @default("USD")
+  unitAmount           Decimal         @map("unit_amount") @db.Decimal(15, 2)
+  paddlePriceId        String?         @unique @map("paddle_price_id")
+  active               Boolean         @default(true)
+  createdAt            DateTime        @default(now()) @map("created_at")
+  updatedAt            DateTime        @updatedAt @map("updated_at")
+
+  organization         Organization?   @relation(fields: [orgId], references: [id], onDelete: SetNull)
+  plan                 BillingPlan     @relation(fields: [billingPlanId], references: [id], onDelete: Cascade)
+
+  @@unique([billingPlanId, interval, currency])
+  @@index([orgId])
+  @@index([active])
+  @@map("billing_plan_prices")
+  @@schema("public")
+}
+
+model PlanEntitlement {
+  id                   String   @id @default(uuid())
+  orgId                String?  @map("org_id")
+  billingPlanId        String   @map("billing_plan_id")
+  featureKey           String   @map("feature_key")
+  valueJson            Json     @map("value_json")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  organization         Organization? @relation(fields: [orgId], references: [id], onDelete: SetNull)
+  plan                 BillingPlan   @relation(fields: [billingPlanId], references: [id], onDelete: Cascade)
+
+  @@unique([billingPlanId, featureKey])
+  @@index([orgId])
+  @@map("plan_entitlements")
+  @@schema("public")
+}
+
+model BillingCustomer {
+  id                   String          @id @default(uuid())
+  orgId                String          @map("org_id")
+  provider             BillingProvider @default(PADDLE)
+  paddleCustomerId     String          @unique @map("paddle_customer_id")
+  email                String?
+  displayName          String?         @map("display_name")
+  createdAt            DateTime        @default(now()) @map("created_at")
+  updatedAt            DateTime        @updatedAt @map("updated_at")
+
+  organization         Organization                @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  subscriptions        OrganizationSubscription[]
+
+  @@unique([orgId, provider])
+  @@index([orgId])
+  @@map("billing_customers")
+  @@schema("public")
+}
+
+model OrganizationSubscription {
+  id                   String                     @id @default(uuid())
+  orgId                String                     @unique @map("org_id")
+  billingCustomerId    String                     @map("billing_customer_id")
+  billingPlanId        String                     @map("billing_plan_id")
+  provider             BillingProvider            @default(PADDLE)
+  status               BillingSubscriptionStatus
+  paddleSubscriptionId String?                    @unique @map("paddle_subscription_id")
+  paddleStatus         String?                    @map("paddle_status")
+  interval             BillingInterval            @default(MONTHLY)
+  trialStart           DateTime?                  @map("trial_start")
+  trialEnd             DateTime?                  @map("trial_end")
+  currentPeriodStart   DateTime?                  @map("current_period_start")
+  currentPeriodEnd     DateTime?                  @map("current_period_end")
+  nextBillingAt        DateTime?                  @map("next_billing_at")
+  graceUntil           DateTime?                  @map("grace_until")
+  cancelAtPeriodEnd    Boolean                    @default(false) @map("cancel_at_period_end")
+  canceledAt           DateTime?                  @map("canceled_at")
+  expiresAt            DateTime?                  @map("expires_at")
+  metadata             Json?
+  createdAt            DateTime                   @default(now()) @map("created_at")
+  updatedAt            DateTime                   @updatedAt @map("updated_at")
+
+  organization         Organization               @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  billingCustomer      BillingCustomer            @relation(fields: [billingCustomerId], references: [id], onDelete: Cascade)
+  billingPlan          BillingPlan                @relation(fields: [billingPlanId], references: [id])
+  statusHistory        SubscriptionStatusHistory[]
+  billingDocuments     BillingDocument[]
+  promoRedemptions     PromoCodeRedemption[]
+  billingEventLogs     BillingEventLog[]
+
+  @@index([status, nextBillingAt])
+  @@index([status, trialEnd])
+  @@index([status, currentPeriodEnd])
+  @@map("organization_subscriptions")
+  @@schema("public")
+}
+
+model PromoCode {
+  id                   String       @id @default(uuid())
+  code                 String       @unique
+  description          String?
+  discountType         DiscountType @map("discount_type")
+  amount               Decimal      @db.Decimal(15, 2)
+  currency             String?
+  maxUses              Int?         @map("max_uses")
+  usedCount            Int          @default(0) @map("used_count")
+  firstCycleOnly       Boolean      @default(false) @map("first_cycle_only")
+  validFrom            DateTime?    @map("valid_from")
+  validUntil           DateTime?    @map("valid_until")
+  active               Boolean      @default(true)
+  paddleDiscountId     String?      @map("paddle_discount_id")
+  createdAt            DateTime     @default(now()) @map("created_at")
+  updatedAt            DateTime     @updatedAt @map("updated_at")
+
+  restrictions         PromoCodePlanRestriction[]
+  redemptions          PromoCodeRedemption[]
+
+  @@index([active, validFrom, validUntil])
+  @@map("promo_codes")
+  @@schema("public")
+}
+
+model PromoCodePlanRestriction {
+  id                   String          @id @default(uuid())
+  promoCodeId          String          @map("promo_code_id")
+  billingPlanId        String          @map("billing_plan_id")
+  interval             BillingInterval?
+  createdAt            DateTime        @default(now()) @map("created_at")
+
+  promoCode            PromoCode       @relation(fields: [promoCodeId], references: [id], onDelete: Cascade)
+  billingPlan          BillingPlan     @relation(fields: [billingPlanId], references: [id], onDelete: Cascade)
+
+  @@unique([promoCodeId, billingPlanId, interval])
+  @@index([promoCodeId])
+  @@index([billingPlanId])
+  @@map("promo_code_plan_restrictions")
+  @@schema("public")
+}
+
+model PromoCodeRedemption {
+  id                   String     @id @default(uuid())
+  promoCodeId          String     @map("promo_code_id")
+  orgId                String     @map("org_id")
+  subscriptionId       String     @map("subscription_id")
+  paddleTransactionId  String?    @map("paddle_transaction_id")
+  redeemedAt           DateTime   @default(now()) @map("redeemed_at")
+
+  promoCode            PromoCode                @relation(fields: [promoCodeId], references: [id], onDelete: Cascade)
+  organization         Organization             @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  subscription         OrganizationSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, redeemedAt])
+  @@index([promoCodeId, redeemedAt])
+  @@map("promo_code_redemptions")
+  @@schema("public")
+}
+
+model BillingEventLog {
+  id                   String                    @id @default(uuid())
+  orgId                String?                   @map("org_id")
+  subscriptionId       String?                   @map("subscription_id")
+  provider             BillingProvider           @default(PADDLE)
+  eventId              String                    @unique @map("event_id")
+  eventType            String                    @map("event_type")
+  signatureHash        String?                   @map("signature_hash")
+  payload              Json
+  status               BillingEventProcessStatus @default(PENDING)
+  processAttempts      Int                       @default(0) @map("process_attempts")
+  errorMessage         String?                   @map("error_message")
+  receivedAt           DateTime                  @default(now()) @map("received_at")
+  processedAt          DateTime?                 @map("processed_at")
+  createdAt            DateTime                  @default(now()) @map("created_at")
+
+  organization         Organization?             @relation(fields: [orgId], references: [id], onDelete: SetNull)
+  subscription         OrganizationSubscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  @@index([orgId, receivedAt])
+  @@index([status, receivedAt])
+  @@map("billing_event_logs")
+  @@schema("public")
+}
+
+model SubscriptionStatusHistory {
+  id                   String                    @id @default(uuid())
+  orgId                String                    @map("org_id")
+  subscriptionId       String                    @map("subscription_id")
+  fromStatus           BillingSubscriptionStatus? @map("from_status")
+  toStatus             BillingSubscriptionStatus  @map("to_status")
+  reason               String?
+  source               String
+  metadata             Json?
+  createdAt            DateTime                  @default(now()) @map("created_at")
+
+  organization         Organization              @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  subscription         OrganizationSubscription  @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, createdAt])
+  @@index([subscriptionId, createdAt])
+  @@map("subscription_status_history")
+  @@schema("public")
+}
+
+model ManualBillingOverride {
+  id                   String                    @id @default(uuid())
+  orgId                String                    @map("org_id")
+  mode                 ManualBillingOverrideMode
+  startsAt             DateTime                  @default(now()) @map("starts_at")
+  endsAt               DateTime?                 @map("ends_at")
+  reason               String?
+  active               Boolean                   @default(true)
+  createdByUserId      String?                   @map("created_by_user_id")
+  metadata             Json?
+  createdAt            DateTime                  @default(now()) @map("created_at")
+  updatedAt            DateTime                  @updatedAt @map("updated_at")
+
+  organization         Organization              @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, active, mode])
+  @@index([endsAt])
+  @@map("manual_billing_overrides")
+  @@schema("public")
+}
+
+model BillingDocument {
+  id                   String                    @id @default(uuid())
+  orgId                String                    @map("org_id")
+  subscriptionId       String                    @map("subscription_id")
+  provider             BillingProvider           @default(PADDLE)
+  documentType         String                    @map("document_type") // INVOICE|RECEIPT|CREDIT_NOTE
+  providerDocumentId   String?                   @map("provider_document_id")
+  providerUrl          String?                   @map("provider_url")
+  status               String
+  currency             String?
+  subtotal             Decimal?                  @db.Decimal(15, 2)
+  tax                  Decimal?                  @db.Decimal(15, 2)
+  total                Decimal?                  @db.Decimal(15, 2)
+  issuedAt             DateTime?                 @map("issued_at")
+  dueAt                DateTime?                 @map("due_at")
+  paidAt               DateTime?                 @map("paid_at")
+  paddleTransactionId  String?                   @map("paddle_transaction_id")
+  rawSnapshot          Json?                     @map("raw_snapshot")
+  createdAt            DateTime                  @default(now()) @map("created_at")
+  updatedAt            DateTime                  @updatedAt @map("updated_at")
+
+  organization         Organization              @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  subscription         OrganizationSubscription  @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, issuedAt])
+  @@index([subscriptionId, issuedAt])
+  @@index([paddleTransactionId])
+  @@map("billing_documents")
   @@schema("public")
 }
 

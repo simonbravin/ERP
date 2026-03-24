@@ -18,6 +18,7 @@ import {
   updateBudgetLineActuals,
   generateAlertsForReport,
 } from './daily-reports-tier2'
+import { assertBillingWriteAllowed } from '@/lib/billing/guards'
 
 const MAX_FILES_PER_REPORT = 10
 const MAX_FILE_BYTES = 10 * 1024 * 1024 // 10MB
@@ -286,6 +287,7 @@ export async function getDailyReport(reportId: string): Promise<DailyReportForEd
 export async function createDailyReport(projectId: string, data: CreateDailyReportInput) {
   const { session, org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'dailyReports.create')
 
   const project = await ensureProjectInOrg(projectId, org.orgId)
   if (!project) throw new Error('Proyecto no encontrado')
@@ -392,6 +394,7 @@ export async function createDailyReport(projectId: string, data: CreateDailyRepo
 export async function updateDailyReport(reportId: string, data: UpdateDailyReportInput) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'dailyReports.update')
 
   const existing = await prisma.dailyReport.findFirst({
     where: { id: reportId, orgId: org.orgId },
@@ -469,6 +472,7 @@ export async function updateDailyReport(reportId: string, data: UpdateDailyRepor
 export async function deleteDailyReport(reportId: string) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'dailyReports.delete')
 
   const existing = await prisma.dailyReport.findFirst({
     where: { id: reportId, orgId: org.orgId },
@@ -495,6 +499,7 @@ export async function deleteDailyReport(reportId: string) {
 export async function submitDailyReport(reportId: string) {
   const { session, org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'dailyReports.submit')
 
   const existing = await prisma.dailyReport.findFirst({
     where: { id: reportId, orgId: org.orgId },
@@ -533,6 +538,7 @@ export async function submitDailyReport(reportId: string) {
 export async function approveDailyReport(reportId: string, _adminNotes?: string) {
   const { session, org } = await getAuthContext()
   requireRole(org.role, 'ADMIN')
+  await assertBillingWriteAllowed(org.orgId, 'dailyReports.approve')
 
   const existing = await prisma.dailyReport.findFirst({
     where: { id: reportId, orgId: org.orgId },
@@ -578,6 +584,7 @@ export async function approveDailyReport(reportId: string, _adminNotes?: string)
 export async function rejectDailyReport(reportId: string, reason: string) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'ADMIN')
+  await assertBillingWriteAllowed(org.orgId, 'dailyReports.reject')
 
   const existing = await prisma.dailyReport.findFirst({
     where: { id: reportId, orgId: org.orgId },
@@ -612,6 +619,7 @@ export async function rejectDailyReport(reportId: string, reason: string) {
 export async function publishDailyReport(reportId: string) {
   const { session, org } = await getAuthContext()
   requireRole(org.role, 'ADMIN')
+  await assertBillingWriteAllowed(org.orgId, 'dailyReports.publish')
 
   const existing = await prisma.dailyReport.findFirst({
     where: { id: reportId, orgId: org.orgId },
@@ -652,6 +660,7 @@ export async function uploadDailyReportFiles(
 ): Promise<{ fileUrl: string; documentId: string; photoId: string }[]> {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'dailyReports.uploadFiles')
 
   const existing = await prisma.dailyReport.findFirst({
     where: { id: reportId, orgId: org.orgId },

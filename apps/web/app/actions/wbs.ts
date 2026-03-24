@@ -29,6 +29,7 @@ import {
   MAX_DEPTH,
   type WbsType,
 } from '@/lib/wbs-utils'
+import { assertBillingWriteAllowed } from '@/lib/billing/guards'
 
 function ensureProjectInOrg(projectId: string, orgId: string) {
   return prisma.project.findFirst({
@@ -322,6 +323,7 @@ export async function getProjectWBSCostsMap(
 export async function createWBSItem(projectId: string, data: CreateWBSItemInput) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'wbs.createItem')
 
   const project = await ensureProjectInOrg(projectId, org.orgId)
   if (!project) return { error: { _form: ['Project not found'] } }
@@ -412,6 +414,7 @@ export async function updateWBSItem(
 ) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'wbs.updateItem')
 
   const project = await ensureProjectInOrg(projectId, org.orgId)
   if (!project) return { error: { _form: ['Project not found'] } }
@@ -495,6 +498,7 @@ export async function reorderWBSItems(
 ): Promise<{ error?: string } | { success: true }> {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'wbs.reorderItems')
 
   const project = await ensureProjectInOrg(projectId, org.orgId)
   if (!project) return { error: 'Project not found' }
@@ -587,6 +591,7 @@ function buildUpdateData(
 export async function deleteWBSItem(id: string, projectId: string) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'wbs.deleteItem')
 
   const project = await ensureProjectInOrg(projectId, org.orgId)
   if (!project) throw new Error('Project not found')
@@ -650,6 +655,7 @@ export async function createWbsNode(data: {
   const org = await getOrgContext(session.user.id)
   if (!org) return { success: false, error: 'Unauthorized' }
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'wbs.createNode')
 
   try {
     const project = await prisma.project.findFirst({
@@ -722,6 +728,7 @@ export async function updateWbsNode(
   const org = await getOrgContext(session.user.id)
   if (!org) return { success: false, error: 'Unauthorized' }
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'wbs.updateNode')
 
   try {
     const node = await prisma.wbsNode.findFirst({
@@ -782,6 +789,7 @@ export async function deleteWbsNode(nodeId: string) {
   const org = await getOrgContext(session.user.id)
   if (!org) return { success: false, error: 'Unauthorized' }
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'wbs.deleteNode')
 
   try {
     const node = await prisma.wbsNode.findFirst({
@@ -828,6 +836,7 @@ export async function reorderWbsNode(nodeId: string, newSortOrder: number) {
   const org = await getOrgContext(session.user.id)
   if (!org) return { success: false, error: 'Unauthorized' }
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'wbs.reorderNode')
 
   try {
     const node = await prisma.wbsNode.findFirst({
@@ -1041,6 +1050,7 @@ export async function addWbsNode(data: {
 }) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'wbs.addNode')
 
   const project = await ensureProjectInOrg(data.projectId, org.orgId)
   if (!project) return { success: false, error: 'Project not found' }
@@ -1208,6 +1218,7 @@ async function getAllDescendants(nodeId: string): Promise<{ id: string }[]> {
 export async function deleteWbsNodeWithRenumber(nodeId: string) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'wbs.deleteWithRenumber')
 
   try {
     const node = await prisma.wbsNode.findFirst({
@@ -1281,6 +1292,7 @@ export async function deleteWbsNodeWithRenumber(nodeId: string) {
 export async function deleteWbsNodeCascade(nodeId: string) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'wbs.deleteCascade')
 
   try {
     const node = await prisma.wbsNode.findFirst({

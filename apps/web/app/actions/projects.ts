@@ -15,6 +15,7 @@ import {
 } from '@repo/validators'
 import type { CreateProjectInput, UpdateProjectInput, ProjectPhase } from '@repo/validators'
 import { Prisma } from '@repo/database'
+import { assertBillingWriteAllowed } from '@/lib/billing/guards'
 
 function generateProjectNumber(orgId: string): Promise<string> {
   const year = new Date().getFullYear()
@@ -133,6 +134,7 @@ export async function createProject(data: CreateProjectInput) {
   await requirePermission('PROJECTS', 'create')
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'projects.create')
 
   const parsed = createProjectSchema.safeParse(data)
   if (!parsed.success) {
@@ -216,6 +218,7 @@ export async function createProjectFromTemplate(data: {
 }) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'projects.createFromTemplate')
 
   try {
     const projectNumber = await generateProjectNumber(org.orgId)
@@ -378,6 +381,7 @@ export async function updateProject(projectId: string, data: UpdateProjectInput)
   await requirePermission('PROJECTS', 'edit')
   const { org, session } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'projects.update')
 
   const existing = await getProject(projectId)
   if (!existing) {
@@ -476,6 +480,7 @@ export async function deleteProject(projectId: string) {
   await requirePermission('PROJECTS', 'delete')
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'projects.delete')
 
   const existing = await getProject(projectId)
   if (!existing) {

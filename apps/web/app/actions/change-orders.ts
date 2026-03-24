@@ -21,6 +21,7 @@ import type {
   UpdateChangeOrderLineInput,
 } from '@repo/validators'
 import { notificationDeepLinkMetadata } from '@/lib/notification-deeplink'
+import { assertBillingWriteAllowed } from '@/lib/billing/guards'
 
 function ensureProjectInOrg(projectId: string, orgId: string) {
   return prisma.project.findFirst({
@@ -201,6 +202,7 @@ async function recalcChangeOrderCostImpact(tx: Parameters<Parameters<typeof pris
 export async function createChangeOrderLine(coId: string, data: CreateChangeOrderLineInput) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'changeOrders.createLine')
 
   const co = await prisma.changeOrder.findFirst({
     where: { id: coId, orgId: org.orgId },
@@ -269,6 +271,7 @@ export async function createChangeOrderLine(coId: string, data: CreateChangeOrde
 export async function updateChangeOrderLine(lineId: string, data: UpdateChangeOrderLineInput) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'changeOrders.updateLine')
 
   const line = await prisma.changeOrderLine.findFirst({
     where: { id: lineId, orgId: org.orgId },
@@ -312,6 +315,7 @@ export async function updateChangeOrderLine(lineId: string, data: UpdateChangeOr
 export async function deleteChangeOrderLine(lineId: string) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'changeOrders.deleteLine')
 
   const line = await prisma.changeOrderLine.findFirst({
     where: { id: lineId, orgId: org.orgId },
@@ -356,6 +360,7 @@ export async function updateChangeOrderWithLines(
 ) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'changeOrders.updateWithLines')
 
   const co = await prisma.changeOrder.findFirst({
     where: { id: coId, orgId: org.orgId },
@@ -441,6 +446,7 @@ export async function updateChangeOrderWithLines(
 export async function updateChangeOrder(coId: string, data: UpdateChangeOrderInput) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'changeOrders.update')
 
   const co = await prisma.changeOrder.findFirst({
     where: { id: coId, orgId: org.orgId },
@@ -510,6 +516,7 @@ export async function updateChangeOrder(coId: string, data: UpdateChangeOrderInp
 export async function submitForApproval(coId: string) {
   const { session, org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'changeOrders.submitForApproval')
 
   const co = await prisma.changeOrder.findFirst({
     where: { id: coId, orgId: org.orgId },
@@ -559,6 +566,7 @@ export async function submitForApproval(coId: string) {
 export async function approveChangeOrder(coId: string) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'ADMIN')
+  await assertBillingWriteAllowed(org.orgId, 'changeOrders.approve')
 
   const co = await prisma.changeOrder.findFirst({
     where: { id: coId, orgId: org.orgId },
@@ -699,6 +707,7 @@ export async function approveChangeOrder(coId: string) {
 export async function rejectChangeOrder(coId: string, reason: string) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'ADMIN')
+  await assertBillingWriteAllowed(org.orgId, 'changeOrders.reject')
 
   const co = await prisma.changeOrder.findFirst({
     where: { id: coId, orgId: org.orgId },
@@ -738,6 +747,7 @@ export async function rejectChangeOrder(coId: string, reason: string) {
 export async function requestChanges(coId: string, feedback: string) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'ADMIN')
+  await assertBillingWriteAllowed(org.orgId, 'changeOrders.requestChanges')
 
   const co = await prisma.changeOrder.findFirst({
     where: { id: coId, orgId: org.orgId },

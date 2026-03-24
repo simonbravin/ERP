@@ -8,6 +8,7 @@ import { assertProjectAccess, canEditProjectArea, PROJECT_AREAS } from '@/lib/pr
 import { uploadToR2, getDownloadUrl, calculateChecksum } from '@/lib/r2-client'
 import { publishOutboxEvent } from '@/lib/events/event-publisher'
 import { parseCreateDocumentForm } from '@/lib/schemas/documents'
+import { assertBillingWriteAllowed } from '@/lib/billing/guards'
 
 /** Use this so we throw a clear error if Prisma client was not regenerated after adding DocumentFolder. */
 function getDocumentFolderModel() {
@@ -42,6 +43,7 @@ async function getProjectDocumentStorageUsed(projectId: string): Promise<number>
 export async function createDocument(formData: FormData) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'documents.create')
 
   const file = formData.get('file') as File
   if (!file) {
@@ -163,6 +165,7 @@ export async function createDocument(formData: FormData) {
 export async function uploadNewVersion(docId: string, formData: FormData) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'documents.uploadVersion')
 
   const file = formData.get('file') as File
   const notes = (formData.get('notes') as string) || undefined
@@ -285,6 +288,7 @@ export async function linkDocumentToEntity(
 ) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'documents.linkEntity')
 
   const doc = await prisma.document.findFirst({
     where: { id: docId, orgId: org.orgId },
@@ -377,6 +381,7 @@ export async function listDocumentsForEntity(
 export async function deleteDocument(docId: string) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'ADMIN')
+  await assertBillingWriteAllowed(org.orgId, 'documents.delete')
 
   const doc = await prisma.document.findFirst({
     where: { id: docId, orgId: org.orgId },
@@ -423,6 +428,7 @@ export async function createDocumentFolder(params: {
 }) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'documents.createFolder')
 
   const { projectId, name } = params
   let { parentId } = params
@@ -469,6 +475,7 @@ export async function createDocumentFolder(params: {
 export async function deleteDocumentFolder(folderId: string) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'ADMIN')
+  await assertBillingWriteAllowed(org.orgId, 'documents.deleteFolder')
 
   const docFolder = getDocumentFolderModel()
   const folder = await docFolder.findFirst({
@@ -522,6 +529,7 @@ export async function getOrCreateProjectSubfolder(
 ): Promise<string> {
   const { org } = await getAuthContext()
   await assertProjectAccess(projectId, org)
+  await assertBillingWriteAllowed(org.orgId, 'documents.ensureSubfolder')
   const docFolder = getDocumentFolderModel()
   const root = await docFolder.findFirst({
     where: { projectId, parentId: null, orgId: org.orgId },
@@ -564,6 +572,7 @@ export async function uploadProjectAttachmentAndLink(
 ) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'VIEWER')
+  await assertBillingWriteAllowed(org.orgId, 'documents.qualityAttachment')
   const file = formData.get('file') as File
   if (!file || !(file instanceof File) || file.size === 0) {
     throw new Error('No file provided')

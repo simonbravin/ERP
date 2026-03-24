@@ -25,6 +25,7 @@ import { publishOutboxEvent } from '@/lib/events/event-publisher'
 import { serializeForClient } from '@/lib/utils/serialization'
 import { assertProjectAccess, canEditProjectArea, PROJECT_AREAS } from '@/lib/project-permissions'
 import { notificationDeepLinkMetadata } from '@/lib/notification-deeplink'
+import { assertBillingWriteAllowed } from '@/lib/billing/guards'
 
 function ensureProjectInOrg(projectId: string, orgId: string) {
   return prisma.project.findFirst({
@@ -306,6 +307,7 @@ export async function createBudgetVersion(projectId: string, data: CreateBudgetV
   await requirePermission('BUDGET', 'create')
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'budget.createVersion')
   let projectRole: string | null
   try {
     const access = await assertProjectAccess(projectId, org)
@@ -386,6 +388,7 @@ export async function createBudgetVersion(projectId: string, data: CreateBudgetV
 export async function updateBudgetVersion(versionId: string, data: UpdateBudgetVersionInput) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'budget.updateVersion')
 
   const version = await prisma.budgetVersion.findFirst({
     where: { id: versionId, orgId: org.orgId },
@@ -425,6 +428,7 @@ export async function updateBudgetVersion(versionId: string, data: UpdateBudgetV
 export async function setBudgetBaseline(versionId: string) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'budget.setBaseline')
 
   const version = await prisma.budgetVersion.findFirst({
     where: { id: versionId, orgId: org.orgId },
@@ -469,6 +473,7 @@ export async function approveBudgetVersion(versionId: string) {
   await requirePermission('BUDGET', 'approve')
   const { session, org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'budget.approveVersion')
 
   const version = await prisma.budgetVersion.findFirst({
     where: { id: versionId, orgId: org.orgId },
@@ -541,6 +546,7 @@ export async function updateBudgetVersionStatus(
   const org = await getOrgContext(session.user.id)
   if (!org) return { success: false, error: 'Unauthorized' }
   requireRole(org.role, 'ADMIN')
+  await assertBillingWriteAllowed(org.orgId, 'budget.updateVersionStatus')
 
   try {
     const version = await prisma.budgetVersion.findFirst({
@@ -623,6 +629,7 @@ export async function updateMarkupMode(
 ) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'budget.updateMarkupMode')
 
   try {
     const version = await prisma.budgetVersion.findFirst({
@@ -696,6 +703,7 @@ export async function updateGlobalMarkups(
 ) {
   const { session, org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'budget.updateGlobalMarkups')
 
   try {
     const version = await prisma.budgetVersion.findFirst({
@@ -790,6 +798,7 @@ export async function updateLineMarkup(
 ) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'budget.updateLineMarkup')
 
   try {
     const line = await prisma.budgetLine.findFirst({
@@ -849,6 +858,7 @@ export async function updateLineMarkup(
 export async function createBudgetLine(versionId: string, data: CreateBudgetLineInput) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'budget.createLine')
 
   const version = await prisma.budgetVersion.findFirst({
     where: { id: versionId, orgId: org.orgId },
@@ -941,6 +951,7 @@ export async function createBudgetLine(versionId: string, data: CreateBudgetLine
 export async function updateBudgetLine(lineId: string, data: UpdateBudgetLineInput) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'budget.updateLine')
 
   const line = await prisma.budgetLine.findFirst({
     where: { id: lineId, orgId: org.orgId },
@@ -1025,6 +1036,7 @@ export async function deleteBudgetLine(lineId: string) {
   await requirePermission('BUDGET', 'delete')
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'budget.deleteLine')
 
   const line = await prisma.budgetLine.findFirst({
     where: { id: lineId, orgId: org.orgId },
@@ -1063,6 +1075,7 @@ export async function deleteBudgetLine(lineId: string) {
 export async function copyBudgetVersion(sourceVersionId: string) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'budget.copyVersion')
 
   const source = await prisma.budgetVersion.findFirst({
     where: { id: sourceVersionId, orgId: org.orgId },
@@ -1165,6 +1178,7 @@ export async function importLinesFromVersion(
 ) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'budget.importLines')
 
   const [target, source] = await Promise.all([
     prisma.budgetVersion.findFirst({
@@ -1431,6 +1445,7 @@ export async function addBudgetResource(
 ): Promise<{ success: boolean; error?: string; resource?: { id: string; type: string; name: string; description: string | null; unit: string; quantity: number; unitCost: number; totalCost: number; supplierName: string | null } }> {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'budget.addResource')
 
   const line = await prisma.budgetLine.findFirst({
     where: { id: budgetLineId, orgId: org.orgId },
@@ -1528,6 +1543,7 @@ export async function updateBudgetResource(
 ): Promise<{ success: boolean; error?: string }> {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'budget.updateResource')
 
   const resource = await prisma.budgetResource.findFirst({
     where: { id: resourceId, orgId: org.orgId },
@@ -1599,6 +1615,7 @@ export async function updateBudgetResource(
 export async function deleteBudgetResource(resourceId: string): Promise<{ success: boolean; error?: string }> {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'budget.deleteResource')
 
   const resource = await prisma.budgetResource.findFirst({
     where: { id: resourceId, orgId: org.orgId },
@@ -1631,6 +1648,7 @@ export async function updateBudgetLineQuantity(
 ): Promise<{ success: boolean; error?: string }> {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'budget.updateLineQuantity')
 
   if (newQuantity <= 0 || !Number.isFinite(newQuantity)) {
     return { success: false, error: 'Cantidad inválida' }

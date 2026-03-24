@@ -30,6 +30,7 @@ import {
 } from '@/lib/schemas/schedule'
 import { createAuditLog } from '@/lib/audit-log'
 import { addDays, differenceInDays } from 'date-fns'
+import { assertBillingWriteAllowed } from '@/lib/billing/guards'
 
 /**
  * Crear nuevo cronograma desde WBS.
@@ -57,6 +58,7 @@ export async function createScheduleFromWBS(
   const org = await getOrgContext(session.user.id)
   if (!org) return { success: false, error: 'Unauthorized' }
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'schedule.createFromWbs')
 
   try {
     const access = await assertProjectAccess(parsed.projectId, org)
@@ -264,6 +266,7 @@ export async function duplicateScheduleAsDraft(
   const org = await getOrgContext(session.user.id)
   if (!org) return { success: false, error: 'Unauthorized' }
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'schedule.duplicateAsDraft')
 
   if (!data.name?.trim()) {
     return { success: false, error: 'El nombre es obligatorio' }
@@ -435,6 +438,7 @@ export async function updateTaskDates(
   const org = await getOrgContext(session.user.id)
   if (!org) return { success: false, error: 'Unauthorized' }
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'schedule.updateTaskDates')
 
   try {
     const task = await prisma.scheduleTask.findFirst({
@@ -646,6 +650,7 @@ export async function addTaskDependency(data: {
   const org = await getOrgContext(session.user.id)
   if (!org) return { success: false, error: 'Unauthorized' }
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'schedule.addTaskDependency')
 
   try {
     const schedule = await prisma.schedule.findFirst({
@@ -727,6 +732,7 @@ export async function removeTaskDependency(dependencyId: string) {
   const org = await getOrgContext(session.user.id)
   if (!org) return { success: false, error: 'Unauthorized' }
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'schedule.removeTaskDependency')
 
   try {
     const dependency = await prisma.taskDependency.findFirst({
@@ -787,6 +793,7 @@ export async function updateTaskProgress(
   const org = await getOrgContext(session.user.id)
   if (!org) return { success: false, error: 'Unauthorized' }
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'schedule.updateTaskProgress')
 
   try {
     const task = await prisma.scheduleTask.findFirst({
@@ -1061,6 +1068,7 @@ export async function setScheduleAsBaseline(scheduleId: string) {
   const org = await getOrgContext(session.user.id)
   if (!org) return { success: false, error: 'Unauthorized' }
   requireRole(org.role, 'ADMIN')
+  await assertBillingWriteAllowed(org.orgId, 'schedule.setBaseline')
 
   try {
     const schedule = await prisma.schedule.findFirst({
@@ -1149,6 +1157,7 @@ export async function approveSchedule(scheduleId: string) {
   const org = await getOrgContext(session.user.id)
   if (!org) return { success: false, error: 'Unauthorized' }
   requireRole(org.role, 'ADMIN')
+  await assertBillingWriteAllowed(org.orgId, 'schedule.approve')
 
   try {
     const schedule = await prisma.schedule.findFirst({
@@ -1217,6 +1226,7 @@ export async function updateScheduleNonWorkingDates(scheduleId: string, text: st
   const org = await getOrgContext(session.user.id)
   if (!org) return { success: false, error: 'Unauthorized' }
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'schedule.updateNonWorkingDates')
 
   try {
     const schedule = await prisma.schedule.findFirst({
@@ -1283,6 +1293,7 @@ export async function importScheduleFromMsProjectXml(scheduleId: string, xml: st
   const org = await getOrgContext(session.user.id)
   if (!org) return { success: false, error: 'Unauthorized' }
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'schedule.importMsProjectXml')
 
   if (xml.length > 6_000_000) {
     return { success: false, error: 'El archivo XML es demasiado grande.' }

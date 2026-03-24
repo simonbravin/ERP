@@ -12,6 +12,7 @@ import {
   type MsProjectExportDep,
   type MsProjectExportTask,
 } from '@/lib/schedule/ms-project-xml'
+import { assertBillingWriteAllowed } from '@/lib/billing/guards'
 
 type OrgData = {
   name: string
@@ -77,6 +78,7 @@ export async function exportMaterialsToExcel(
 
   const org = await getOrgContext(session.user.id)
   if (!org?.orgId) return { success: false, error: 'Unauthorized' }
+  await assertBillingWriteAllowed(org.orgId, 'exports.request')
 
   const orgData = await getOrganizationData(org.orgId)
 
@@ -158,6 +160,7 @@ export async function exportBudgetToExcel(
 
   const org = await getOrgContext(session.user.id)
   if (!org?.orgId) return { success: false, error: 'Unauthorized' }
+  await assertBillingWriteAllowed(org.orgId, 'exports.request')
 
   const orgData = await getOrganizationData(org.orgId)
 
@@ -255,6 +258,7 @@ export async function exportMaterialsBySupplierToExcel(
 
   const org = await getOrgContext(session.user.id)
   if (!org?.orgId) return { success: false, error: 'Unauthorized' }
+  await assertBillingWriteAllowed(org.orgId, 'exports.request')
 
   const orgData = await getOrganizationData(org.orgId)
 
@@ -345,6 +349,7 @@ export async function exportAllMaterialsBySupplierToExcel(
 
   const org = await getOrgContext(session.user.id)
   if (!org?.orgId) return { success: false, error: 'Unauthorized' }
+  await assertBillingWriteAllowed(org.orgId, 'exports.request')
 
   const orgData = await getOrganizationData(org.orgId)
 
@@ -442,6 +447,7 @@ export async function exportPurchaseOrderToExcel(
 
   const org = await getOrgContext(session.user.id)
   if (!org?.orgId) return { success: false, error: 'Unauthorized' }
+  await assertBillingWriteAllowed(org.orgId, 'exports.request')
 
   const orgData = await getOrganizationData(org.orgId)
 
@@ -533,6 +539,7 @@ export async function exportProjectsToExcel(selectedColumns: string[]) {
 
   const org = await getOrgContext(session.user.id)
   if (!org?.orgId) return { success: false, error: 'Unauthorized' }
+  await assertBillingWriteAllowed(org.orgId, 'exports.request')
 
   const orgData = await getOrganizationData(org.orgId)
 
@@ -606,6 +613,7 @@ export async function exportTeamToExcel(selectedColumns: string[]) {
 
   const org = await getOrgContext(session.user.id)
   if (!org?.orgId) return { success: false, error: 'Unauthorized' }
+  await assertBillingWriteAllowed(org.orgId, 'exports.request')
 
   const orgData = await getOrganizationData(org.orgId)
 
@@ -698,6 +706,7 @@ export async function exportGenericTable(
 
   const org = await getOrgContext(session.user.id)
   if (!org?.orgId) return { success: false, error: 'Unauthorized' }
+  await assertBillingWriteAllowed(org.orgId, 'exports.request')
 
   const orgData = await getOrganizationData(org.orgId)
 
@@ -757,6 +766,7 @@ export async function exportCompanyTransactionsToExcel(
   if (!session?.user?.id) return { success: false, error: 'Unauthorized' }
   const org = await getOrgContext(session.user.id)
   if (!org?.orgId) return { success: false, error: 'Unauthorized' }
+  await assertBillingWriteAllowed(org.orgId, 'exports.request')
   const orgData = await getOrganizationData(org.orgId)
   try {
     const { getCompanyTransactions } = await import('./finance')
@@ -823,6 +833,7 @@ export async function exportCompanyCashflowToExcel(
   if (!session?.user?.id) return { success: false, error: 'Unauthorized' }
   const org = await getOrgContext(session.user.id)
   if (!org?.orgId) return { success: false, error: 'Unauthorized' }
+  await assertBillingWriteAllowed(org.orgId, 'exports.request')
   const orgData = await getOrganizationData(org.orgId)
   try {
     const { getCompanyCashflowDetailed } = await import('./finance')
@@ -882,6 +893,7 @@ export async function exportProjectCashflowToExcel(
   if (!session?.user?.id) return { success: false, error: 'Unauthorized' }
   const org = await getOrgContext(session.user.id)
   if (!org?.orgId) return { success: false, error: 'Unauthorized' }
+  await assertBillingWriteAllowed(org.orgId, 'exports.request')
   const project = await getProject(params.projectId)
   if (!project) return { success: false, error: 'Proyecto no encontrado' }
   try {
@@ -937,6 +949,7 @@ export async function exportOverheadToExcel(selectedColumns: string[]) {
   if (!session?.user?.id) return { success: false, error: 'Unauthorized' }
   const org = await getOrgContext(session.user.id)
   if (!org?.orgId) return { success: false, error: 'Unauthorized' }
+  await assertBillingWriteAllowed(org.orgId, 'exports.request')
   const orgData = await getOrganizationData(org.orgId)
   try {
     const { getOverheadTransactions } = await import('./finance')
@@ -996,6 +1009,7 @@ export async function exportProjectTransactionsToExcel(
   if (!session?.user?.id) return { success: false, error: 'Unauthorized' }
   const org = await getOrgContext(session.user.id)
   if (!org?.orgId) return { success: false, error: 'Unauthorized' }
+  await assertBillingWriteAllowed(org.orgId, 'exports.request')
   const orgData = await getOrganizationData(org.orgId)
   try {
     const { getProjectTransactions } = await import('./finance')
@@ -1059,6 +1073,7 @@ export async function exportCertificationsToExcel(
   if (!session?.user?.id) return { success: false, error: 'Unauthorized' }
   const org = await getOrgContext(session.user.id)
   if (!org?.orgId) return { success: false, error: 'Unauthorized' }
+  await assertBillingWriteAllowed(org.orgId, 'exports.request')
   const orgData = await getOrganizationData(org.orgId)
   try {
     const { getProjectCertifications } = await import('./certifications')
@@ -1243,6 +1258,7 @@ export async function exportScheduleToExcel(
   if (!session?.user?.id) return { success: false, error: 'Unauthorized' }
   const org = await getOrgContext(session.user.id)
   if (!org?.orgId) return { success: false, error: 'Unauthorized' }
+  await assertBillingWriteAllowed(org.orgId, 'exports.request')
 
   const lang = scheduleExcelLocale(locale)
   const labels = SCHEDULE_EXCEL_LABELS[lang]
@@ -1351,6 +1367,7 @@ export async function exportScheduleToMsProjectXml(scheduleId: string) {
   if (!session?.user?.id) return { success: false, error: 'Unauthorized' }
   const org = await getOrgContext(session.user.id)
   if (!org?.orgId) return { success: false, error: 'Unauthorized' }
+  await assertBillingWriteAllowed(org.orgId, 'exports.request')
 
   try {
     const schedule = await getScheduleForView(scheduleId)

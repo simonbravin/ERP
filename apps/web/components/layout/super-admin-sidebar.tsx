@@ -19,6 +19,7 @@ import {
   Building2,
   Users,
   FileText,
+  CreditCard,
   LogOut,
   Shield,
 } from 'lucide-react'
@@ -26,6 +27,7 @@ import {
 const nav = [
   { name: 'Dashboard', href: '/super-admin', icon: LayoutDashboard },
   { name: 'Organizations', href: '/super-admin/organizations', icon: Building2 },
+  { name: 'Billing', href: '/super-admin/billing', icon: CreditCard },
   { name: 'Users', href: '/super-admin/users', icon: Users },
   { name: 'Audit logs', href: '/super-admin/logs', icon: FileText },
 ]

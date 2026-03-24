@@ -3,7 +3,7 @@
 import { useTranslations } from 'next-intl'
 import { Link } from '@/i18n/navigation'
 import { usePathname } from 'next/navigation'
-import { Building2, User, Users } from 'lucide-react'
+import { Building2, User, Users, CreditCard } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface SettingsTabsProps {
@@ -31,6 +31,12 @@ export function SettingsTabs({ userRole }: SettingsTabsProps) {
       name: t('team'),
       href: '/settings/team',
       icon: Users,
+      roles: ['ADMIN', 'OWNER'],
+    },
+    {
+      name: t('subscription', { defaultValue: 'Suscripción' }),
+      href: '/settings/subscription',
+      icon: CreditCard,
       roles: ['ADMIN', 'OWNER'],
     },
   ]

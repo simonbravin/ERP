@@ -8,6 +8,7 @@ import { publishOutboxEvent } from '@/lib/events/event-publisher'
 import { toBaseAmount } from '@/lib/currency-utils'
 import { serializeTransaction } from './finance-helpers'
 import { getApprovedOrBaselineBudgetTotals } from './budget'
+import { assertBillingWriteAllowed } from '@/lib/billing/guards'
 
 export async function createCompanyTransaction(data: {
   type: 'EXPENSE' | 'INCOME' | 'OVERHEAD'
@@ -100,6 +101,7 @@ export async function allocateOverhead(
 ) {
   const { org } = await requireOrgFinanceAccess()
   requireRole(org.role, 'ACCOUNTANT')
+  await assertBillingWriteAllowed(org.orgId, 'finance.allocateOverhead')
   const tx = await prisma.financeTransaction.findFirst({
     where: { id: transactionId, orgId: org.orgId, deleted: false },
     select: { id: true, projectId: true, total: true },
@@ -492,6 +494,7 @@ export async function deleteOverheadAllocation(allocationId: string) {
   await requirePermission('FINANCE', 'edit')
   const { org } = await requireOrgFinanceAccess()
   requireRole(org.role, 'ACCOUNTANT')
+  await assertBillingWriteAllowed(org.orgId, 'finance.deleteOverheadAllocation')
   const allocation = await prisma.overheadAllocation.findUnique({
     where: { id: allocationId },
     select: { orgId: true, transactionId: true },
@@ -522,6 +525,7 @@ export async function updateOverheadAllocation(
   await requirePermission('FINANCE', 'edit')
   const { org } = await requireOrgFinanceAccess()
   requireRole(org.role, 'ACCOUNTANT')
+  await assertBillingWriteAllowed(org.orgId, 'finance.updateOverheadAllocation')
   const allocation = await prisma.overheadAllocation.findUnique({
     where: { id: allocationId },
     include: { transaction: { select: { total: true } } },

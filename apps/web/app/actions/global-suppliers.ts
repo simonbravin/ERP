@@ -6,6 +6,7 @@ import { getAuthContext } from '@/lib/auth-helpers'
 import { hasPermission } from '@/lib/permissions'
 import { requireRole, type OrgRole } from '@/lib/rbac'
 import { publishOutboxEvent } from '@/lib/events/event-publisher'
+import { assertBillingWriteAllowed } from '@/lib/billing/guards'
 
 export async function linkGlobalSupplier(
   globalPartyId: string,
@@ -22,6 +23,7 @@ export async function linkGlobalSupplier(
 ) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'suppliers.linkGlobal')
 
   const globalParty = await prisma.globalParty.findUnique({
     where: { id: globalPartyId },
@@ -77,6 +79,7 @@ export async function linkGlobalSupplier(
 export async function unlinkGlobalSupplier(globalPartyId: string) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'ADMIN')
+  await assertBillingWriteAllowed(org.orgId, 'suppliers.unlinkGlobal')
 
   const link = await prisma.orgPartyLink.findUnique({
     where: {
@@ -124,6 +127,7 @@ export async function updateSupplierLink(
 ) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'suppliers.updateLink')
 
   const link = await prisma.orgPartyLink.findFirst({
     where: { id: linkId, orgId: org.orgId },
@@ -207,6 +211,7 @@ export async function createLocalSupplier(data: {
 }): Promise<{ success: true; partyId: string } | { success: false; duplicateName: true }> {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'suppliers.createLocalSupplier')
 
   const nameTrim = data.name.trim()
   if (!data.forceCreate) {
@@ -265,6 +270,7 @@ export async function createLocalClient(data: {
 }): Promise<{ success: true; partyId: string } | { success: false; duplicateName: true }> {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'suppliers.createLocalClient')
 
   const nameTrim = data.name.trim()
   if (!data.forceCreate) {
@@ -327,6 +333,7 @@ export async function updateLocalParty(partyId: string, data: UpdateLocalPartyDa
   if (!hasPermission(org.role as OrgRole, 'suppliers', 'edit', org.customPermissions ?? null)) {
     throw new Error('No tienes permiso para editar proveedores y clientes.')
   }
+  await assertBillingWriteAllowed(org.orgId, 'suppliers.updateLocalParty')
 
   const party = await prisma.party.findFirst({
     where: { id: partyId, orgId: org.orgId, active: true },

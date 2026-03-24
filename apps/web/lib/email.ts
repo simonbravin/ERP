@@ -228,3 +228,33 @@ export async function sendWeeklyReportEmail(params: {
     return { success: false, error: { message: String(err) } }
   }
 }
+
+export async function sendBillingReminderEmail(params: {
+  to: string
+  subject: string
+  contentHtml: string
+}): Promise<{ success: true; data?: { id?: string } } | { success: false; error: { message: string } }> {
+  const { to, subject, contentHtml } = params
+  const apiKey = process.env.RESEND_API_KEY?.trim()
+  if (!apiKey) {
+    console.warn('[email] RESEND_API_KEY not set; billing reminder email skipped.')
+    return { success: false, error: { message: 'Email not configured' } }
+  }
+  const resend = new Resend(apiKey)
+  try {
+    const { data: _data, error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: [to],
+      subject,
+      html: wrapEmailWithTemplate(contentHtml),
+    })
+    if (error) {
+      console.error('Billing reminder email error:', error)
+      return { success: false, error }
+    }
+    return { success: true, data: _data }
+  } catch (err) {
+    console.error('Billing reminder email error:', err)
+    return { success: false, error: { message: String(err) } }
+  }
+}

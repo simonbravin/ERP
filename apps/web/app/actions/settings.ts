@@ -7,6 +7,7 @@ import { getOrgContext } from '@/lib/org-context'
 import { requireRole } from '@/lib/rbac'
 import { uploadToR2, r2Client, StorageNotConfiguredError } from '@/lib/r2-client'
 import type { UpdateUserProfileInput, UpdateOrganizationInput } from '@repo/validators'
+import { assertBillingWriteAllowed } from '@/lib/billing/guards'
 
 const IMAGE_MAX_BYTES = 5 * 1024 * 1024 // 5MB
 const IMAGE_ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'] as const
@@ -56,6 +57,7 @@ export async function updateOrganization(data: UpdateOrganizationInput) {
   const orgContext = await getOrgContext(session.user.id)
   if (!orgContext) throw new Error('Unauthorized')
   requireRole(orgContext.role, 'ADMIN')
+  await assertBillingWriteAllowed(orgContext.orgId, 'settings.updateOrganization')
 
   try {
     await prisma.organization.update({
@@ -121,6 +123,7 @@ export async function uploadOrgLogo(formData: FormData) {
   const orgContext = await getOrgContext(session.user.id)
   if (!orgContext) return { success: false, error: 'Unauthorized' }
   requireRole(orgContext.role, 'ADMIN')
+  await assertBillingWriteAllowed(orgContext.orgId, 'settings.uploadOrgLogo')
 
   const file = formData.get('logo') as File | null
   if (!file || !file.size) return { success: false, error: 'Selecciona una imagen' }
@@ -201,6 +204,7 @@ export async function removeOrgLogo() {
   const orgContext = await getOrgContext(session.user.id)
   if (!orgContext) return { success: false, error: 'Unauthorized' }
   requireRole(orgContext.role, 'ADMIN')
+  await assertBillingWriteAllowed(orgContext.orgId, 'settings.removeOrgLogo')
 
   try {
     const profile = await prisma.orgProfile.findUnique({

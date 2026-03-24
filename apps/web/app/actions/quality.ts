@@ -6,6 +6,7 @@ import { requireRole } from '@/lib/rbac'
 import { getAuthContext } from '@/lib/auth-helpers'
 import { assertProjectAccess, canEditProjectArea, PROJECT_AREAS } from '@/lib/project-permissions'
 import { parseUuidOrThrow } from '@/lib/schemas/ids'
+import { assertBillingWriteAllowed } from '@/lib/billing/guards'
 
 async function generateRfiNumber(projectId: string): Promise<number> {
   const lastRfi = await prisma.rFI.findFirst({
@@ -31,6 +32,7 @@ export async function createRfi(
 
   const { org } = await getAuthContext()
   requireRole(org.role, 'VIEWER')
+  await assertBillingWriteAllowed(org.orgId, 'quality.createRfi')
 
   const project = await prisma.project.findFirst({
     where: { id: validProjectId, orgId: org.orgId },
@@ -73,6 +75,7 @@ export async function addRfiComment(rfiId: string, comment: string) {
   const validRfiId = parseUuidOrThrow(rfiId, 'ID de RFI')
 
   const { org } = await getAuthContext()
+  await assertBillingWriteAllowed(org.orgId, 'quality.addRfiComment')
 
   const rfi = await prisma.rFI.findFirst({
     where: { id: validRfiId, orgId: org.orgId },
@@ -142,6 +145,7 @@ export async function closeRfi(rfiId: string) {
 
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'quality.closeRfi')
 
   const rfi = await prisma.rFI.findFirst({
     where: { id: validRfiId, orgId: org.orgId },
@@ -185,6 +189,7 @@ export async function createSubmittal(
 
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'quality.createSubmittal')
 
   const project = await prisma.project.findFirst({
     where: { id: validProjectId, orgId: org.orgId },
@@ -232,6 +237,7 @@ export async function submitSubmittal(submittalId: string) {
 
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'quality.submitSubmittal')
 
   const submittal = await prisma.submittal.findFirst({
     where: { id: validSubmittalId, orgId: org.orgId },
@@ -272,6 +278,7 @@ export async function reviewSubmittal(
 
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'quality.reviewSubmittal')
 
   const submittal = await prisma.submittal.findFirst({
     where: { id: validSubmittalId, orgId: org.orgId },

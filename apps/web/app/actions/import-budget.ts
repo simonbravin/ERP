@@ -6,6 +6,7 @@ import { requireRole } from '@/lib/rbac'
 import { getAuthContext } from '@/lib/auth-helpers'
 import { Prisma } from '@repo/database'
 import type { ParsedWbsItem } from '@/lib/types/excel-import'
+import { assertBillingWriteAllowed } from '@/lib/billing/guards'
 
 async function generateProjectNumber(orgId: string): Promise<string> {
   const year = new Date().getFullYear()
@@ -41,6 +42,7 @@ export async function importBudgetFromExcel(
 ): Promise<ImportBudgetResult> {
   const { org } = await getAuthContext()
   requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'budget.importExcel')
 
   try {
     const projectNumber = await generateProjectNumber(org.orgId)

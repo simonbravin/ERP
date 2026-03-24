@@ -2070,6 +2070,19 @@
     "activity_update_schedule": "actualizó el cronograma",
     "activity_update_task_dates_scheduletask": "actualizó fechas de tareas del cronograma"
   },
+  "billing": {
+    "toastReadOnly": "Tu organización está en modo solo lectura por facturación. Podés gestionar la suscripción en configuración.",
+    "toastSelectPlanPrice": "Seleccioná un plan y precio.",
+    "toastCheckoutMissingUrl": "No se pudo iniciar el checkout.",
+    "toastCheckoutError": "Error al iniciar el checkout.",
+    "availablePlans": "Planes disponibles",
+    "noPlansConfigured": "No hay planes con precio Paddle configurado. Completá el seed de BillingPlan y BillingPlanPrice (incl. paddlePriceId) para habilitar el checkout.",
+    "choosePlan": "Elegir plan",
+    "planPriceLabel": "Plan y precio",
+    "selectPlaceholder": "Seleccioná una opción",
+    "goToCheckout": "Ir a checkout",
+    "opening": "Abriendo…"
+  },
   "settings": {
     "settings": "Configuración",
     "settingsSubtitle": "Gestiona la configuración de tu organización y perfil",

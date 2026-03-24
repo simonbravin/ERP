@@ -30,6 +30,9 @@
     "db:create-superadmin:prod": "dotenv -e .env.production.local -- tsx src/set-superadmin-password.ts",
     "ensure-demo-org": "tsx src/ensure-demo-org.ts",
     "ensure-demo-org:prod": "dotenv -e .env.production.local -- tsx src/ensure-demo-org.ts",
+    "db:backfill-billing-legacy": "tsx src/backfill-billing-from-legacy.ts",
+    "db:backfill-billing-legacy:prod": "dotenv -e .env.production.local -- tsx src/backfill-billing-from-legacy.ts",
+    "db:seed-billing-catalog": "tsx src/run-seed-billing-catalog.ts",
     "build": "prisma generate",
     "lint": "prisma validate"
   },

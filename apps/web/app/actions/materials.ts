@@ -6,6 +6,7 @@ import { prisma } from '@repo/database'
 import { Prisma } from '@repo/database'
 import type { ConsolidatedMaterial, MaterialsBySupplier, MaterialLineForPO } from '@/lib/types/materials'
 import { RESOURCE_TYPES } from '@/lib/constants/budget'
+import { assertBillingWriteAllowed } from '@/lib/billing/guards'
 
 function getSupplierName(attributes: unknown): string | null {
   if (!attributes || typeof attributes !== 'object') return null
@@ -292,6 +293,7 @@ export async function createPurchaseOrderCommitment(
 
   const org = await getOrgContext(session.user.id)
   if (!org?.orgId) return { success: false, error: 'No organization' }
+  await assertBillingWriteAllowed(org.orgId, 'materials.createPurchaseOrder')
 
   const { projectId, partyId, issueDate, description, lines } = input
   if (!lines.length) return { success: false, error: 'Debe incluir al menos una línea' }
@@ -611,6 +613,7 @@ export async function updatePurchaseOrder(
 
   const org = await getOrgContext(session.user.id)
   if (!org?.orgId) return { success: false, error: 'No organization' }
+  await assertBillingWriteAllowed(org.orgId, 'materials.updatePurchaseOrder')
 
   const { commitmentId, partyId, issueDate, description, lines } = input
   if (!lines.length) return { success: false, error: 'Debe incluir al menos una línea' }

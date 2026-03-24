@@ -2068,6 +2068,19 @@
     "activity_update_schedule": "updated the schedule",
     "activity_update_task_dates_scheduletask": "updated schedule task dates"
   },
+  "billing": {
+    "toastReadOnly": "Your organization is in read-only mode due to billing. You can still manage subscription from settings.",
+    "toastSelectPlanPrice": "Select a plan and price.",
+    "toastCheckoutMissingUrl": "Could not start checkout.",
+    "toastCheckoutError": "Something went wrong starting checkout.",
+    "availablePlans": "Available plans",
+    "noPlansConfigured": "No plans with a Paddle price configured. Seed BillingPlan and BillingPlanPrice (including paddlePriceId) to enable checkout.",
+    "choosePlan": "Choose plan",
+    "planPriceLabel": "Plan and price",
+    "selectPlaceholder": "Select an option",
+    "goToCheckout": "Go to checkout",
+    "opening": "Opening…"
+  },
   "settings": {
     "settings": "Settings",
     "settingsSubtitle": "Manage your organization and profile settings",

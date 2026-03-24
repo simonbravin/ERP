@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs'
 import { prisma } from './client'
 import { seedInventoryCategories } from './seed-inventory-categories'
+import { seedBillingCatalogFromEnv } from './seed-billing-catalog'
 
 async function seedCurrencies() {
   await prisma.currency.createMany({
@@ -193,7 +194,10 @@ async function main() {
   await seedDevUser()
   await seedDailyReports()
   await seedInventoryCategories()
-  console.log('Seed completed: currencies, super admin, dev user, daily reports, inventory categories')
+  await seedBillingCatalogFromEnv()
+  console.log(
+    'Seed completed: currencies, super admin, dev user, daily reports, inventory categories, billing catalog (if env set)'
+  )
 }
 
 main()

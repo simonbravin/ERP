@@ -10,6 +10,7 @@ import {
 } from '@repo/validators'
 import type { CreateResourceInput, UpdateResourceInput } from '@repo/validators'
 import { generateResourceCode } from '@/lib/resource-utils'
+import { assertBillingWriteAllowed } from '@/lib/billing/guards'
 
 async function getNextResourceSequence(orgId: string, category: string): Promise<number> {
   const prefix = generateResourceCode(category, 0).replace(/0+$/, '')
@@ -196,6 +197,7 @@ export async function createResource(data: CreateResourceInput) {
 export async function updateResource(id: string, data: UpdateResourceInput) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'ADMIN')
+  await assertBillingWriteAllowed(org.orgId, 'resources.update')
 
   const existing = await prisma.resource.findFirst({
     where: { id, orgId: org.orgId },
@@ -254,6 +256,7 @@ export async function listSuppliers() {
 export async function deactivateResource(id: string) {
   const { org } = await getAuthContext()
   requireRole(org.role, 'ADMIN')
+  await assertBillingWriteAllowed(org.orgId, 'resources.deactivate')
 
   const existing = await prisma.resource.findFirst({
     where: { id, orgId: org.orgId },

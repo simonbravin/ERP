@@ -13,6 +13,15 @@ import type { InviteTeamMemberInput } from '@repo/validators'
 import { sendInvitationEmail, sendAddedToOrgEmail } from '@/lib/email'
 import { requirePermission } from '@/lib/auth-helpers'
 import { publishOutboxEvent } from '@/lib/events/event-publisher'
+import { assertBillingWriteAllowed } from '@/lib/billing/guards'
+import { isBillingWriteBlocked } from '@/lib/billing/errors'
+
+function teamBillingBlocked(err: unknown): { success: false; error: string } | null {
+  if (isBillingWriteBlocked(err)) {
+    return { success: false, error: err.message }
+  }
+  return null
+}
 
 export async function inviteTeamMember(data: InviteTeamMemberInput) {
   const session = await getSession()
@@ -30,6 +39,14 @@ export async function inviteTeamMember(data: InviteTeamMemberInput) {
   }
 
   const orgId = orgContext.orgId
+
+  try {
+    await assertBillingWriteAllowed(orgId, 'team.inviteMember')
+  } catch (e) {
+    const blocked = teamBillingBlocked(e)
+    if (blocked) return blocked
+    throw e
+  }
 
   try {
     const existingUser = await prisma.user.findUnique({
@@ -111,6 +128,14 @@ export async function deactivateMember(memberId: string) {
   }
 
   try {
+    await assertBillingWriteAllowed(orgContext.orgId, 'team.deactivateMember')
+  } catch (e) {
+    const blocked = teamBillingBlocked(e)
+    if (blocked) return blocked
+    throw e
+  }
+
+  try {
     const member = await prisma.orgMember.findFirst({
       where: { id: memberId, orgId: orgContext.orgId },
     })
@@ -161,6 +186,14 @@ export async function activateMember(memberId: string) {
   }
 
   try {
+    await assertBillingWriteAllowed(orgContext.orgId, 'team.activateMember')
+  } catch (e) {
+    const blocked = teamBillingBlocked(e)
+    if (blocked) return blocked
+    throw e
+  }
+
+  try {
     const member = await prisma.orgMember.findFirst({
       where: { id: memberId, orgId: orgContext.orgId },
     })
@@ -207,6 +240,14 @@ export async function resendInvitation(_memberId: string) {
   }
 
   try {
+    await assertBillingWriteAllowed(orgContext.orgId, 'team.resendInvitation')
+  } catch (e) {
+    const blocked = teamBillingBlocked(e)
+    if (blocked) return blocked
+    throw e
+  }
+
+  try {
     // TODO: Recuperar email del miembro pendiente (requiere modelo OrgInvitation)
     // TODO: Reenviar email con link de registro
 
@@ -232,6 +273,14 @@ export async function resendInvitationEmail(invitationId: string) {
     requireRole(orgContext.role as 'OWNER' | 'ADMIN', 'ADMIN')
   } catch {
     return { success: false, error: 'No tienes permiso para reenviar invitaciones' }
+  }
+
+  try {
+    await assertBillingWriteAllowed(orgContext.orgId, 'team.resendInvitationEmail')
+  } catch (e) {
+    const blocked = teamBillingBlocked(e)
+    if (blocked) return blocked
+    throw e
   }
 
   const invitation = await prisma.invitation.findFirst({
@@ -391,6 +440,14 @@ export async function setMemberRestrictedToProjects(
     return { success: false, error: 'No tienes permiso para esta acción' }
   }
 
+  try {
+    await assertBillingWriteAllowed(orgContext.orgId, 'team.setMemberRestrictedToProjects')
+  } catch (e) {
+    const blocked = teamBillingBlocked(e)
+    if (blocked) return blocked
+    throw e
+  }
+
   const target = await prisma.orgMember.findFirst({
     where: { id: orgMemberId, orgId: orgContext.orgId },
   })
@@ -429,6 +486,14 @@ export async function updateMemberPermissions(
     requireRole(orgContext.role as 'OWNER' | 'ADMIN', 'ADMIN')
   } catch {
     return { success: false, error: 'No tienes permiso para cambiar permisos' }
+  }
+
+  try {
+    await assertBillingWriteAllowed(orgContext.orgId, 'team.updateMemberPermissions')
+  } catch (e) {
+    const blocked = teamBillingBlocked(e)
+    if (blocked) return blocked
+    throw e
   }
 
   const target = await prisma.orgMember.findFirst({
@@ -474,6 +539,8 @@ export async function inviteUser(data: { email: string; role: OrgRole }) {
 
   const orgContext = await getOrgContext(session.user.id)
   if (!orgContext) throw new Error('No autorizado')
+
+  await assertBillingWriteAllowed(orgContext.orgId, 'team.inviteUser')
 
   const orgId = orgContext.orgId
   const email = data.email.toLowerCase().trim()
@@ -584,6 +651,8 @@ export async function revokeInvitation(invitationId: string) {
   const orgContext = await getOrgContext(session.user.id)
   if (!orgContext) throw new Error('No autorizado')
 
+  await assertBillingWriteAllowed(orgContext.orgId, 'team.revokeInvitation')
+
   const invitation = await prisma.invitation.findFirst({
     where: { id: invitationId, orgId: orgContext.orgId },
   })
@@ -620,6 +689,8 @@ export async function acceptInvitation(
     })
     throw new Error('Esta invitación ha expirado')
   }
+
+  await assertBillingWriteAllowed(invitation.orgId, 'team.acceptInvitation')
 
   let user = await prisma.user.findUnique({
     where: { email: invitation.email },
@@ -684,6 +755,14 @@ export async function updateMemberRole(
     return { success: false, error: 'No tienes permiso para cambiar roles' }
   }
 
+  try {
+    await assertBillingWriteAllowed(orgContext.orgId, 'team.updateMemberRole')
+  } catch (e) {
+    const blocked = teamBillingBlocked(e)
+    if (blocked) return blocked
+    throw e
+  }
+
   const targetMember = await prisma.orgMember.findFirst({
     where: { id: memberId, orgId: orgContext.orgId },
   })
@@ -721,6 +800,8 @@ export async function toggleMemberStatus(
     const orgContext = await getOrgContext(session.user.id)
     if (!orgContext) return { success: false, error: 'No autorizado' }
 
+    await assertBillingWriteAllowed(orgContext.orgId, 'team.toggleMemberStatus')
+
     const member = await prisma.orgMember.findFirst({
       where: { id: memberId, orgId: orgContext.orgId },
     })
@@ -739,6 +820,9 @@ export async function toggleMemberStatus(
     revalidatePath('/settings/team')
     return { success: true }
   } catch (error) {
+    if (isBillingWriteBlocked(error)) {
+      return { success: false, error: error.message }
+    }
     console.error('Error toggling member status:', error)
     return {
       success: false,
@@ -786,6 +870,8 @@ export async function addProjectMember(data: {
   const orgContext = await getOrgContext(session.user.id)
   if (!orgContext) throw new Error('No autorizado')
 
+  await assertBillingWriteAllowed(orgContext.orgId, 'team.addProjectMember')
+
   const project = await prisma.project.findFirst({
     where: { id: data.projectId, orgId: orgContext.orgId },
   })
@@ -826,6 +912,8 @@ export async function removeProjectMember(projectMemberId: string) {
 
   const orgContext = await getOrgContext(session.user.id)
   if (!orgContext) throw new Error('No autorizado')
+
+  await assertBillingWriteAllowed(orgContext.orgId, 'team.removeProjectMember')
 
   const pm = await prisma.projectMember.findFirst({
     where: { id: projectMemberId },
