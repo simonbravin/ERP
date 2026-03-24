@@ -5,6 +5,8 @@ import {
   adminListPromoCodesAction,
   adminListRecentBillingEventsAction,
 } from '@/app/actions/super-admin-billing'
+import { BillingSchemaMissingNotice } from '@/components/super-admin/billing-schema-missing'
+import { isPrismaSchemaDriftError } from '@/lib/prisma/schema-migration-error'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -35,11 +37,22 @@ export default async function SuperAdminBillingPage({
   const status = sp.status?.trim() || undefined
   const planCode = sp.plan?.trim() || undefined
 
-  const [orgs, promos, events] = await Promise.all([
-    adminListOrganizationsBillingAction({ query: q, status, planCode }),
-    adminListPromoCodesAction(),
-    adminListRecentBillingEventsAction(60),
-  ])
+  let orgs: Awaited<ReturnType<typeof adminListOrganizationsBillingAction>>
+  let promos: Awaited<ReturnType<typeof adminListPromoCodesAction>>
+  let events: Awaited<ReturnType<typeof adminListRecentBillingEventsAction>>
+  try {
+    ;[orgs, promos, events] = await Promise.all([
+      adminListOrganizationsBillingAction({ query: q, status, planCode }),
+      adminListPromoCodesAction(),
+      adminListRecentBillingEventsAction(60),
+    ])
+  } catch (err) {
+    if (isPrismaSchemaDriftError(err)) {
+      console.error('[super-admin/billing] Prisma billing schema not deployed:', err)
+      return <BillingSchemaMissingNotice />
+    }
+    throw err
+  }
 
   return (
     <div className="space-y-6 p-6">

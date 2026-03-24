@@ -73,7 +73,15 @@ export async function getSuperAdminDashboardStats() {
     orgsActive,
     orgsBlocked,
     usersTotal,
-    recentOrgs,
+    recentOrgs: recentOrgs.map((o) => ({
+      id: o.id,
+      name: o.name,
+      slug: o.slug,
+      subscriptionStatus: o.subscriptionStatus,
+      isBlocked: o.isBlocked,
+      createdAt: o.createdAt.toISOString(),
+      _count: o._count,
+    })),
   }
 }
 

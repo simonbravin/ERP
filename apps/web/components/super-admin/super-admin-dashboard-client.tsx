@@ -20,7 +20,7 @@ type Stats = {
     name: string
     isBlocked: boolean
     subscriptionStatus: string
-    createdAt: Date
+    createdAt: string
     _count: { members: number; projects: number }
   }>
 }

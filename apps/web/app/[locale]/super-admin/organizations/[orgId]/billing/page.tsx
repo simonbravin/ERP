@@ -1,5 +1,7 @@
 import { notFound } from 'next/navigation'
 import { adminGetOrganizationBillingSnapshotAction } from '@/app/actions/super-admin-billing'
+import { BillingSchemaMissingNotice } from '@/components/super-admin/billing-schema-missing'
+import { isPrismaSchemaDriftError } from '@/lib/prisma/schema-migration-error'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Link } from '@/i18n/navigation'
@@ -10,7 +12,16 @@ export default async function SuperAdminOrganizationBillingDetailPage({
   params: Promise<{ orgId: string }>
 }) {
   const { orgId } = await params
-  const snapshot = await adminGetOrganizationBillingSnapshotAction(orgId)
+  let snapshot: Awaited<ReturnType<typeof adminGetOrganizationBillingSnapshotAction>>
+  try {
+    snapshot = await adminGetOrganizationBillingSnapshotAction(orgId)
+  } catch (err) {
+    if (isPrismaSchemaDriftError(err)) {
+      console.error('[super-admin/org/billing] Prisma billing schema not deployed:', err)
+      return <BillingSchemaMissingNotice />
+    }
+    throw err
+  }
   if (!snapshot) notFound()
 
   const { org, subscription, events, overrides, documents, statusHistory } = snapshot
