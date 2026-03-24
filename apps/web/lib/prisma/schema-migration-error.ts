@@ -4,9 +4,10 @@ import { Prisma } from '@repo/database'
 export function isPrismaSchemaDriftError(error: unknown): boolean {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === 'P2021') return true
+    // Raw query failed — only treat as "missing object" when message is explicit
     if (error.code === 'P2010') {
       const m = error.message.toLowerCase()
-      if (m.includes('does not exist') || m.includes('relation') || m.includes('column')) return true
+      if (m.includes('does not exist')) return true
     }
   }
   if (error instanceof Prisma.PrismaClientInitializationError) {
