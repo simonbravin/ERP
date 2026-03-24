@@ -73,14 +73,13 @@ export function LoginPageCard({ initialTab = 'login' }: LoginPageCardProps) {
       </div>
 
       {/* Columna derecha: branding (pantalla completa, borde redondeado a la izquierda) */}
-      <div className="relative flex flex-1 flex-col overflow-hidden bg-navy px-6 py-10 text-primary-foreground md:w-[55%] md:rounded-l-2xl md:overflow-hidden md:px-12 md:py-16 lg:px-16">
+      <div className="relative flex flex-1 flex-col justify-center overflow-hidden bg-navy px-6 py-10 text-primary-foreground md:w-[55%] md:rounded-l-2xl md:overflow-hidden md:px-12 md:py-16 lg:px-16">
         <LoginBrandingSvg />
-        {/* Text sits at top so the visual fills the rest */}
-        <div className="relative z-10 w-full text-center pt-2 sm:pt-4">
-          <p className="text-sm font-semibold tracking-widest text-accent uppercase sm:text-base">
+        <div className="relative z-10 mx-auto w-full max-w-[380px] text-center">
+          <p className="text-base font-medium text-accent sm:text-lg">
             {t('discoverBloqer', { defaultValue: 'Descubre Bloqer hoy' })}
           </p>
-          <h3 className="mt-2 text-xl font-bold leading-snug text-white sm:mt-3 sm:text-2xl md:text-3xl">
+          <h3 className="mt-3 text-2xl font-bold leading-snug text-white sm:mt-4 sm:text-3xl md:text-4xl lg:text-[2.25rem]">
             {t('tagline', {
               defaultValue: 'Gestión de obras, en un solo lugar.',
             })}

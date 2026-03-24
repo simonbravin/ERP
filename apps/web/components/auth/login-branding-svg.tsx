@@ -9,7 +9,7 @@ export function LoginBrandingSvg() {
   // Blueprint color: #22d3ee (cyan)  Data/chart: #60a5fa (blue)  Positive: #4ade80 (green)
   return (
     <svg
-      className="absolute inset-0 h-full w-full overflow-hidden"
+      className="absolute inset-0 h-full w-full overflow-hidden opacity-50"
       viewBox="0 0 720 900"
       preserveAspectRatio="xMidYMid slice"
       aria-hidden
