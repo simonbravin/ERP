@@ -2024,6 +2024,8 @@
   "dashboard": {
     "title": "Dashboard",
     "subtitle": "Overview of your organization activity",
+    "sectionOverview": "At a glance",
+    "sectionFinance": "Financial indicators",
     "kpiActiveProjects": "Active Projects",
     "kpiTotalBudget": "Total Budget",
     "kpiPendingCertifications": "Pending Certifications",

@@ -98,7 +98,7 @@ export default async function ReportsPage() {
   ]
 
   return (
-    <div className="erp-view-container space-y-6 bg-background">
+    <div className="erp-view-container space-y-8 bg-background md:space-y-10">
       <div className="erp-header-row flex flex-wrap items-center justify-between gap-4">
         <div className="erp-section-header">
           <h1 className="erp-page-title">Reportes y Exportaciones</h1>
@@ -117,47 +117,44 @@ export default async function ReportsPage() {
         )}
       </div>
 
-      <div>
-        <h2 className="erp-section-title mb-4">
-          Reportes Predefinidos
-        </h2>
-        <ReportsPredefinedSection
-          predefinedReports={predefinedReports}
-          projects={projects}
-        />
-      </div>
+      <div className="space-y-10">
+        <section className="space-y-4">
+          <h2 className="erp-section-title">Reportes Predefinidos</h2>
+          <ReportsPredefinedSection
+            predefinedReports={predefinedReports}
+            projects={projects}
+          />
+        </section>
 
-      <div>
-        <h2 className="erp-section-title mb-4">
-          Query Builder
-        </h2>
-        <p className="erp-section-desc mb-4">
-          Construí consultas sin SQL: elegí tabla, campos y filtros para previsualizar datos.
-        </p>
-        <QueryBuilder />
-      </div>
+        <section className="space-y-4 border-t border-border/60 pt-8 md:pt-10">
+          <h2 className="erp-section-title">Query Builder</h2>
+          <p className="erp-section-desc">
+            Construí consultas sin SQL: elegí tabla, campos y filtros para
+            previsualizar datos.
+          </p>
+          <QueryBuilder />
+        </section>
 
-      <div>
-        <h2 className="erp-section-title mb-4">
-          Reportes Personalizados
-        </h2>
-        {reports.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-border p-12 text-center">
-            <p className="text-muted-foreground">
-              Aún no hay reportes personalizados.
-            </p>
-            {['ADMIN', 'OWNER'].includes(org.role) && (
-              <Button asChild className="mt-4" variant="outline">
-                <Link href="/reports/new">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Crear Primer Reporte
-                </Link>
-              </Button>
-            )}
-          </div>
-        ) : (
-          <CustomReportsList reports={reports as CustomReportWithCreator[]} />
-        )}
+        <section className="space-y-4 border-t border-border/60 pt-8 md:pt-10">
+          <h2 className="erp-section-title">Reportes Personalizados</h2>
+          {reports.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-border p-12 text-center">
+              <p className="text-muted-foreground">
+                Aún no hay reportes personalizados.
+              </p>
+              {['ADMIN', 'OWNER'].includes(org.role) && (
+                <Button asChild className="mt-4" variant="outline">
+                  <Link href="/reports/new">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Crear Primer Reporte
+                  </Link>
+                </Button>
+              )}
+            </div>
+          ) : (
+            <CustomReportsList reports={reports as CustomReportWithCreator[]} />
+          )}
+        </section>
       </div>
     </div>
   )

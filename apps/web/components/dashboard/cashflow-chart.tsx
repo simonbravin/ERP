@@ -86,7 +86,7 @@ export function CashflowChart({ timeline }: CashflowChartProps) {
     Math.abs(value) >= 1000 ? `${(value / 1000).toFixed(0)}k` : String(value)
 
   return (
-    <div className="rounded-xl border border-border/60 bg-card p-6 shadow-sm">
+    <div className="flex h-full min-h-[360px] flex-col rounded-xl border border-border/60 bg-card p-6 shadow-sm">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="text-lg font-semibold text-foreground">
@@ -111,9 +111,9 @@ export function CashflowChart({ timeline }: CashflowChartProps) {
         </Tabs>
       </div>
 
-      <div className="mt-5 h-80 min-h-[280px] w-full min-w-0" style={{ minHeight: 280 }}>
+      <div className="mt-5 flex min-h-[280px] w-full min-w-0 flex-1 flex-col">
         {chartData.length > 0 ? (
-          <ResponsiveContainer key={range} width="100%" height={280}>
+          <ResponsiveContainer key={range} width="100%" height="100%" minHeight={280}>
             <AreaChart data={chartData} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis dataKey="monthLabel" tick={{ fontSize: 12 }} />
@@ -159,7 +159,7 @@ export function CashflowChart({ timeline }: CashflowChartProps) {
             </AreaChart>
           </ResponsiveContainer>
         ) : (
-          <div className="flex h-full items-center justify-center">
+          <div className="flex min-h-[280px] flex-1 items-center justify-center">
             <p className="text-sm text-muted-foreground">{t('noDataAvailable')}</p>
           </div>
         )}

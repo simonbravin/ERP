@@ -61,7 +61,7 @@ export default async function DashboardHomePage() {
 
   if (restrictedNoProjects) {
     return (
-      <div className="erp-view-container space-y-6 bg-background">
+      <div className="erp-view-container space-y-8 bg-background md:space-y-10">
         <div className="erp-section-header">
           <h1 className="erp-page-title">{t('title')}</h1>
           <p className="erp-section-desc">{t('subtitle')}</p>
@@ -82,35 +82,48 @@ export default async function DashboardHomePage() {
   }
 
   return (
-    <div className="erp-view-container space-y-6 bg-background">
+    <div className="erp-view-container space-y-8 bg-background md:space-y-10">
       <div className="erp-section-header">
         <h1 className="erp-page-title">{t('title')}</h1>
         <p className="erp-section-desc">{t('subtitle')}</p>
       </div>
 
-      {/* Main KPIs: 4 cards (proyectos, presupuesto, gastos, avance) */}
-      <KPICards kpis={kpis} variant="main" />
+      <section
+        className="space-y-6"
+        aria-labelledby="dashboard-section-overview"
+      >
+        <h2 id="dashboard-section-overview" className="erp-section-title">
+          {t('sectionOverview')}
+        </h2>
+        <KPICards kpis={kpis} variant="main" />
 
-      {/* Flujo de caja + Alertas */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="min-h-[360px] lg:col-span-2">
-          <CashflowChart timeline={cashflowTimeline} />
+        <div className="grid grid-cols-1 gap-6 md:gap-8 lg:grid-cols-3 lg:items-stretch">
+          <div className="flex min-h-[360px] flex-col lg:col-span-2 lg:h-full lg:min-h-0">
+            <CashflowChart timeline={cashflowTimeline} />
+          </div>
+          <div className="flex min-h-[280px] flex-col lg:h-full lg:min-h-0">
+            <AlertsWidget alerts={alerts} />
+          </div>
         </div>
-        <div>
-          <AlertsWidget alerts={alerts} />
-        </div>
-      </div>
 
-      {/* Resumen del período (cashflow empresa: generales + proyectos) */}
-      {cashflowSummary && (
-        <CashflowSummaryStats summary={cashflowSummary} />
-      )}
+        {cashflowSummary && (
+          <CashflowSummaryStats summary={cashflowSummary} />
+        )}
+      </section>
 
-      {/* Certificaciones pendientes, Cuentas por cobrar, Cuentas por pagar, Órdenes de cambio */}
-      <KPICards kpis={kpis} variant="finance" />
+      <section
+        className="space-y-6 border-t border-border/60 pt-8 md:pt-10"
+        aria-labelledby="dashboard-section-finance"
+      >
+        <h2 id="dashboard-section-finance" className="erp-section-title">
+          {t('sectionFinance')}
+        </h2>
+        <KPICards kpis={kpis} variant="finance" />
+      </section>
 
-      {/* Actividad reciente */}
-      <RecentActivityFeed activities={recentActivity} />
+      <section aria-label={t('recentActivityTitle')}>
+        <RecentActivityFeed activities={recentActivity} />
+      </section>
     </div>
   )
 }

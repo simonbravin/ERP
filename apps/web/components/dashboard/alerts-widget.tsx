@@ -40,11 +40,11 @@ export function AlertsWidget({ alerts }: AlertsWidgetProps) {
   }
 
   return (
-    <div className="rounded-xl border border-border/60 bg-card p-6 shadow-sm">
+    <div className="flex h-full min-h-0 flex-col rounded-xl border border-border/60 bg-card p-6 shadow-sm">
       <h3 className="text-lg font-semibold text-foreground">{t('alertsTitle')}</h3>
 
       {alerts.length === 0 ? (
-        <div className="mt-4 flex flex-col items-center justify-center py-8">
+        <div className="mt-4 flex flex-1 flex-col items-center justify-center py-8">
           <div className="rounded-full bg-muted p-3">
             <CheckCircle className="h-8 w-8 text-green-500" />
           </div>
@@ -53,7 +53,7 @@ export function AlertsWidget({ alerts }: AlertsWidgetProps) {
           </p>
         </div>
       ) : (
-        <div className="mt-4 space-y-3">
+        <div className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
           {alerts.map((alert) => {
             const Icon = iconMap[alert.type]
             const colors = colorMap[alert.type]

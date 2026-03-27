@@ -153,7 +153,7 @@ export function KPICards({ kpis, variant = 'all' }: KPICardsProps) {
   )
 
   return (
-    <div className={`grid gap-4 ${CARD_STYLES[variant]}`}>
+    <div className={`grid gap-4 md:gap-5 ${CARD_STYLES[variant]}`}>
       {cards.map((card) => {
         const wrapperClass =
           'rounded-xl border border-border/60 bg-card p-5 shadow-sm transition-shadow hover:shadow-md min-w-0'

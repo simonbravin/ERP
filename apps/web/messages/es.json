@@ -2026,6 +2026,8 @@
   "dashboard": {
     "title": "Tablero de Control",
     "subtitle": "Resumen de la actividad de tu organización",
+    "sectionOverview": "Panorama general",
+    "sectionFinance": "Indicadores financieros",
     "kpiActiveProjects": "Proyectos Activos",
     "kpiTotalBudget": "Presupuesto Total",
     "kpiPendingCertifications": "Certificaciones Pendientes",
