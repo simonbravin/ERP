@@ -25,6 +25,10 @@ export const spacing = {
 export const colors = {
   brand: {
     navy: 'hsl(var(--navy))',
+    accent: 'hsl(var(--brand-accent))',
+    accentSoft: 'hsl(var(--brand-accent-soft))',
+    accentDark: 'hsl(var(--brand-accent-dark))',
+    // Legacy compatibility while old consumers are migrated.
     orange: 'hsl(var(--orange))',
   },
   status: {

@@ -13,6 +13,7 @@ import {
 } from 'recharts'
 import { formatCurrency, formatCurrencyCompact } from '@/lib/format-utils'
 import type { CompanyCashflowPoint } from '@/app/actions/finance'
+import { chartAxis, chartFinanceLines } from '@/lib/chart-theme'
 
 const MONTH_NAMES = [
   'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
@@ -39,7 +40,7 @@ export function CompanyCashflowChart({ initialData }: CompanyCashflowChartProps)
   if (chartData.length === 0) {
     return (
       <div className="rounded-lg border border-border bg-card p-8 text-center">
-        <p className="text-sm text-slate-500 dark:text-slate-400">
+        <p className="text-sm text-muted-foreground">
           No hay datos de cashflow para el período seleccionado
         </p>
       </div>
@@ -51,10 +52,10 @@ export function CompanyCashflowChart({ initialData }: CompanyCashflowChartProps)
       <div className="h-80 min-h-[200px] w-full min-w-0">
         <ResponsiveContainer width="100%" height={200}>
           <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" className="dark:stroke-slate-700" />
-            <XAxis dataKey="monthLabel" stroke="#64748b" fontSize={12} tickLine={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke={chartAxis.grid} />
+            <XAxis dataKey="monthLabel" stroke={chartAxis.tick} fontSize={12} tickLine={false} />
             <YAxis
-              stroke="#64748b"
+              stroke={chartAxis.tick}
               fontSize={12}
               tickLine={false}
               tickFormatter={(v: number) => formatCurrencyCompact(v, 'es-AR', 'ARS')}
@@ -64,10 +65,39 @@ export function CompanyCashflowChart({ initialData }: CompanyCashflowChartProps)
               labelFormatter={(_, payload) => payload?.[0]?.payload?.monthLabel ?? ''}
             />
             <Legend wrapperStyle={{ paddingTop: '1rem' }} />
-            <Line type="monotone" dataKey="income" name="Ingresos" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} />
-            <Line type="monotone" dataKey="expense" name="Gastos" stroke="#ef4444" strokeWidth={2} dot={{ r: 3 }} />
-            <Line type="monotone" dataKey="overhead" name="Overhead" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
-            <Line type="monotone" dataKey="balance" name="Balance acumulado" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} strokeDasharray="4 4" />
+            <Line
+              type="monotone"
+              dataKey="income"
+              name="Ingresos"
+              stroke={chartFinanceLines.income}
+              strokeWidth={2}
+              dot={{ r: 3 }}
+            />
+            <Line
+              type="monotone"
+              dataKey="expense"
+              name="Gastos"
+              stroke={chartFinanceLines.expense}
+              strokeWidth={2}
+              dot={{ r: 3 }}
+            />
+            <Line
+              type="monotone"
+              dataKey="overhead"
+              name="Overhead"
+              stroke={chartFinanceLines.overhead}
+              strokeWidth={2}
+              dot={{ r: 3 }}
+            />
+            <Line
+              type="monotone"
+              dataKey="balance"
+              name="Balance acumulado"
+              stroke={chartFinanceLines.balance}
+              strokeWidth={2}
+              dot={{ r: 3 }}
+              strokeDasharray="4 4"
+            />
           </LineChart>
         </ResponsiveContainer>
       </div>

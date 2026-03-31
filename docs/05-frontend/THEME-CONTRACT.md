@@ -65,9 +65,10 @@ Use the utility classes `badge-success`, `badge-warning`, etc. (they already use
 
 - **Accent** = secondary emphasis: links, active tab, focus ring, progress bars, tags.  
   - **Rule**: `bg-accent`, `text-accent`, `ring-ring` (ring follows accent).  
-  - In this ERP: accent = **Cobre (orange)** for brand highlight.
+  - In this ERP: accent = **Verde** para highlight de marca y estados positivos.
 
-- **Orange / Cobre** = brand; can map to `--accent` / `--ring` or stay as `--orange` for brand-only use.
+- **Brand accent** = `--brand-accent`, `--brand-accent-soft`, `--brand-accent-dark`.
+- **Orange / Cobre** = token legacy (`--orange*`) mantenido temporalmente por compatibilidad; migrar nuevos usos a `--brand-accent*`.
 
 **Do not** use primary as blue in light and accent in dark; keep one strategy and stick to tokens.
 

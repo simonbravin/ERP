@@ -26,20 +26,13 @@ import { AlertCircle } from 'lucide-react'
 import { Link } from '@/i18n/navigation'
 import type { ProjectFinanceExecutiveDashboard } from '@/app/actions/finance'
 import type { FinanceAlert } from '@/app/actions/finance'
+import { CHART_PALETTE, CHART_PIE_PLACEHOLDER_FILL } from '@/lib/chart-theme'
 
 const EXPENSE_TYPE_LABELS: Record<string, string> = {
   EXPENSE: 'Gastos',
   PURCHASE: 'Compras',
   OVERHEAD: 'Generales',
 }
-
-const CHART_COLORS = [
-  'hsl(var(--chart-1))',
-  'hsl(var(--chart-2))',
-  'hsl(var(--chart-4))',
-  'hsl(var(--chart-5))',
-  'hsl(var(--chart-3))',
-]
 
 interface ProjectFinanceDashboardClientProps {
   data: ProjectFinanceExecutiveDashboard
@@ -211,11 +204,11 @@ export function ProjectFinanceDashboardClient({ data, alerts = [] }: ProjectFina
                   labelLine={false}
                   label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                   outerRadius={100}
-                  fill="#8884d8"
+                  fill={CHART_PIE_PLACEHOLDER_FILL}
                   dataKey="value"
                 >
                   {compositionChartData.map((_, index) => (
-                    <Cell key={index} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                    <Cell key={index} fill={CHART_PALETTE[index % CHART_PALETTE.length]} />
                   ))}
                 </Pie>
                 <Tooltip formatter={(value: number) => formatCurrency(value, 'ARS')} />

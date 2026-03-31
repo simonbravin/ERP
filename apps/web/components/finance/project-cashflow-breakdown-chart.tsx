@@ -4,19 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
 import { formatCurrency } from '@/lib/format-utils'
 import type { ProjectCashflowBreakdownByWbsItem } from '@/app/actions/finance'
-
-const COLORS = [
-  'hsl(var(--chart-4))',
-  'hsl(var(--chart-1))',
-  'hsl(var(--chart-2))',
-  'hsl(var(--chart-3))',
-  'hsl(var(--chart-5))',
-  '#8884d8',
-  '#82ca9d',
-  '#ffc658',
-  '#ff7c7c',
-  '#a4de6c',
-]
+import { CHART_PIE_PLACEHOLDER_FILL, chartSeriesColor } from '@/lib/chart-theme'
 
 interface Props {
   breakdown: ProjectCashflowBreakdownByWbsItem[]
@@ -42,7 +30,7 @@ export function ProjectCashflowBreakdownChart({ breakdown }: Props) {
   const chartData = breakdown.map((item, index) => ({
     name: `${item.wbsNodeCode} - ${item.wbsNodeName.substring(0, 25)}${item.wbsNodeName.length > 25 ? '...' : ''}`,
     value: item.totalExpense,
-    fill: COLORS[index % COLORS.length],
+    fill: chartSeriesColor(index),
   }))
 
   return (
@@ -62,7 +50,7 @@ export function ProjectCashflowBreakdownChart({ breakdown }: Props) {
                   labelLine={false}
                   label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
                   outerRadius={100}
-                  fill="#8884d8"
+                  fill={CHART_PIE_PLACEHOLDER_FILL}
                   dataKey="value"
                 >
                   {chartData.map((entry, index) => (

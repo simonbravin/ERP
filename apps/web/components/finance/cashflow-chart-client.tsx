@@ -21,6 +21,7 @@ import type {
   CashflowDataPoint,
   ProjectCashflowBreakdownByWbsItem,
 } from '@/app/actions/finance'
+import { chartSeriesColor } from '@/lib/chart-theme'
 
 type TimelineByWbsItem = { month: string; wbsExpenses: Record<string, number> }
 
@@ -36,16 +37,6 @@ function formatMonthKey(monthKey: string): string {
   return chartMonthYearShortEs(monthKey)
 }
 
-const CHART_COLORS = [
-  'hsl(var(--chart-4))',
-  'hsl(var(--chart-1))',
-  'hsl(var(--chart-2))',
-  'hsl(var(--chart-3))',
-  'hsl(var(--chart-5))',
-  '#8884d8',
-  '#82ca9d',
-  '#ffc658',
-]
 
 export function CashflowChartClient({
   projectId: _projectId,
@@ -189,7 +180,7 @@ export function CashflowChartClient({
                             key={key}
                             dataKey={key}
                             name={label}
-                            fill={CHART_COLORS[idx % CHART_COLORS.length]}
+                            fill={chartSeriesColor(idx)}
                             stackId="g"
                             animationDuration={300}
                             animationBegin={idx * 50}

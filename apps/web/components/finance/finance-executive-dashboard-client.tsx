@@ -30,14 +30,7 @@ import { Link } from '@/i18n/navigation'
 import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import type { FinanceExecutiveDashboard, FinanceAlert } from '@/app/actions/finance'
-
-const COLORS = [
-  'hsl(var(--chart-1))',
-  'hsl(var(--chart-2))',
-  'hsl(var(--chart-4))',
-  'hsl(var(--chart-5))',
-  'hsl(var(--chart-3))',
-]
+import { CHART_PALETTE, CHART_PIE_PLACEHOLDER_FILL } from '@/lib/chart-theme'
 
 const CATEGORY_LABELS: Record<string, string> = {
   EXPENSE: 'Gastos',
@@ -182,11 +175,11 @@ export function FinanceExecutiveDashboardClient({ data, alerts = [] }: Props) {
                     labelLine={false}
                     label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                     outerRadius={100}
-                    fill="#8884d8"
+                    fill={CHART_PIE_PLACEHOLDER_FILL}
                     dataKey="value"
                   >
                     {categoryChartData.map((_, index) => (
-                      <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                      <Cell key={index} fill={CHART_PALETTE[index % CHART_PALETTE.length]} />
                     ))}
                   </Pie>
                   <Tooltip formatter={(value: number) => formatCurrency(value, 'ARS')} />

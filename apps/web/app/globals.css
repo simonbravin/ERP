@@ -26,17 +26,17 @@
     --secondary-foreground: 222 35% 12%;
 
     --muted: 214 24% 94%;
-    --muted-foreground: 218 14% 48%;
+    --muted-foreground: 218 14% 40%;
 
-    --accent: 28 68% 50%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 142 70% 45%;
+    --accent-foreground: 142 70% 10%;
 
     --destructive: 6 52% 50%;
     --destructive-foreground: 0 0% 100%;
 
     --border: 214 28% 90%;
     --input: 214 28% 88%;
-    --ring: 28 68% 50%;
+    --ring: 142 70% 45%;
 
     /* Brand */
     --navy: 222 36% 20%;
@@ -47,35 +47,39 @@
     --orange-light: 28 65% 58%;
     --orange-dark: 28 70% 42%;
 
+    --brand-accent: 142 70% 45%;
+    --brand-accent-soft: 142 50% 60%;
+    --brand-accent-dark: 142 70% 35%;
+
     /* Status */
-    --status-success: 150 28% 44%;
-    --status-success-foreground: 150 45% 20%;
-    --status-warning: 38 60% 52%;
+    --status-success: 142 60% 45%;
+    --status-success-foreground: 142 70% 12%;
+    --status-warning: 38 80% 55%;
     --status-warning-foreground: 38 70% 20%;
     --status-danger: 6 52% 50%;
     --status-danger-foreground: 6 70% 18%;
     --status-neutral: 215 14% 62%;
     --status-neutral-foreground: 222 35% 12%;
-    --status-info: 210 42% 50%;
+    --status-info: 210 60% 55%;
     --status-info-foreground: 210 60% 20%;
 
     /* Phase (project phase badges) */
     --phase-pre-construction: 263 70% 50%;
     --phase-pre-construction-foreground: 263 45% 18%;
-    --phase-construction: 217 91% 60%;
+    --phase-construction: 217 85% 60%;
     --phase-construction-foreground: 217 70% 22%;
     --phase-closeout: 215 16% 47%;
     --phase-closeout-foreground: 222 25% 14%;
-    --phase-complete: 152 69% 40%;
-    --phase-complete-foreground: 152 45% 18%;
+    --phase-complete: 142 70% 45%;
+    --phase-complete-foreground: 142 70% 20%;
 
     /* Sidebar */
-    --sidebar: 222 36% 20%;
-    --sidebar-foreground: 210 22% 96%;
-    --sidebar-muted: 210 18% 70%;
-    --sidebar-accent: 222 32% 26%;
-    --sidebar-border: 222 28% 26%;
-    --sidebar-ring: 28 68% 50%;
+    --sidebar: 214 25% 94%;
+    --sidebar-foreground: 222 35% 12%;
+    --sidebar-muted: 213 18% 60%;
+    --sidebar-accent: 214 28% 88%;
+    --sidebar-border: 214 20% 85%;
+    --sidebar-ring: 142 70% 45%;
 
     /* Table */
     --table-head: 214 24% 92%;
@@ -84,8 +88,8 @@
 
     --radius: 0.5rem;
     --chart-1: 222 36% 28%;
-    --chart-2: 152 28% 42%;
-    --chart-3: 28 68% 50%;
+    --chart-2: 142 60% 45%;
+    --chart-3: 210 60% 55%;
     --chart-4: 6 52% 50%;
     --chart-5: 218 24% 38%;
 
@@ -96,64 +100,68 @@
   }
 
   .dark {
-    --background: 222 26% 9%;
-    --foreground: 213 22% 95%;
+    --background: 222 47% 11%;
+    --foreground: 213 20% 90%;
 
-    --card: 222 24% 12%;
-    --card-foreground: 213 22% 95%;
+    --card: 222 47% 13%;
+    --card-foreground: 213 20% 90%;
 
-    --popover: 222 24% 12%;
-    --popover-foreground: 213 22% 95%;
+    --popover: 222 47% 13%;
+    --popover-foreground: 213 20% 90%;
 
-    --primary: 213 22% 95%;
-    --primary-foreground: 222 26% 10%;
+    --primary: 213 20% 90%;
+    --primary-foreground: 222 47% 11%;
 
-    --secondary: 217 22% 16%;
-    --secondary-foreground: 213 22% 95%;
+    --secondary: 217 30% 18%;
+    --secondary-foreground: 213 20% 90%;
 
-    --muted: 218 20% 16%;
-    --muted-foreground: 215 14% 72%;
+    --muted: 218 30% 18%;
+    --muted-foreground: 215 14% 65%;
 
-    --accent: 28 70% 56%;
-    --accent-foreground: 222 26% 9%;
+    --accent: 142 70% 45%;
+    --accent-foreground: 142 70% 10%;
 
     --destructive: 8 50% 35%;
-    --destructive-foreground: 213 22% 95%;
+    --destructive-foreground: 213 20% 90%;
 
-    --border: 218 22% 24%;
-    --input: 218 22% 24%;
-    --ring: 28 70% 56%;
+    --border: 0 0% 100% / 0.1;
+    --input: 217 30% 18%;
+    --ring: 142 70% 45%;
 
     /* Brand */
-    --navy: 217 22% 16%;
-    --navy-light: 217 22% 22%;
-    --navy-dark: 217 28% 10%;
+    --navy: 217 30% 18%;
+    --navy-light: 217 30% 24%;
+    --navy-dark: 222 47% 11%;
 
     --orange: 28 70% 56%;
     --orange-light: 28 75% 64%;
     --orange-dark: 28 65% 46%;
 
+    --brand-accent: 142 70% 45%;
+    --brand-accent-soft: 142 50% 60%;
+    --brand-accent-dark: 142 70% 35%;
+
     /* Status */
-    --status-success: 150 35% 50%;
-    --status-success-foreground: 210 20% 96%;
-    --status-warning: 40 70% 58%;
-    --status-warning-foreground: 210 20% 96%;
+    --status-success: 142 60% 50%;
+    --status-success-foreground: 142 70% 10%;
+    --status-warning: 38 80% 60%;
+    --status-warning-foreground: 213 20% 90%;
     --status-danger: 8 65% 58%;
-    --status-danger-foreground: 210 20% 96%;
-    --status-neutral: 215 15% 70%;
-    --status-neutral-foreground: 210 20% 96%;
+    --status-danger-foreground: 213 20% 90%;
+    --status-neutral: 215 15% 65%;
+    --status-neutral-foreground: 213 20% 90%;
     --status-info: 210 60% 60%;
-    --status-info-foreground: 210 20% 96%;
+    --status-info-foreground: 213 20% 90%;
 
     /* Phase (project phase badges) */
     --phase-pre-construction: 263 55% 58%;
     --phase-pre-construction-foreground: 263 25% 92%;
     --phase-construction: 217 80% 62%;
-    --phase-construction-foreground: 210 20% 96%;
+    --phase-construction-foreground: 213 20% 90%;
     --phase-closeout: 215 18% 55%;
-    --phase-closeout-foreground: 210 20% 96%;
-    --phase-complete: 152 55% 48%;
-    --phase-complete-foreground: 210 20% 96%;
+    --phase-closeout-foreground: 213 20% 90%;
+    --phase-complete: 142 60% 50%;
+    --phase-complete-foreground: 213 20% 90%;
 
     /* Auth (login/register brand) */
     --auth-primary: 241 76% 75%;
@@ -161,12 +169,12 @@
     --auth-primary-foreground: 0 0% 100%;
 
     /* Sidebar */
-    --sidebar: 217 22% 16%;
-    --sidebar-foreground: 213 22% 95%;
-    --sidebar-muted: 213 18% 68%;
-    --sidebar-accent: 222 24% 22%;
-    --sidebar-border: 222 22% 22%;
-    --sidebar-ring: 28 70% 56%;
+    --sidebar: 222 47% 9%;
+    --sidebar-foreground: 213 20% 90%;
+    --sidebar-muted: 213 18% 60%;
+    --sidebar-accent: 222 35% 18%;
+    --sidebar-border: 0 0% 100% / 0.05;
+    --sidebar-ring: 142 70% 45%;
 
     /* Table */
     --table-head: 218 22% 17%;
@@ -245,6 +253,9 @@
   --color-navy: hsl(var(--navy));
   --color-navy-light: hsl(var(--navy-light));
   --color-navy-dark: hsl(var(--navy-dark));
+  --color-brand-accent: hsl(var(--brand-accent));
+  --color-brand-accent-soft: hsl(var(--brand-accent-soft));
+  --color-brand-accent-dark: hsl(var(--brand-accent-dark));
 
   --color-sidebar: hsl(var(--sidebar));
   --color-sidebar-foreground: hsl(var(--sidebar-foreground));
