@@ -93,6 +93,12 @@
     --chart-4: 6 52% 50%;
     --chart-5: 218 24% 38%;
 
+    /* Chart semantics (finance — use in SVG charts, not --status-*) */
+    --chart-income: 142 60% 45%;
+    --chart-expense: 6 52% 50%;
+    --chart-balance: 222 36% 28%;
+    --chart-neutral: 218 24% 38%;
+
     /* Auth (login/register brand) */
     --auth-primary: 241 68% 62%;
     --auth-primary-hover: 241 39% 47%;
@@ -180,6 +186,18 @@
     --table-head: 218 22% 17%;
     --table-row-hover: 218 20% 20%;
     --table-border: 218 22% 24%;
+
+    /* Charts (readability on dark surfaces) */
+    --chart-1: 210 45% 72%;
+    --chart-2: 142 55% 56%;
+    --chart-3: 205 55% 68%;
+    --chart-4: 8 62% 58%;
+    --chart-5: 215 18% 68%;
+
+    --chart-income: 142 55% 56%;
+    --chart-expense: 8 62% 58%;
+    --chart-balance: 210 45% 72%;
+    --chart-neutral: 215 18% 68%;
   }
 
   /* Theme template: midnight (cooler, deeper dark). Works best with .dark; overrides only variables below. */
@@ -210,6 +228,11 @@
     --accent-foreground: 224 30% 6%;
     --popover: 224 28% 9%;
     --popover-foreground: 210 25% 95%;
+
+    --chart-income: 142 55% 56%;
+    --chart-expense: 8 62% 58%;
+    --chart-balance: 210 45% 72%;
+    --chart-neutral: 215 18% 68%;
   }
 
   /* Theme template: slate (neutral gray dark). Works best with .dark; overrides only variables below. */
@@ -240,6 +263,11 @@
     --accent-foreground: 215 20% 8%;
     --popover: 215 18% 12%;
     --popover-foreground: 210 20% 95%;
+
+    --chart-income: 142 55% 56%;
+    --chart-expense: 8 62% 58%;
+    --chart-balance: 210 45% 72%;
+    --chart-neutral: 215 18% 68%;
   }
 }
 
@@ -354,6 +382,10 @@
   --color-chart-3: hsl(var(--chart-3));
   --color-chart-4: hsl(var(--chart-4));
   --color-chart-5: hsl(var(--chart-5));
+  --color-chart-income: hsl(var(--chart-income));
+  --color-chart-expense: hsl(var(--chart-expense));
+  --color-chart-balance: hsl(var(--chart-balance));
+  --color-chart-neutral: hsl(var(--chart-neutral));
 
   --color-auth-primary: hsl(var(--auth-primary));
   --color-auth-primary-hover: hsl(var(--auth-primary-hover));
@@ -882,4 +914,45 @@
 }
 .login-branding-pulse {
   animation: login-branding-pulse 3s ease-in-out infinite;
+}
+
+/* Chart series hover dimming (CashflowTimeline, company cashflow, executive trend) */
+@layer components {
+  [data-slot='chart'] .recharts-line-curve {
+    transition: stroke-opacity 150ms ease, stroke-width 150ms ease;
+  }
+  [data-slot='chart'] .recharts-area-area {
+    transition: fill-opacity 150ms ease, stroke-opacity 150ms ease, stroke-width 150ms ease;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-slot='chart'] .recharts-line-curve,
+  [data-slot='chart'] .recharts-area-area {
+    transition: none;
+  }
+}
+
+/* SVAR Gantt: marcador "hoy" (class from schedule-svar-gantt markers) */
+.bloqer-svar-gantt .bloqer-svar-gantt-marker-today {
+  border-left: 2px dashed hsl(var(--destructive) / 0.85);
+  background: hsl(var(--destructive) / 0.06);
+}
+.dark .bloqer-svar-gantt .bloqer-svar-gantt-marker-today {
+  background: hsl(var(--destructive) / 0.12);
+}
+
+/* SVAR Gantt: barra baseline (clase interna wx-baseline cuando baselines={true}) */
+.bloqer-svar-gantt .wx-baseline:not(.wx-milestone) {
+  box-sizing: border-box;
+  background: hsl(var(--muted) / 0.45) !important;
+  border: 1px dashed hsl(var(--muted-foreground) / 0.55) !important;
+  border-radius: 3px;
+}
+.dark .bloqer-svar-gantt .wx-baseline:not(.wx-milestone) {
+  background: hsl(var(--muted) / 0.35) !important;
+  border-color: hsl(var(--muted-foreground) / 0.45) !important;
+}
+.bloqer-svar-gantt .wx-baseline.wx-milestone {
+  border: 1px dashed hsl(var(--muted-foreground) / 0.6) !important;
+  background: hsl(var(--muted) / 0.35) !important;
 }

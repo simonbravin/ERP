@@ -1,27 +1,26 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useMessageBus } from '@/hooks/use-message-bus'
-import {
-  AreaChart,
-  Area,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  Cell,
-} from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Cell } from 'recharts'
 import { ChartCard } from '@/components/charts/chart-card'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { formatCurrency } from '@/lib/format-utils'
+import { formatChartAxisCurrency } from '@/lib/chart-format'
+import { chartSemanticHsl } from '@/lib/chart-theme'
+import { CashflowTimelineComposedChart } from '@/components/charts/cashflow-timeline-composed-chart'
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+  type ChartConfig,
+} from '@/components/ui/chart'
 import { TrendingUp, TrendingDown, AlertTriangle, Download, CalendarClock } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
@@ -40,9 +39,6 @@ const COLORS = {
   budget: 'hsl(var(--chart-3))',
   actual: 'hsl(var(--chart-1))',
   committed: 'hsl(var(--chart-4))',
-  variance: 'hsl(var(--chart-2))',
-  income: 'hsl(var(--chart-1))',
-  expense: 'hsl(var(--chart-2))',
 }
 
 interface Props {
@@ -129,12 +125,51 @@ export function ProjectDashboardClient({ project, data }: Props) {
     Varianza: w.variance,
   }))
 
-  const cashflowChartData = data.cashflow.map((m) => ({
-    mes: chartMonthShortEs(m.month),
-    Ingresos: m.income,
-    Gastos: m.expense,
-    Balance: m.balance,
-  }))
+  const cashflowTimelineRows = useMemo(
+    () =>
+      data.cashflow.map((m) => ({
+        monthLabel: chartMonthShortEs(m.month),
+        income: m.income,
+        expense: m.expense,
+        balance: m.balance,
+        periodNet: m.income - m.expense,
+      })),
+    [data.cashflow]
+  )
+
+  const projectCashflowConfig = {
+    income: { label: 'Ingresos', color: chartSemanticHsl.income },
+    expense: { label: 'Gastos', color: chartSemanticHsl.expense },
+    balance: {
+      label: 'Balance acumulado',
+      color: chartSemanticHsl.runningBalance,
+    },
+  } satisfies ChartConfig
+
+  const projectCashflowTooltipLabels = {
+    income: 'Ingresos',
+    expenses: 'Gastos',
+    runningBalance: 'Balance acumulado',
+    periodNet: 'Neto del período',
+    vsPrevious: 'vs. mes anterior',
+  }
+
+  const axisCurrency = useMemo(
+    () => (v: number) => formatChartAxisCurrency(v, { locale: 'es-AR', currency: 'ARS' }),
+    []
+  )
+
+  const valueFmt = useMemo(() => (v: number) => formatCurrency(v, 'ARS'), [])
+
+  const wbsBarConfig = {
+    Presupuestado: { label: 'Presupuestado', color: COLORS.budget },
+    Real: { label: 'Real', color: COLORS.actual },
+    Comprometido: { label: 'Comprometido', color: COLORS.committed },
+  } satisfies ChartConfig
+
+  const certChartConfig = {
+    Monto: { label: 'Monto', color: 'hsl(var(--chart-3))' },
+  } satisfies ChartConfig
 
   const certChartData = data.certifications.data.map((c) => ({
     name: `Cert ${c.number}`,
@@ -350,33 +385,61 @@ export function ProjectDashboardClient({ project, data }: Props) {
             description="WBS con mayor gasto real"
           >
             <div className="h-[280px] min-h-[280px] w-full min-w-0" style={{ minHeight: 280 }}>
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart
-                data={wbsChartData}
-                layout="vertical"
-                margin={{ top: 10, right: 30, left: 60, bottom: 10 }}
+              <ChartContainer
+                config={wbsBarConfig}
+                className="aspect-auto h-[280px] min-h-[280px] w-full"
               >
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis
-                  type="number"
-                  tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
-                  tick={{ fontSize: 12 }}
-                />
-                <YAxis type="category" dataKey="name" width={56} tick={{ fontSize: 11 }} />
-                <Tooltip
-                  formatter={(value: number) => formatCurrency(value)}
-                  contentStyle={{
-                    backgroundColor: 'hsl(var(--background))',
-                    border: '1px solid hsl(var(--border))',
-                  }}
-                />
-                <Legend />
-                <Bar dataKey="Presupuestado" fill={COLORS.budget} radius={[0, 4, 4, 0]} />
-                <Bar dataKey="Real" fill={COLORS.actual} radius={[0, 4, 4, 0]} />
-                <Bar dataKey="Comprometido" fill={COLORS.committed} radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+                <BarChart
+                  data={wbsChartData}
+                  layout="vertical"
+                  margin={{ top: 16, right: 24, left: 4, bottom: 8 }}
+                >
+                  <CartesianGrid
+                    horizontal={false}
+                    stroke="hsl(var(--border))"
+                    strokeOpacity={0.4}
+                    strokeDasharray="4 4"
+                  />
+                  <XAxis
+                    type="number"
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
+                    tick={{ fontSize: 12 }}
+                    tickFormatter={axisCurrency}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    width={56}
+                    tickLine={false}
+                    axisLine={false}
+                    tick={{ fontSize: 11 }}
+                  />
+                  <ChartTooltip
+                    isAnimationActive={false}
+                    content={
+                      <ChartTooltipContent valueFormatter={(v) => valueFmt(Number(v))} />
+                    }
+                  />
+                  <ChartLegend
+                    verticalAlign="bottom"
+                    content={<ChartLegendContent className="pt-4" />}
+                  />
+                  <Bar
+                    dataKey="Presupuestado"
+                    fill="var(--color-Presupuestado)"
+                    radius={[0, 4, 4, 0]}
+                  />
+                  <Bar dataKey="Real" fill="var(--color-Real)" radius={[0, 4, 4, 0]} />
+                  <Bar
+                    dataKey="Comprometido"
+                    fill="var(--color-Comprometido)"
+                    radius={[0, 4, 4, 0]}
+                  />
+                </BarChart>
+              </ChartContainer>
+            </div>
           </ChartCard>
         </div>
 
@@ -386,44 +449,16 @@ export function ProjectDashboardClient({ project, data }: Props) {
             description="Ingresos vs gastos por mes"
           >
             <div className="h-[280px] min-h-[280px] w-full min-w-0" style={{ minHeight: 280 }}>
-            <ResponsiveContainer width="100%" height={280}>
-              <AreaChart
-                data={cashflowChartData}
-                margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
-                <YAxis
-                  tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
-                  tick={{ fontSize: 12 }}
-                />
-                <Tooltip
-                  formatter={(value: number) => formatCurrency(value)}
-                  contentStyle={{
-                    backgroundColor: 'hsl(var(--background))',
-                    border: '1px solid hsl(var(--border))',
-                  }}
-                />
-                <Legend />
-                <Area
-                  type="monotone"
-                  dataKey="Ingresos"
-                  stackId="1"
-                  stroke={COLORS.income}
-                  fill={COLORS.income}
-                  fillOpacity={0.6}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="Gastos"
-                  stackId="2"
-                  stroke={COLORS.expense}
-                  fill={COLORS.expense}
-                  fillOpacity={0.6}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+              <CashflowTimelineComposedChart
+                animationKey={`${data.cashflow.length}`}
+                data={cashflowTimelineRows}
+                config={projectCashflowConfig}
+                currency="ARS"
+                locale="es-AR"
+                tooltipLabels={projectCashflowTooltipLabels}
+                className="aspect-auto h-[280px] min-h-[280px] w-full"
+              />
+            </div>
         </ChartCard>
       </div>
 
@@ -434,31 +469,48 @@ export function ProjectDashboardClient({ project, data }: Props) {
           description="Monto por certificación"
         >
           <div className="h-[280px] min-h-[280px] w-full min-w-0" style={{ minHeight: 280 }}>
-            <ResponsiveContainer width="100%" height={280}>
+            <ChartContainer
+              config={certChartConfig}
+              className="aspect-auto h-[280px] min-h-[280px] w-full"
+            >
               <BarChart
                 data={certChartData}
-                margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                margin={{ top: 16, right: 18, left: 4, bottom: 8 }}
               >
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                <CartesianGrid
+                  vertical={false}
+                  stroke="hsl(var(--border))"
+                  strokeOpacity={0.4}
+                  strokeDasharray="4 4"
+                />
+                <XAxis
+                  dataKey="name"
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={10}
+                  tick={{ fontSize: 11 }}
+                />
                 <YAxis
-                  tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  width={58}
                   tick={{ fontSize: 12 }}
+                  tickFormatter={axisCurrency}
                 />
-                <Tooltip
-                  formatter={(value: number) => formatCurrency(value)}
-                  contentStyle={{
-                    backgroundColor: 'hsl(var(--background))',
-                    border: '1px solid hsl(var(--border))',
-                  }}
+                <ChartTooltip
+                  isAnimationActive={false}
+                  content={
+                    <ChartTooltipContent valueFormatter={(v) => valueFmt(Number(v))} />
+                  }
                 />
-                <Bar dataKey="Monto" radius={[4, 4, 0, 0]}>
+                <Bar dataKey="Monto" fill="var(--color-Monto)" radius={[4, 4, 0, 0]}>
                   {certChartData.map((_, index) => (
                     <Cell key={index} fill={certChartData[index].fill} />
                   ))}
                 </Bar>
               </BarChart>
-            </ResponsiveContainer>
+            </ChartContainer>
           </div>
           </ChartCard>
         </div>

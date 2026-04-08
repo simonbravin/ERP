@@ -1,21 +1,13 @@
 'use client'
 
 import { useState, useMemo, useCallback } from 'react'
-import { useTranslations } from 'next-intl'
-import { formatCurrency } from '@/lib/format-utils'
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from 'recharts'
+import { useLocale, useTranslations } from 'next-intl'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { CashflowDataPointDetailed } from '@/app/actions/finance'
 import { chartMonthYearShortEs } from '@/lib/chart-date-labels'
+import { chartSemanticHsl } from '@/lib/chart-theme'
+import { CashflowTimelineComposedChart } from '@/components/charts/cashflow-timeline-composed-chart'
+import type { ChartConfig } from '@/components/ui/chart'
 
 export type CashflowRange = 'currentMonth' | 'last3' | 'last6' | 'last12'
 
@@ -35,11 +27,12 @@ interface CashflowChartProps {
 }
 
 /**
- * Cashflow chart: Ingresos, Gastos, Balance acumulado (same as Finanzas > Cashflow).
- * Toggles slice the loaded 12-month timeline client-side; no reload.
+ * Cashflow: income / expense lines + subtle running-balance area (linear interpolation).
+ * Range tabs slice the loaded timeline client-side.
  */
 export function CashflowChart({ timeline }: CashflowChartProps) {
   const t = useTranslations('dashboard')
+  const locale = useLocale()
   const [range, setRange] = useState<CashflowRange>('last6')
 
   const handleRangeChange = useCallback((v: string) => {
@@ -55,7 +48,6 @@ export function CashflowChart({ timeline }: CashflowChartProps) {
       const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
       const point = timeline.find((p) => p.month === currentMonthKey)
       if (point) return [point]
-      // Si el backend no incluyó el mes corriente (ej. rango corto), mostrar un punto en cero
       return [
         {
           month: currentMonthKey,
@@ -75,15 +67,31 @@ export function CashflowChart({ timeline }: CashflowChartProps) {
   const chartData = useMemo(
     () =>
       slicedData.map((point) => ({
-        ...point,
         monthLabel: formatMonthKey(point.month),
+        income: point.income,
+        expense: point.expense,
+        balance: point.balance,
+        periodNet: point.income - point.expense,
       })),
     [slicedData]
   )
 
-  const tooltipFormatter = (value: number) => formatCurrency(value, 'ARS')
-  const yAxisFormatter = (value: number) =>
-    Math.abs(value) >= 1000 ? `${(value / 1000).toFixed(0)}k` : String(value)
+  const chartConfig = {
+    income: { label: t('income'), color: chartSemanticHsl.income },
+    expense: { label: t('expenses'), color: chartSemanticHsl.expense },
+    balance: {
+      label: t('cashflowRunningBalance'),
+      color: chartSemanticHsl.runningBalance,
+    },
+  } satisfies ChartConfig
+
+  const tooltipLabels = {
+    income: t('income'),
+    expenses: t('expenses'),
+    runningBalance: t('cashflowRunningBalance'),
+    periodNet: t('cashflowPeriodNet'),
+    vsPrevious: t('cashflowVsPrevious'),
+  }
 
   return (
     <div className="flex h-full min-h-[360px] flex-col rounded-xl border border-border/60 bg-card p-6 shadow-sm">
@@ -113,51 +121,15 @@ export function CashflowChart({ timeline }: CashflowChartProps) {
 
       <div className="mt-5 flex min-h-[280px] w-full min-w-0 flex-1 flex-col">
         {chartData.length > 0 ? (
-          <ResponsiveContainer key={range} width="100%" height="100%" minHeight={280}>
-            <AreaChart data={chartData} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis dataKey="monthLabel" tick={{ fontSize: 12 }} />
-              <YAxis tickFormatter={yAxisFormatter} tick={{ fontSize: 12 }} />
-              <Tooltip
-                formatter={tooltipFormatter}
-                contentStyle={{
-                  backgroundColor: 'hsl(var(--background))',
-                  border: '1px solid hsl(var(--border))',
-                }}
-              />
-              <Legend wrapperStyle={{ paddingTop: '1rem' }} />
-              <Area
-                type="monotone"
-                dataKey="income"
-                name={t('income')}
-                stackId="a"
-                fill="hsl(var(--chart-2))"
-                stroke="hsl(var(--chart-2))"
-                animationDuration={900}
-                animationBegin={0}
-              />
-              <Area
-                type="monotone"
-                dataKey="expense"
-                name={t('expenses')}
-                stackId="b"
-                fill="hsl(var(--chart-4))"
-                stroke="hsl(var(--chart-4))"
-                animationDuration={900}
-                animationBegin={100}
-              />
-              <Area
-                type="monotone"
-                dataKey="balance"
-                name={t('net')}
-                fill="transparent"
-                stroke="hsl(var(--chart-3))"
-                strokeDasharray="4 4"
-                animationDuration={900}
-                animationBegin={200}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+          <CashflowTimelineComposedChart
+            animationKey={range}
+            data={chartData}
+            config={chartConfig}
+            currency="ARS"
+            locale={locale === 'en' ? 'en-US' : 'es-AR'}
+            tooltipLabels={tooltipLabels}
+            className="aspect-auto min-h-[280px] w-full"
+          />
         ) : (
           <div className="flex min-h-[280px] flex-1 items-center justify-center">
             <p className="text-sm text-muted-foreground">{t('noDataAvailable')}</p>

@@ -1,16 +1,70 @@
 'use client'
 
+import { useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
+import { PieChart, Pie, Cell } from 'recharts'
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+  type ChartConfig,
+} from '@/components/ui/chart'
 import { formatCurrency } from '@/lib/format-utils'
 import type { CashflowBreakdownItem } from '@/app/actions/finance'
-import { CHART_PIE_PLACEHOLDER_FILL, chartSeriesColor } from '@/lib/chart-theme'
+import {
+  CHART_PIE_PLACEHOLDER_FILL,
+  chartSeriesColor,
+  groupPieSlicesForDisplay,
+} from '@/lib/chart-theme'
 
 interface Props {
   breakdown: CashflowBreakdownItem[]
 }
 
 export function CashflowBreakdownChart({ breakdown }: Props) {
+  const totalExpenses = breakdown.reduce((sum, i) => sum + i.totalExpense, 0)
+
+  const rawSlices = useMemo(
+    () =>
+      breakdown.map((item) => ({
+        name:
+          item.projectId === null
+            ? 'Generales'
+            : `${item.projectNumber} - ${item.projectName.substring(0, 20)}${item.projectName.length > 20 ? '...' : ''}`,
+        value: item.totalExpense,
+      })),
+    [breakdown]
+  )
+
+  const displaySlices = useMemo(
+    () => groupPieSlicesForDisplay(rawSlices, 'Otros', 6, 5),
+    [rawSlices]
+  )
+
+  const chartData = useMemo(
+    () =>
+      displaySlices.map((s, i) => ({
+        ...s,
+        id: `p${i}`,
+      })),
+    [displaySlices]
+  )
+
+  const chartConfig = useMemo(() => {
+    const c: ChartConfig = {}
+    displaySlices.forEach((s, i) => {
+      c[`p${i}`] = { label: s.name, color: chartSeriesColor(i) }
+    })
+    return c
+  }, [displaySlices])
+
+  const valueFmt = useMemo(
+    () => (v: number) => formatCurrency(v, 'ARS'),
+    []
+  )
+
   if (breakdown.length === 0) {
     return (
       <Card>
@@ -18,23 +72,13 @@ export function CashflowBreakdownChart({ breakdown }: Props) {
           <CardTitle>Composición de Gastos</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-center text-sm text-muted-foreground py-8">
+          <p className="py-8 text-center text-sm text-muted-foreground">
             No hay gastos en el período seleccionado.
           </p>
         </CardContent>
       </Card>
     )
   }
-
-  const totalExpenses = breakdown.reduce((sum, i) => sum + i.totalExpense, 0)
-  const chartData = breakdown.map((item, index) => ({
-    name:
-      item.projectId === null
-        ? 'Generales'
-        : `${item.projectNumber} - ${item.projectName.substring(0, 20)}${item.projectName.length > 20 ? '...' : ''}`,
-    value: item.totalExpense,
-    fill: chartSeriesColor(index),
-  }))
 
   return (
     <Card>
@@ -44,26 +88,32 @@ export function CashflowBreakdownChart({ breakdown }: Props) {
       <CardContent>
         <div className="grid gap-6 lg:grid-cols-2">
           <div className="h-64 min-h-[200px] w-full">
-            <ResponsiveContainer width="100%" height={256}>
+            <ChartContainer config={chartConfig} className="aspect-auto mx-auto h-[256px] w-full max-w-[320px]">
               <PieChart>
                 <Pie
                   data={chartData}
+                  dataKey="value"
+                  nameKey="id"
                   cx="50%"
                   cy="50%"
                   labelLine={false}
                   label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
                   outerRadius={100}
                   fill={CHART_PIE_PLACEHOLDER_FILL}
-                  dataKey="value"
                 >
-                  {chartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                  {chartData.map((_, index) => (
+                    <Cell key={`cell-${index}`} fill={`var(--color-p${index})`} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value: number) => formatCurrency(value, 'ARS')} />
-                <Legend />
+                <ChartTooltip
+                  isAnimationActive={false}
+                  content={
+                    <ChartTooltipContent nameKey="id" valueFormatter={(v) => valueFmt(v)} />
+                  }
+                />
+                <ChartLegend content={<ChartLegendContent nameKey="id" />} />
               </PieChart>
-            </ResponsiveContainer>
+            </ChartContainer>
           </div>
 
           <div className="overflow-hidden rounded-md border">

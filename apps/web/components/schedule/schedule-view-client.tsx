@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from 'next-intl'
 import { useRouter, Link } from '@/i18n/navigation'
 import { useMessageBus } from '@/hooks/use-message-bus'
 import { ScheduleGanttBlock } from './schedule-gantt-block'
+import { ScheduleSvarGantt } from './schedule-svar-gantt'
 import { GanttControlPanel } from './gantt-control-panel'
 import { DependencyManager } from './dependency-manager'
 import { TaskEditDialog } from './task-edit-dialog'
@@ -36,6 +37,9 @@ import {
   setScheduleAsBaseline,
   approveSchedule,
   updateTaskDates,
+  updateTaskProgress,
+  addTaskDependency,
+  removeTaskDependency,
   updateScheduleNonWorkingDates,
   importScheduleFromMsProjectXml,
 } from '@/app/actions/schedule'
@@ -122,6 +126,8 @@ export function ScheduleViewClient({
   const [groupBy, setGroupBy] = useState<'none' | 'phase' | 'assigned'>('none')
   const [weekStartsOn, setWeekStartsOn] = useState<0 | 1>(1)
   const [viewMode, setViewMode] = useState<'gantt' | 'calendar'>('gantt')
+
+  const baselineChartOverlaySupported = viewMode === 'gantt'
   const [showWbsDetailColumns, setShowWbsDetailColumns] = useState(true)
   const [calendarWbsStrip, setCalendarWbsStrip] = useState(false)
 
@@ -136,6 +142,7 @@ export function ScheduleViewClient({
       const stored = JSON.parse(raw) as Partial<{
         zoom: 'day' | 'week' | 'month'
         showCriticalPath: boolean
+        showBaseline: boolean
         showProgress: boolean
         showDependencies: boolean
         showTodayLine: boolean
@@ -147,6 +154,12 @@ export function ScheduleViewClient({
       }>
       if (stored.zoom && ['day', 'week', 'month'].includes(stored.zoom)) setZoom(stored.zoom)
       if (typeof stored.showCriticalPath === 'boolean') setShowCriticalPath(stored.showCriticalPath)
+      if (
+        typeof stored.showBaseline === 'boolean' &&
+        baselineOverlayAvailable
+      ) {
+        setShowBaseline(stored.showBaseline)
+      }
       if (typeof stored.showProgress === 'boolean') setShowProgress(stored.showProgress)
       if (typeof stored.showDependencies === 'boolean') setShowDependencies(stored.showDependencies)
       if (typeof stored.showTodayLine === 'boolean') setShowTodayLine(stored.showTodayLine)
@@ -159,7 +172,7 @@ export function ScheduleViewClient({
     } catch {
       // ignore invalid stored prefs
     }
-  }, [schedulePrefsKey])
+  }, [schedulePrefsKey, baselineOverlayAvailable])
 
   const hasPersistedOnce = useRef(false)
   useEffect(() => {
@@ -172,6 +185,7 @@ export function ScheduleViewClient({
       JSON.stringify({
         zoom,
         showCriticalPath,
+        showBaseline,
         showProgress,
         showDependencies,
         showTodayLine,
@@ -186,6 +200,7 @@ export function ScheduleViewClient({
     schedulePrefsKey,
     zoom,
     showCriticalPath,
+    showBaseline,
     showProgress,
     showDependencies,
     showTodayLine,
@@ -267,28 +282,6 @@ export function ScheduleViewClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sync expand-all only when schedule or task ids change
   }, [expandedNodesResetKey])
 
-  const ganttTasks = schedule.tasks.map((task: (typeof schedule.tasks)[0]) => {
-    const level = task.wbsNode.code.split('.').length - 1
-    return {
-      id: task.id,
-      wbsNodeId: task.wbsNodeId,
-      name: `${task.wbsNode.code} ${task.wbsNode.name}`,
-      startDate: task.plannedStartDate,
-      endDate: task.plannedEndDate,
-      progress: Number(task.progressPercent),
-      isCritical: task.isCritical,
-      level,
-      taskType: (task.taskType as 'TASK' | 'SUMMARY' | 'MILESTONE') || 'TASK',
-      dependencies: (task.successors as { id: string; successorId: string; dependencyType: string }[]).map(
-        (dep) => ({
-          id: dep.id,
-          targetId: dep.successorId,
-          type: dep.dependencyType as 'FS' | 'SS' | 'FF' | 'SF',
-        })
-      ),
-    }
-  })
-
   function shouldShowTask(
     task: { code: string; id: string },
     allTasks: { code: string; id: string }[]
@@ -367,9 +360,12 @@ export function ScheduleViewClient({
   const visibleTableTasks = sortedByGroup.filter((task) =>
     shouldShowTask(task, tableTasks)
   )
-  const visibleGanttTasks = visibleTableTasks
-    .map((t) => ganttTasks.find((g) => g.id === t.id))
-    .filter(Boolean) as typeof ganttTasks
+  const svarVisibleTaskIds = useMemo(
+    () => new Set<string>(visibleTableTasks.map((r) => r.id)),
+    [visibleTableTasks]
+  )
+
+  const svarGanttReadonly = !canEdit || schedule.status !== 'DRAFT'
 
   const totalTasks = schedule.tasks.length
   const criticalTasks = schedule.tasks.filter(
@@ -665,6 +661,68 @@ export function ScheduleViewClient({
       toast.error(t('updateError'))
     }
   }
+
+  const handleSvarProgressPersist = useCallback(
+    async (taskId: string, progressPercent: number) => {
+      try {
+        const result = await updateTaskProgress(taskId, { progressPercent })
+        if (result.success) {
+          toast.success(t('taskUpdated'))
+          router.refresh()
+        } else {
+          toast.error(result.error ?? t('updateError'))
+        }
+      } catch {
+        toast.error(t('updateError'))
+      }
+    },
+    [router, t]
+  )
+
+  const handleSvarDependencyAdd = useCallback(
+    async (input: {
+      predecessorId: string
+      successorId: string
+      dependencyType: 'FS' | 'SS' | 'FF' | 'SF'
+      lagDays: number
+    }) => {
+      try {
+        const result = await addTaskDependency({
+          scheduleId: schedule.id,
+          predecessorId: input.predecessorId,
+          successorId: input.successorId,
+          dependencyType: input.dependencyType,
+          lagDays: input.lagDays,
+        })
+        if (result.success) {
+          toast.success(t('dependencyAddedDesc'))
+          router.refresh()
+        } else {
+          toast.error(result.error ?? t('dependencyAddError'))
+        }
+      } catch {
+        toast.error(t('dependencyAddError'))
+      }
+    },
+    [schedule.id, router, t]
+  )
+
+  const handleSvarDependencyRemove = useCallback(
+    async (dependencyId: string) => {
+      try {
+        const result = await removeTaskDependency(dependencyId)
+        if (result.success) {
+          toast.success(t('dependencyRemovedDesc'))
+          router.refresh()
+        } else {
+          toast.error(result.error ?? t('dependencyRemoveError'))
+        }
+      } catch {
+        toast.error(t('dependencyRemoveError'))
+      }
+    },
+    [router, t]
+  )
 
   function handleToggleExpand(taskId: string) {
     setExpandedNodes((prev) => {
@@ -1174,6 +1232,7 @@ export function ScheduleViewClient({
         showBaseline={showBaseline}
         onShowBaselineChange={setShowBaseline}
         baselineOverlayAvailable={baselineOverlayAvailable}
+        baselineChartOverlaySupported={baselineChartOverlaySupported}
         showProgress={showProgress}
         onShowProgressChange={setShowProgress}
         showDependencies={showDependencies}
@@ -1336,9 +1395,104 @@ export function ScheduleViewClient({
               className="flex min-h-0 flex-1 flex-col overflow-hidden"
               style={{ minHeight: 0 }}
             >
+              {viewMode === 'gantt' ? (
+                <div
+                  ref={fullscreenScheduleScrollRef}
+                  className="flex min-h-0 flex-1 overflow-auto"
+                >
+                  <ScheduleSvarGantt
+                    scheduleData={scheduleData}
+                    visibleTaskIds={svarVisibleTaskIds}
+                    visibleStartDate={visibleStartDate}
+                    visibleEndDate={visibleEndDate}
+                    zoom={zoom}
+                    weekStartsOn={weekStartsOn}
+                    readonly={svarGanttReadonly}
+                    showCriticalPath={showCriticalPath}
+                    showDependencies={showDependencies}
+                    showProgress={showProgress}
+                    showTodayLine={showTodayLine}
+                    showBaseline={showBaseline && baselineOverlayAvailable}
+                    baselinePlanByWbsNodeId={scheduleData.baselinePlanByWbsNodeId}
+                    className="min-h-0 w-full flex-1"
+                    onTaskDatesPersist={handleTaskDragEnd}
+                    onTaskProgressPersist={handleSvarProgressPersist}
+                    onDependencyAdd={handleSvarDependencyAdd}
+                    onDependencyRemove={handleSvarDependencyRemove}
+                    onTaskActivate={(taskId) => {
+                      setSelectedTaskForEdit(taskId)
+                      handleCenterOnTask(taskId)
+                    }}
+                  />
+                </div>
+              ) : (
+                <ScheduleGanttBlock
+                  tableTasks={visibleTableTasks}
+                  allTableTasks={tableTasks}
+                  expandedNodes={expandedNodes}
+                  onToggleExpand={handleToggleExpand}
+                  onTaskClick={(taskId) => {
+                    setSelectedTaskForEdit(taskId)
+                    handleCenterOnTask(taskId)
+                  }}
+                  onDependenciesClick={(taskId) =>
+                    setSelectedTaskForDependency(taskId)
+                  }
+                  onTaskDatesChange={handleTaskDragEnd}
+                  canEdit={canEdit}
+                  highlightedTask={highlightedTask}
+                  searchQuery={searchQuery}
+                  workingDaysPerWeek={schedule.workingDaysPerWeek}
+                  calendarOptions={calendarOptions}
+                  groupBy={groupBy}
+                  visibleStartDate={visibleStartDate}
+                  visibleEndDate={visibleEndDate}
+                  zoom={zoom}
+                  weekStartsOn={weekStartsOn}
+                  scrollContainerRef={fullscreenScheduleScrollRef}
+                  showWbsDetailColumns={showWbsDetailColumns}
+                  wbsMinimalStrip={calendarWbsStrip}
+                />
+              )}
+            </div>
+          </div>
+        )}
+
+        <div className="overflow-hidden rounded-lg border border-border">
+          <div className="flex min-h-0" style={{ minHeight: 'max(520px, 60vh)', maxHeight: '85vh' }}>
+            {viewMode === 'gantt' ? (
+              <div
+                ref={mainScheduleScrollRef}
+                className="flex min-h-0 w-full flex-1 overflow-auto"
+              >
+                <ScheduleSvarGantt
+                  scheduleData={scheduleData}
+                  visibleTaskIds={svarVisibleTaskIds}
+                  visibleStartDate={visibleStartDate}
+                  visibleEndDate={visibleEndDate}
+                  zoom={zoom}
+                  weekStartsOn={weekStartsOn}
+                  readonly={svarGanttReadonly}
+                  showCriticalPath={showCriticalPath}
+                  showDependencies={showDependencies}
+                  showProgress={showProgress}
+                  showTodayLine={showTodayLine}
+                  showBaseline={showBaseline && baselineOverlayAvailable}
+                  baselinePlanByWbsNodeId={scheduleData.baselinePlanByWbsNodeId}
+                  className="min-h-[520px] w-full flex-1"
+                  onTaskDatesPersist={handleTaskDragEnd}
+                  onTaskProgressPersist={handleSvarProgressPersist}
+                  onDependencyAdd={handleSvarDependencyAdd}
+                  onDependencyRemove={handleSvarDependencyRemove}
+                  onTaskActivate={(taskId) => {
+                    setSelectedTaskForEdit(taskId)
+                    handleCenterOnTask(taskId)
+                  }}
+                />
+              </div>
+            ) : (
               <ScheduleGanttBlock
                 tableTasks={visibleTableTasks}
-                ganttTasks={visibleGanttTasks}
                 allTableTasks={tableTasks}
                 expandedNodes={expandedNodes}
                 onToggleExpand={handleToggleExpand}
@@ -1352,7 +1506,6 @@ export function ScheduleViewClient({
                 onTaskDatesChange={handleTaskDragEnd}
                 canEdit={canEdit}
                 highlightedTask={highlightedTask}
-                onHighlightTask={setHighlightedTask}
                 searchQuery={searchQuery}
                 workingDaysPerWeek={schedule.workingDaysPerWeek}
                 calendarOptions={calendarOptions}
@@ -1360,64 +1513,12 @@ export function ScheduleViewClient({
                 visibleStartDate={visibleStartDate}
                 visibleEndDate={visibleEndDate}
                 zoom={zoom}
-                showCriticalPath={showCriticalPath}
-                showDependencies={showDependencies}
-                showTodayLine={showTodayLine}
-                showProgress={showProgress}
-                showBaseline={showBaseline && baselineOverlayAvailable}
-                baselinePlanByWbsNodeId={scheduleData.baselinePlanByWbsNodeId}
-                onTaskDragEnd={handleTaskDragEnd}
-                ganttAriaLabel={t('ganttAriaLabel')}
                 weekStartsOn={weekStartsOn}
-                viewMode={viewMode}
-                scrollContainerRef={fullscreenScheduleScrollRef}
+                scrollContainerRef={mainScheduleScrollRef}
                 showWbsDetailColumns={showWbsDetailColumns}
-                wbsMinimalStrip={viewMode === 'calendar' && calendarWbsStrip}
+                wbsMinimalStrip={calendarWbsStrip}
               />
-            </div>
-          </div>
-        )}
-
-        <div className="overflow-hidden rounded-lg border border-border">
-          <div className="flex min-h-0" style={{ minHeight: 'max(520px, 60vh)', maxHeight: '85vh' }}>
-            <ScheduleGanttBlock
-              tableTasks={visibleTableTasks}
-              ganttTasks={visibleGanttTasks}
-              allTableTasks={tableTasks}
-              expandedNodes={expandedNodes}
-              onToggleExpand={handleToggleExpand}
-              onTaskClick={(taskId) => {
-                setSelectedTaskForEdit(taskId)
-                handleCenterOnTask(taskId)
-              }}
-              onDependenciesClick={(taskId) =>
-                setSelectedTaskForDependency(taskId)
-              }
-              onTaskDatesChange={handleTaskDragEnd}
-              canEdit={canEdit}
-              highlightedTask={highlightedTask}
-              onHighlightTask={setHighlightedTask}
-              searchQuery={searchQuery}
-              workingDaysPerWeek={schedule.workingDaysPerWeek}
-              calendarOptions={calendarOptions}
-              groupBy={groupBy}
-              visibleStartDate={visibleStartDate}
-              visibleEndDate={visibleEndDate}
-              zoom={zoom}
-              showCriticalPath={showCriticalPath}
-              showDependencies={showDependencies}
-              showTodayLine={showTodayLine}
-              showProgress={showProgress}
-              showBaseline={showBaseline && baselineOverlayAvailable}
-              baselinePlanByWbsNodeId={scheduleData.baselinePlanByWbsNodeId}
-              onTaskDragEnd={handleTaskDragEnd}
-              ganttAriaLabel={t('ganttAriaLabel')}
-              weekStartsOn={weekStartsOn}
-              viewMode={viewMode}
-              scrollContainerRef={mainScheduleScrollRef}
-              showWbsDetailColumns={showWbsDetailColumns}
-              wbsMinimalStrip={viewMode === 'calendar' && calendarWbsStrip}
-            />
+            )}
           </div>
           <div
             className="flex flex-wrap items-center gap-4 border-t border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground"

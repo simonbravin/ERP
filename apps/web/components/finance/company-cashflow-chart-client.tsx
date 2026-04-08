@@ -13,19 +13,19 @@ import {
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import {
-  AreaChart,
-  Area,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { formatCurrency } from '@/lib/format-utils'
+import { formatChartAxisCurrency } from '@/lib/chart-format'
+import { chartSemanticHsl } from '@/lib/chart-theme'
+import { CashflowTimelineComposedChart } from '@/components/charts/cashflow-timeline-composed-chart'
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+  type ChartConfig,
+} from '@/components/ui/chart'
 import type {
   CashflowDataPointDetailed,
   CashflowBreakdownItem,
@@ -113,13 +113,47 @@ export function CompanyCashflowChartClient({
         ...point,
         monthLabel: formatMonthKey(point.month),
         Proyectos: point.expense - point.overhead,
+        periodNet: point.income - point.expense,
       })),
     [initialData]
   )
 
-  const tooltipFormatter = (value: number) => formatCurrency(value, 'ARS')
+  const cashflowChartRows = useMemo(
+    () =>
+      chartData.map(({ monthLabel, income, expense, balance, periodNet }) => ({
+        monthLabel,
+        income,
+        expense,
+        balance,
+        periodNet,
+      })),
+    [chartData]
+  )
+
+  const cashflowChartConfig = {
+    income: { label: 'Ingresos', color: chartSemanticHsl.income },
+    expense: { label: 'Gastos', color: chartSemanticHsl.expense },
+    balance: {
+      label: 'Balance acumulado',
+      color: chartSemanticHsl.runningBalance,
+    },
+  } satisfies ChartConfig
+
+  const cashflowTooltipLabels = {
+    income: 'Ingresos',
+    expenses: 'Gastos',
+    runningBalance: 'Balance acumulado',
+    periodNet: 'Neto del período',
+    vsPrevious: 'vs. mes anterior',
+  }
+
   const yAxisFormatter = (value: number) =>
-    value >= 1000 ? `${(value / 1000).toFixed(0)}k` : String(value)
+    formatChartAxisCurrency(value, { locale: 'es-AR', currency: 'ARS' })
+
+  const expenseStackChartConfig = {
+    overhead: { label: 'Overhead', color: 'hsl(var(--chart-neutral))' },
+    Proyectos: { label: 'Proyectos', color: 'hsl(var(--chart-1))' },
+  } satisfies ChartConfig
 
   if (initialData.length === 0) {
     return (
@@ -184,74 +218,76 @@ export function CompanyCashflowChartClient({
 
           <TabsContent value="cashflow" className="mt-4">
             <div className="h-80 w-full min-w-0">
-              <ResponsiveContainer width="100%" height={280}>
-                <AreaChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="monthLabel" tick={{ fontSize: 12 }} />
-                  <YAxis tickFormatter={yAxisFormatter} tick={{ fontSize: 12 }} />
-                  <Tooltip
-                    formatter={tooltipFormatter}
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--background))',
-                      border: '1px solid hsl(var(--border))',
-                    }}
-                  />
-                  <Legend />
-                  <Area
-                    type="monotone"
-                    dataKey="income"
-                    name="Ingresos"
-                    stackId="a"
-                    fill="hsl(var(--chart-2))"
-                    stroke="hsl(var(--chart-2))"
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="expense"
-                    name="Gastos"
-                    stackId="b"
-                    fill="hsl(var(--chart-4))"
-                    stroke="hsl(var(--chart-4))"
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="balance"
-                    name="Balance acumulado"
-                    fill="transparent"
-                    stroke="hsl(var(--chart-3))"
-                    strokeDasharray="4 4"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+              <CashflowTimelineComposedChart
+                animationKey={`${preset}-${initialData.length}`}
+                data={cashflowChartRows}
+                config={cashflowChartConfig}
+                currency="ARS"
+                locale="es-AR"
+                tooltipLabels={cashflowTooltipLabels}
+                className="aspect-auto h-full min-h-[280px] w-full"
+              />
             </div>
           </TabsContent>
 
           <TabsContent value="breakdown" className="mt-4">
             <div className="h-80 w-full min-w-0">
-              <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="monthLabel" tick={{ fontSize: 12 }} />
-                  <YAxis tickFormatter={yAxisFormatter} tick={{ fontSize: 12 }} />
-                  <Tooltip
-                    formatter={tooltipFormatter}
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--background))',
-                      border: '1px solid hsl(var(--border))',
-                    }}
+              <ChartContainer
+                config={expenseStackChartConfig}
+                className="aspect-auto h-full min-h-[280px] w-full"
+              >
+                <BarChart
+                  data={chartData}
+                  margin={{ top: 18, right: 20, left: 4, bottom: 8 }}
+                >
+                  <CartesianGrid
+                    vertical={false}
+                    stroke="hsl(var(--border))"
+                    strokeOpacity={0.4}
+                    strokeDasharray="4 4"
                   />
-                  <Legend />
-                  <Bar dataKey="overhead" name="Overhead" fill="hsl(var(--chart-4))" stackId="g" animationDuration={900} animationBegin={0} />
+                  <XAxis
+                    dataKey="monthLabel"
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={10}
+                    tick={{ fontSize: 12 }}
+                  />
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
+                    width={58}
+                    tick={{ fontSize: 12 }}
+                    tickFormatter={yAxisFormatter}
+                  />
+                  <ChartTooltip
+                    isAnimationActive={false}
+                    cursor={{ fill: 'hsl(var(--muted))', opacity: 0.25 }}
+                    content={
+                      <ChartTooltipContent
+                        valueFormatter={(v) => formatCurrency(Number(v), 'ARS')}
+                      />
+                    }
+                  />
+                  <ChartLegend
+                    verticalAlign="bottom"
+                    content={<ChartLegendContent className="pt-4" />}
+                  />
+                  <Bar
+                    dataKey="overhead"
+                    stackId="g"
+                    fill="var(--color-overhead)"
+                    radius={[0, 0, 0, 0]}
+                  />
                   <Bar
                     dataKey="Proyectos"
-                    name="Proyectos"
-                    fill="hsl(var(--chart-1))"
                     stackId="g"
-                    animationDuration={900}
-                    animationBegin={100}
+                    fill="var(--color-Proyectos)"
+                    radius={[4, 4, 0, 0]}
                   />
                 </BarChart>
-              </ResponsiveContainer>
+              </ChartContainer>
             </div>
           </TabsContent>
         </Tabs>

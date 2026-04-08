@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { ChartCard } from '@/components/charts/chart-card'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -10,17 +10,33 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
 } from 'recharts'
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+  type ChartConfig,
+} from '@/components/ui/chart'
 import { formatCurrency } from '@/lib/format-utils'
+import { formatChartAxisCurrency } from '@/lib/chart-format'
 import { ExportDropdown, type ExportFormat } from '@/components/list'
 import { downloadReportPdf } from '@/lib/reports/download-report-pdf'
 import { toast } from 'sonner'
 import type { CertificationsByProjectRow } from '@/app/actions/predefined-reports'
 
 const PDF_TEMPLATE = 'certifications-report'
+
+const REPORT_LOCALE = 'es-AR'
+const REPORT_CURRENCY = 'ARS'
+
+const chartConfig = {
+  Borrador: { label: 'Borrador', color: 'hsl(var(--chart-4))' },
+  Emitida: { label: 'Emitida', color: 'hsl(var(--chart-3))' },
+  Aprobada: { label: 'Aprobada', color: 'hsl(var(--chart-1))' },
+  Rechazada: { label: 'Rechazada', color: 'hsl(var(--chart-2))' },
+} satisfies ChartConfig
 
 interface Props {
   data: CertificationsByProjectRow[]
@@ -50,6 +66,17 @@ function downloadCsv(data: CertificationsByProjectRow[]) {
 export function CertificationsReportClient({ data }: Props) {
   const tCommon = useTranslations('common')
   const [exporting, setExporting] = useState(false)
+
+  const axisCurrency = useMemo(
+    () => (v: number) =>
+      formatChartAxisCurrency(v, { locale: REPORT_LOCALE, currency: REPORT_CURRENCY }),
+    []
+  )
+
+  const valueFmt = useMemo(
+    () => (v: number) => formatCurrency(v, REPORT_CURRENCY, REPORT_LOCALE),
+    []
+  )
 
   async function handleExport(format: ExportFormat) {
     if (format === 'csv') {
@@ -92,28 +119,44 @@ export function CertificationsReportClient({ data }: Props) {
         description="Montos por estado: Borrador, Emitida, Aprobada, Rechazada"
       >
         <div className="h-[360px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+          <ChartContainer config={chartConfig} className="aspect-auto h-full w-full min-h-[320px]">
+            <BarChart
+              accessibilityLayer
+              data={chartData}
+              margin={{ top: 16, right: 18, left: 6, bottom: 8 }}
+            >
+              <CartesianGrid
+                vertical={false}
+                stroke="hsl(var(--border))"
+                strokeOpacity={0.45}
+                strokeDasharray="4 4"
+              />
+              <XAxis dataKey="name" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
               <YAxis
-                tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
                 tick={{ fontSize: 12 }}
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={axisCurrency}
               />
-              <Tooltip
-                formatter={(value: number) => formatCurrency(value)}
-                contentStyle={{
-                  backgroundColor: 'hsl(var(--background))',
-                  border: '1px solid hsl(var(--border))',
-                }}
+              <ChartTooltip
+                isAnimationActive={false}
+                cursor={{ fill: 'hsl(var(--muted))', opacity: 0.25 }}
+                content={
+                  <ChartTooltipContent
+                    valueFormatter={(v) => valueFmt(v)}
+                    labelFormatter={(label) =>
+                      typeof label === 'string' ? label : String(label ?? '')
+                    }
+                  />
+                }
               />
-              <Legend />
-              <Bar dataKey="Borrador" stackId="a" fill="hsl(var(--chart-4))" radius={[0, 0, 0, 0]} />
-              <Bar dataKey="Emitida" stackId="a" fill="hsl(var(--chart-3))" radius={[0, 0, 0, 0]} />
-              <Bar dataKey="Aprobada" stackId="a" fill="hsl(var(--chart-1))" radius={[0, 0, 0, 0]} />
-              <Bar dataKey="Rechazada" stackId="a" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
+              <ChartLegend content={<ChartLegendContent />} />
+              <Bar dataKey="Borrador" stackId="a" fill="var(--color-Borrador)" radius={[0, 0, 0, 0]} />
+              <Bar dataKey="Emitida" stackId="a" fill="var(--color-Emitida)" radius={[0, 0, 0, 0]} />
+              <Bar dataKey="Aprobada" stackId="a" fill="var(--color-Aprobada)" radius={[0, 0, 0, 0]} />
+              <Bar dataKey="Rechazada" stackId="a" fill="var(--color-Rechazada)" radius={[4, 4, 0, 0]} />
             </BarChart>
-          </ResponsiveContainer>
+          </ChartContainer>
         </div>
       </ChartCard>
 
@@ -130,12 +173,12 @@ export function CertificationsReportClient({ data }: Props) {
               <thead>
                 <tr className="border-b">
                   <th className="pb-2 text-left font-medium">Proyecto</th>
-                  <th className="pb-2 text-right font-medium">Certificaciones</th>
+                  <th className="pb-2 text-right font-medium">Total</th>
                   <th className="pb-2 text-right font-medium">Borrador</th>
                   <th className="pb-2 text-right font-medium">Emitida</th>
                   <th className="pb-2 text-right font-medium">Aprobada</th>
                   <th className="pb-2 text-right font-medium">Rechazada</th>
-                  <th className="pb-2 text-right font-medium">Total</th>
+                  <th className="pb-2 text-right font-medium">Cant.</th>
                 </tr>
               </thead>
               <tbody>
@@ -143,11 +186,11 @@ export function CertificationsReportClient({ data }: Props) {
                   <tr key={row.projectId} className="border-b">
                     <td className="py-2">
                       <span className="font-medium">{row.projectNumber}</span>
-                      <span className="ml-1 text-muted-foreground">
-                        {row.projectName}
-                      </span>
+                      <span className="ml-1 text-muted-foreground">{row.projectName}</span>
                     </td>
-                    <td className="py-2 text-right">{row.count}</td>
+                    <td className="py-2 text-right tabular-nums">
+                      {formatCurrency(row.totalCertified)}
+                    </td>
                     <td className="py-2 text-right tabular-nums">
                       {formatCurrency(row.draft)}
                     </td>
@@ -160,9 +203,7 @@ export function CertificationsReportClient({ data }: Props) {
                     <td className="py-2 text-right tabular-nums">
                       {formatCurrency(row.rejected)}
                     </td>
-                    <td className="py-2 text-right tabular-nums font-medium">
-                      {formatCurrency(row.totalCertified)}
-                    </td>
+                    <td className="py-2 text-right tabular-nums">{row.count}</td>
                   </tr>
                 ))}
               </tbody>

@@ -31,6 +31,7 @@
     "@repo/database": "workspace:*",
     "@repo/validators": "workspace:*",
     "@sparticuz/chromium": "^119.0.2",
+    "@svar-ui/react-gantt": "^2.6.1",
     "@tanstack/react-query": "^5.90.20",
     "@tanstack/react-table": "^8.21.3",
     "@tanstack/react-virtual": "^3.13.19",

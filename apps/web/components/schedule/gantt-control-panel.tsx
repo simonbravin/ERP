@@ -27,6 +27,8 @@ interface GanttControlPanelProps {
   showBaseline: boolean
   onShowBaselineChange: (show: boolean) => void
   baselineOverlayAvailable: boolean
+  /** When false, the baseline toggle is disabled (e.g. calendar view: comparison only in Gantt). */
+  baselineChartOverlaySupported?: boolean
   showProgress: boolean
   onShowProgressChange: (show: boolean) => void
   showDependencies: boolean
@@ -48,6 +50,7 @@ export function GanttControlPanel({
   showBaseline,
   onShowBaselineChange,
   baselineOverlayAvailable,
+  baselineChartOverlaySupported = true,
   showProgress,
   onShowProgressChange,
   showDependencies,
@@ -63,6 +66,13 @@ export function GanttControlPanel({
   exportingExcel = false,
 }: GanttControlPanelProps) {
   const t = useTranslations('schedule')
+  const baselineToggleDisabled =
+    !baselineOverlayAvailable || !baselineChartOverlaySupported
+  const baselineToggleTitle = !baselineOverlayAvailable
+    ? t('baselineUnavailableHint')
+    : !baselineChartOverlaySupported
+      ? t('baselineGanttViewOnly')
+      : undefined
 
   return (
     <Card>
@@ -113,9 +123,7 @@ export function GanttControlPanel({
             <Label className="text-sm font-medium">{t('tracking')}</Label>
             <div
               className="flex items-center justify-between"
-              title={
-                baselineOverlayAvailable ? undefined : t('baselineUnavailableHint')
-              }
+              title={baselineToggleTitle}
             >
               <div className="flex items-center gap-2">
                 <Eye className="h-4 w-4 text-blue-600" />
@@ -124,7 +132,7 @@ export function GanttControlPanel({
               <Switch
                 checked={showBaseline}
                 onCheckedChange={onShowBaselineChange}
-                disabled={!baselineOverlayAvailable}
+                disabled={baselineToggleDisabled}
               />
             </div>
             <div className="flex items-center justify-between">

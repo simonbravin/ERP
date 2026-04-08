@@ -1,27 +1,26 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  AreaChart,
-  Area,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatCurrency } from '@/lib/format-utils'
+import { formatChartAxisCurrency } from '@/lib/chart-format'
 import { chartMonthLongYearEs, chartMonthYearShortEs } from '@/lib/chart-date-labels'
 import type {
   CashflowDataPoint,
   ProjectCashflowBreakdownByWbsItem,
 } from '@/app/actions/finance'
-import { chartSeriesColor } from '@/lib/chart-theme'
+import { chartSemanticHsl, chartSeriesColor } from '@/lib/chart-theme'
+import { CashflowTimelineComposedChart } from '@/components/charts/cashflow-timeline-composed-chart'
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+  type ChartConfig,
+} from '@/components/ui/chart'
 
 type TimelineByWbsItem = { month: string; wbsExpenses: Record<string, number> }
 
@@ -37,6 +36,18 @@ function formatMonthKey(monthKey: string): string {
   return chartMonthYearShortEs(monthKey)
 }
 
+function wbsBarLabel(
+  key: string,
+  breakdownByWbs: ProjectCashflowBreakdownByWbsItem[]
+): string {
+  const item = breakdownByWbs.find((b) => (b.wbsNodeId ?? '__null__') === key)
+  if (key === '__other__') return 'Otros'
+  if (key === '__null__') return 'Sin partida'
+  if (item) {
+    return `${item.wbsNodeCode} - ${item.wbsNodeName.substring(0, 15)}${item.wbsNodeName.length > 15 ? '…' : ''}`
+  }
+  return key
+}
 
 export function CashflowChartClient({
   projectId: _projectId,
@@ -47,13 +58,35 @@ export function CashflowChartClient({
 }: Props) {
   const data = initialData
 
-  const chartData = data.map((point) => ({
-    month: formatMonthKey(point.month),
-    monthKey: point.month,
-    Ingresos: point.income,
-    Gastos: point.expense,
-    Balance: point.balance,
-  }))
+  const cashflowRows = useMemo(
+    () =>
+      data.map((point) => ({
+        monthLabel: formatMonthKey(point.month),
+        monthKey: point.month,
+        income: point.income,
+        expense: point.expense,
+        balance: point.balance,
+        periodNet: point.income - point.expense,
+      })),
+    [data]
+  )
+
+  const cashflowChartConfig = {
+    income: { label: 'Ingresos', color: chartSemanticHsl.income },
+    expense: { label: 'Gastos', color: chartSemanticHsl.expense },
+    balance: {
+      label: 'Balance acumulado',
+      color: chartSemanticHsl.runningBalance,
+    },
+  } satisfies ChartConfig
+
+  const cashflowTooltipLabels = {
+    income: 'Ingresos',
+    expenses: 'Gastos',
+    runningBalance: 'Balance acumulado',
+    periodNet: 'Neto del período',
+    vsPrevious: 'vs. mes anterior',
+  }
 
   const breakdownChartData = useMemo(() => {
     if (timelineByWbs.length === 0) return []
@@ -72,11 +105,112 @@ export function CashflowChartClient({
     return Array.from(keys)
   }, [timelineByWbs])
 
+  const wbsStackChartConfig = useMemo(() => {
+    const c: ChartConfig = {}
+    wbsBarKeys.forEach((key, idx) => {
+      c[key] = {
+        label: wbsBarLabel(key, breakdownByWbs),
+        color: chartSeriesColor(idx),
+      }
+    })
+    return c
+  }, [wbsBarKeys, breakdownByWbs])
+
   const hasBreakdown = breakdownChartData.length > 0 && wbsBarKeys.length > 0
 
-  const yAxisFormatter = (value: number) =>
-    value >= 1000 ? `${(value / 1000).toFixed(0)}k` : String(value)
-  const tooltipFormatter = (value: number) => formatCurrency(value, 'ARS')
+  const axisCurrency = useCallback(
+    (v: number) => formatChartAxisCurrency(v, { locale: 'es-AR', currency: 'ARS' }),
+    []
+  )
+
+  const valueFmt = useCallback((v: number) => formatCurrency(v, 'ARS'), [])
+
+  const cashflowChart = (
+    <>
+      {cashflowRows.length > 0 ? (
+        <div className="h-80 w-full min-w-0">
+          <CashflowTimelineComposedChart
+            animationKey={`${cashflowRows.length}-${cashflowRows[0]?.monthKey ?? ''}`}
+            data={cashflowRows}
+            config={cashflowChartConfig}
+            currency="ARS"
+            locale="es-AR"
+            tooltipLabels={cashflowTooltipLabels}
+            className="aspect-auto h-full min-h-[280px] w-full"
+          />
+        </div>
+      ) : (
+        <div className="flex h-80 items-center justify-center text-muted-foreground">
+          No hay datos para el rango seleccionado
+        </div>
+      )}
+    </>
+  )
+
+  const wbsStackChart = (
+    <div className="h-80 w-full min-w-0">
+      <ChartContainer
+        config={wbsStackChartConfig}
+        className="aspect-auto h-full min-h-[280px] w-full"
+      >
+        <BarChart
+          data={breakdownChartData}
+          margin={{ top: 18, right: 20, left: 4, bottom: 8 }}
+        >
+          <CartesianGrid
+            vertical={false}
+            stroke="hsl(var(--border))"
+            strokeOpacity={0.4}
+            strokeDasharray="4 4"
+          />
+          <XAxis
+            dataKey="monthLabel"
+            tickLine={false}
+            axisLine={false}
+            tickMargin={10}
+            tick={{ fontSize: 12 }}
+          />
+          <YAxis
+            tickLine={false}
+            axisLine={false}
+            tickMargin={8}
+            width={58}
+            tick={{ fontSize: 12 }}
+            tickFormatter={axisCurrency}
+          />
+          <ChartTooltip
+            isAnimationActive={false}
+            cursor={{ fill: 'hsl(var(--muted))', opacity: 0.25 }}
+            content={
+              <ChartTooltipContent
+                labelFormatter={(_, payload) => {
+                  const mk = (payload?.[0]?.payload as { monthKey?: string } | undefined)
+                    ?.monthKey
+                  return mk ? chartMonthLongYearEs(mk) : ''
+                }}
+                valueFormatter={(v) => valueFmt(Number(v))}
+              />
+            }
+          />
+          <ChartLegend
+            verticalAlign="bottom"
+            content={<ChartLegendContent className="pt-4" />}
+          />
+          {wbsBarKeys.map((key, idx) => (
+            <Bar
+              key={key}
+              dataKey={key}
+              stackId="g"
+              fill={`var(--color-${key})`}
+              radius={
+                idx === wbsBarKeys.length - 1 ? ([4, 4, 0, 0] as const) : ([0, 0, 0, 0] as const)
+              }
+            />
+          ))}
+        </BarChart>
+      </ChartContainer>
+    </div>
+  )
 
   return (
     <div className="space-y-6">
@@ -92,159 +226,14 @@ export function CashflowChartClient({
                 <TabsTrigger value="breakdown">Desglose Gastos</TabsTrigger>
               </TabsList>
               <TabsContent value="cashflow" className="mt-4">
-                <div className="h-80 w-full min-w-0">
-                  {chartData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={280}>
-                      <AreaChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                        <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                        <YAxis
-                          tickFormatter={yAxisFormatter}
-                          tick={{ fontSize: 12 }}
-                        />
-                        <Tooltip
-                          formatter={(value: number | undefined) =>
-                            value != null ? formatCurrency(value, 'ARS') : ''
-                          }
-                          contentStyle={{
-                            backgroundColor: 'hsl(var(--card))',
-                            border: '1px solid hsl(var(--border))',
-                            borderRadius: 'var(--radius)',
-                          }}
-                          labelFormatter={(_, payload) =>
-                            payload?.[0]?.payload?.monthKey
-                              ? chartMonthLongYearEs(payload[0].payload.monthKey)
-                              : ''
-                          }
-                        />
-                        <Legend />
-                        <Area
-                          type="monotone"
-                          dataKey="Ingresos"
-                          stackId="1"
-                          stroke="hsl(var(--chart-2))"
-                          fill="hsl(var(--chart-2) / 0.3)"
-                        />
-                        <Area
-                          type="monotone"
-                          dataKey="Gastos"
-                          stackId="2"
-                          stroke="hsl(var(--chart-4))"
-                          fill="hsl(var(--chart-4) / 0.3)"
-                        />
-                        <Area
-                          type="monotone"
-                          dataKey="Balance"
-                          stroke="hsl(var(--chart-1))"
-                          fill="transparent"
-                          strokeDasharray="4 4"
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <div className="flex h-80 items-center justify-center text-muted-foreground">
-                      No hay datos para el rango seleccionado
-                    </div>
-                  )}
-                </div>
+                {cashflowChart}
               </TabsContent>
               <TabsContent value="breakdown" className="mt-4">
-                <div className="h-80 w-full min-w-0">
-                  <ResponsiveContainer width="100%" height={280}>
-                    <BarChart data={breakdownChartData}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                      <XAxis dataKey="monthLabel" tick={{ fontSize: 12 }} />
-                      <YAxis tickFormatter={yAxisFormatter} tick={{ fontSize: 12 }} />
-                      <Tooltip
-                        formatter={tooltipFormatter}
-                        contentStyle={{
-                          backgroundColor: 'hsl(var(--background))',
-                          border: '1px solid hsl(var(--border))',
-                        }}
-                      />
-                      <Legend />
-                      {wbsBarKeys.map((key, idx) => {
-                        const item = breakdownByWbs.find(
-                          (b) => (b.wbsNodeId ?? '__null__') === key
-                        )
-                        const label =
-                          key === '__other__'
-                            ? 'Otros'
-                            : key === '__null__'
-                              ? 'Sin partida'
-                              : item
-                                ? `${item.wbsNodeCode} - ${item.wbsNodeName.substring(0, 15)}${item.wbsNodeName.length > 15 ? '…' : ''}`
-                                : key
-                        return (
-                          <Bar
-                            key={key}
-                            dataKey={key}
-                            name={label}
-                            fill={chartSeriesColor(idx)}
-                            stackId="g"
-                            animationDuration={300}
-                            animationBegin={idx * 50}
-                          />
-                        )
-                      })}
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+                {wbsStackChart}
               </TabsContent>
             </Tabs>
           ) : (
-            <div className="h-80 min-h-[200px] w-full min-w-0">
-              {chartData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={280}>
-                  <AreaChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                    <YAxis tickFormatter={yAxisFormatter} tick={{ fontSize: 12 }} />
-                    <Tooltip
-                      formatter={(value: number | undefined) =>
-                        value != null ? formatCurrency(value, 'ARS') : ''
-                      }
-                      contentStyle={{
-                        backgroundColor: 'hsl(var(--card))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: 'var(--radius)',
-                      }}
-                      labelFormatter={(_, payload) =>
-                        payload?.[0]?.payload?.monthKey
-                          ? chartMonthLongYearEs(payload[0].payload.monthKey)
-                          : ''
-                      }
-                    />
-                    <Legend />
-                    <Area
-                      type="monotone"
-                      dataKey="Ingresos"
-                      stackId="1"
-                      stroke="hsl(var(--chart-2))"
-                      fill="hsl(var(--chart-2) / 0.3)"
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="Gastos"
-                      stackId="2"
-                      stroke="hsl(var(--chart-4))"
-                      fill="hsl(var(--chart-4) / 0.3)"
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="Balance"
-                      stroke="hsl(var(--chart-1))"
-                      fill="transparent"
-                      strokeDasharray="4 4"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex h-80 items-center justify-center text-muted-foreground">
-                  No hay datos para el rango seleccionado
-                </div>
-              )}
-            </div>
+            <div className="h-80 min-h-[200px] w-full min-w-0">{cashflowChart}</div>
           )}
           <div className="mt-6">
             <h3 className="mb-3 text-sm font-semibold">Detalle Mensual</h3>

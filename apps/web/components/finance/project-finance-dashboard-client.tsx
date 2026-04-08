@@ -1,19 +1,18 @@
 'use client'
 
+import { useMemo } from 'react'
 import {
-  AreaChart,
   Area,
   BarChart,
   Bar,
+  ComposedChart,
+  Line,
   PieChart,
   Pie,
   Cell,
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
 } from 'recharts'
 import { ChartCard } from '@/components/charts/chart-card'
 import { CompanyFinanceKPICards } from '@/components/finance/company-finance-kpi-cards'
@@ -26,7 +25,21 @@ import { AlertCircle } from 'lucide-react'
 import { Link } from '@/i18n/navigation'
 import type { ProjectFinanceExecutiveDashboard } from '@/app/actions/finance'
 import type { FinanceAlert } from '@/app/actions/finance'
-import { CHART_PALETTE, CHART_PIE_PLACEHOLDER_FILL } from '@/lib/chart-theme'
+import {
+  CHART_PIE_PLACEHOLDER_FILL,
+  chartSeriesColor,
+  chartSemanticHsl,
+  groupPieSlicesForDisplay,
+} from '@/lib/chart-theme'
+import { formatChartAxisCurrency } from '@/lib/chart-format'
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+  type ChartConfig,
+} from '@/components/ui/chart'
 
 const EXPENSE_TYPE_LABELS: Record<string, string> = {
   EXPENSE: 'Gastos',
@@ -53,19 +66,70 @@ export function ProjectFinanceDashboardClient({ data, alerts = [] }: ProjectFina
     unallocatedOverhead: data.summary.unallocatedOverhead,
   }
 
-  const trendChartData = data.monthlyTrend.map((m) => ({
-    mes: chartMonthYearShortEs(m.month),
-    Ingresos: m.income,
-    Gastos: m.expense,
-    Balance: m.balance,
-  }))
+  const trendChartData = useMemo(
+    () =>
+      data.monthlyTrend.map((m) => ({
+        mes: chartMonthYearShortEs(m.month),
+        Ingresos: m.income,
+        Gastos: m.expense,
+        Balance: m.balance,
+      })),
+    [data.monthlyTrend]
+  )
 
-  const compositionChartData = data.expensesByType
-    .filter((c) => c.total > 0)
-    .map((c) => ({
-      name: EXPENSE_TYPE_LABELS[c.type] ?? c.type,
-      value: c.total,
-    }))
+  const trendChartConfig = {
+    Ingresos: { label: 'Ingresos', color: chartSemanticHsl.income },
+    Gastos: { label: 'Gastos', color: chartSemanticHsl.expense },
+    Balance: { label: 'Balance', color: chartSemanticHsl.runningBalance },
+  } satisfies ChartConfig
+
+  const axisCurrency = useMemo(
+    () => (v: number) =>
+      formatChartAxisCurrency(v, { locale: 'es-AR', currency: 'ARS' }),
+    []
+  )
+
+  const valueFmt = useMemo(
+    () => (v: number) => formatCurrency(v, 'ARS'),
+    []
+  )
+
+  const compositionRawSlices = useMemo(
+    () =>
+      data.expensesByType
+        .filter((c) => c.total > 0)
+        .map((c) => ({
+          name: EXPENSE_TYPE_LABELS[c.type] ?? c.type,
+          value: c.total,
+        })),
+    [data.expensesByType]
+  )
+
+  const compositionDisplaySlices = useMemo(
+    () => groupPieSlicesForDisplay(compositionRawSlices, 'Otros', 6, 5),
+    [compositionRawSlices]
+  )
+
+  const compositionChartData = useMemo(
+    () =>
+      compositionDisplaySlices.map((s, i) => ({
+        ...s,
+        id: `p${i}`,
+      })),
+    [compositionDisplaySlices]
+  )
+
+  const compositionChartConfig = useMemo(() => {
+    const c: ChartConfig = {}
+    compositionDisplaySlices.forEach((s, i) => {
+      c[`p${i}`] = { label: s.name, color: chartSeriesColor(i) }
+    })
+    return c
+  }, [compositionDisplaySlices])
+
+  const suppliersChartConfig = {
+    total: { label: 'Total', color: 'hsl(var(--chart-3))' },
+  } satisfies ChartConfig
 
   const suppliersChartData = data.topSuppliers.map((s) => ({
     name: s.supplierName.length > 20 ? s.supplierName.slice(0, 20) + '…' : s.supplierName,
@@ -152,40 +216,71 @@ export function ProjectFinanceDashboardClient({ data, alerts = [] }: ProjectFina
         description="Ingresos vs gastos por mes"
       >
         <div className="h-[280px]">
-          <ResponsiveContainer width="100%" height={280}>
-            <AreaChart data={trendChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
-              <YAxis
-                tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+          <ChartContainer
+            config={trendChartConfig}
+            className="aspect-auto h-[280px] min-h-[280px] w-full"
+          >
+            <ComposedChart
+              data={trendChartData}
+              margin={{ top: 18, right: 20, left: 4, bottom: 8 }}
+            >
+              <CartesianGrid
+                vertical={false}
+                stroke="hsl(var(--border))"
+                strokeOpacity={0.45}
+                strokeDasharray="4 4"
+              />
+              <XAxis
+                dataKey="mes"
+                tickLine={false}
+                axisLine={false}
+                tickMargin={10}
                 tick={{ fontSize: 12 }}
               />
-              <Tooltip
-                formatter={(value: number) => formatCurrency(value, 'ARS')}
-                contentStyle={{
-                  backgroundColor: 'hsl(var(--background))',
-                  border: '1px solid hsl(var(--border))',
-                }}
+              <YAxis
+                tickLine={false}
+                axisLine={false}
+                tickMargin={8}
+                width={58}
+                tick={{ fontSize: 12 }}
+                tickFormatter={axisCurrency}
               />
-              <Legend />
+              <ChartTooltip
+                isAnimationActive={false}
+                cursor={{ stroke: 'hsl(var(--border))', strokeOpacity: 0.55 }}
+                content={
+                  <ChartTooltipContent valueFormatter={(v) => valueFmt(Number(v))} />
+                }
+              />
+              <ChartLegend
+                verticalAlign="bottom"
+                content={<ChartLegendContent className="pt-4" />}
+              />
               <Area
-                type="monotone"
+                type="linear"
+                dataKey="Balance"
+                stroke="var(--color-Balance)"
+                strokeWidth={2.6}
+                fill="var(--color-Balance)"
+                fillOpacity={0.12}
+                dot={false}
+              />
+              <Line
+                type="linear"
                 dataKey="Ingresos"
-                stackId="1"
-                stroke="hsl(var(--chart-1))"
-                fill="hsl(var(--chart-1))"
-                fillOpacity={0.6}
+                stroke="var(--color-Ingresos)"
+                strokeWidth={1.5}
+                dot={false}
               />
-              <Area
-                type="monotone"
+              <Line
+                type="linear"
                 dataKey="Gastos"
-                stackId="2"
-                stroke="hsl(var(--chart-2))"
-                fill="hsl(var(--chart-2))"
-                fillOpacity={0.6}
+                stroke="var(--color-Gastos)"
+                strokeWidth={1.5}
+                dot={false}
               />
-            </AreaChart>
-          </ResponsiveContainer>
+            </ComposedChart>
+          </ChartContainer>
         </div>
       </ChartCard>
 
@@ -195,25 +290,35 @@ export function ProjectFinanceDashboardClient({ data, alerts = [] }: ProjectFina
           description={t('chartExpenseCompositionDesc')}
         >
           <div className="h-[280px]">
-            <ResponsiveContainer width="100%" height={280}>
+            <ChartContainer
+              config={compositionChartConfig}
+              className="aspect-auto mx-auto h-[280px] w-full max-w-[320px]"
+            >
               <PieChart>
                 <Pie
                   data={compositionChartData}
+                  dataKey="value"
+                  nameKey="id"
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
                   outerRadius={100}
                   fill={CHART_PIE_PLACEHOLDER_FILL}
-                  dataKey="value"
                 >
                   {compositionChartData.map((_, index) => (
-                    <Cell key={index} fill={CHART_PALETTE[index % CHART_PALETTE.length]} />
+                    <Cell key={index} fill={`var(--color-p${index})`} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value: number) => formatCurrency(value, 'ARS')} />
+                <ChartTooltip
+                  isAnimationActive={false}
+                  content={
+                    <ChartTooltipContent nameKey="id" valueFormatter={(v) => valueFmt(v)} />
+                  }
+                />
+                <ChartLegend content={<ChartLegendContent nameKey="id" />} />
               </PieChart>
-            </ResponsiveContainer>
+            </ChartContainer>
           </div>
         </ChartCard>
 
@@ -222,23 +327,50 @@ export function ProjectFinanceDashboardClient({ data, alerts = [] }: ProjectFina
           description={t('chartTopSuppliersDesc')}
         >
           <div className="h-[260px]">
-            <ResponsiveContainer width="100%" height={260}>
+            <ChartContainer
+              config={suppliersChartConfig}
+              className="aspect-auto h-[260px] min-h-[260px] w-full"
+            >
               <BarChart
                 data={suppliersChartData}
                 layout="vertical"
-                margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
+                margin={{ top: 16, right: 20, left: 4, bottom: 8 }}
               >
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <CartesianGrid
+                  horizontal={false}
+                  stroke="hsl(var(--border))"
+                  strokeOpacity={0.4}
+                  strokeDasharray="4 4"
+                />
                 <XAxis
                   type="number"
-                  tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
                   tick={{ fontSize: 12 }}
+                  tickFormatter={axisCurrency}
                 />
-                <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(value: number) => formatCurrency(value, 'ARS')} />
-                <Bar dataKey="total" fill="hsl(var(--chart-3))" radius={[0, 4, 4, 0]} />
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  width={100}
+                  tickLine={false}
+                  axisLine={false}
+                  tick={{ fontSize: 11 }}
+                />
+                <ChartTooltip
+                  isAnimationActive={false}
+                  content={
+                    <ChartTooltipContent valueFormatter={(v) => valueFmt(Number(v))} />
+                  }
+                />
+                <Bar
+                  dataKey="total"
+                  fill="var(--color-total)"
+                  radius={[0, 4, 4, 0]}
+                />
               </BarChart>
-            </ResponsiveContainer>
+            </ChartContainer>
           </div>
         </ChartCard>
       </div>

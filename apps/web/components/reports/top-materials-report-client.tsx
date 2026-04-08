@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { ChartCard } from '@/components/charts/chart-card'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -10,16 +10,28 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
 } from 'recharts'
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from '@/components/ui/chart'
 import { formatCurrency } from '@/lib/format-utils'
+import { formatChartAxisCurrency } from '@/lib/chart-format'
 import { ExportDropdown, type ExportFormat } from '@/components/list'
 import { downloadReportPdf } from '@/lib/reports/download-report-pdf'
 import { toast } from 'sonner'
 import type { TopMaterialsRow } from '@/app/actions/predefined-reports'
 
 const PDF_TEMPLATE = 'top-materials'
+
+const REPORT_LOCALE = 'es-AR'
+const REPORT_CURRENCY = 'ARS'
+
+const chartConfig = {
+  Costo: { label: 'Costo total', color: 'hsl(var(--chart-4))' },
+} satisfies ChartConfig
 
 interface Props {
   data: TopMaterialsRow[]
@@ -47,6 +59,17 @@ function downloadCsv(data: TopMaterialsRow[]) {
 export function TopMaterialsReportClient({ data }: Props) {
   const tCommon = useTranslations('common')
   const [exporting, setExporting] = useState(false)
+
+  const axisCurrency = useMemo(
+    () => (v: number) =>
+      formatChartAxisCurrency(v, { locale: REPORT_LOCALE, currency: REPORT_CURRENCY }),
+    []
+  )
+
+  const valueFmt = useMemo(
+    () => (v: number) => formatCurrency(v, REPORT_CURRENCY, REPORT_LOCALE),
+    []
+  )
 
   async function handleExport(format: ExportFormat) {
     if (format === 'csv') {
@@ -89,22 +112,41 @@ export function TopMaterialsReportClient({ data }: Props) {
         description="Presupuestos aprobados, agrupado por descripción y unidad"
       >
         <div className="h-[360px]">
-          <ResponsiveContainer width="100%" height="100%">
+          <ChartContainer config={chartConfig} className="aspect-auto h-full w-full min-h-[320px]">
             <BarChart
+              accessibilityLayer
               data={chartData}
               layout="vertical"
-              margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
+              margin={{ top: 16, right: 18, left: 6, bottom: 8 }}
             >
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+              <CartesianGrid
+                horizontal={false}
+                stroke="hsl(var(--border))"
+                strokeOpacity={0.45}
+                strokeDasharray="4 4"
+              />
               <XAxis
                 type="number"
-                tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={axisCurrency}
               />
               <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 11 }} />
-              <Tooltip formatter={(value: number) => formatCurrency(value)} />
-              <Bar dataKey="Costo" fill="hsl(var(--chart-4))" radius={[0, 4, 4, 0]} />
+              <ChartTooltip
+                isAnimationActive={false}
+                cursor={{ fill: 'hsl(var(--muted))', opacity: 0.25 }}
+                content={
+                  <ChartTooltipContent
+                    valueFormatter={(v) => valueFmt(v)}
+                    labelFormatter={(label) =>
+                      typeof label === 'string' ? label : String(label ?? '')
+                    }
+                  />
+                }
+              />
+              <Bar dataKey="Costo" fill="var(--color-Costo)" radius={[0, 4, 4, 0]} />
             </BarChart>
-          </ResponsiveContainer>
+          </ChartContainer>
         </div>
       </ChartCard>
 
@@ -123,26 +165,22 @@ export function TopMaterialsReportClient({ data }: Props) {
                   <th className="pb-2 text-left font-medium">Material</th>
                   <th className="pb-2 text-right font-medium">Unidad</th>
                   <th className="pb-2 text-right font-medium">Cantidad</th>
-                  <th className="pb-2 text-right font-medium">Costo unit. prom.</th>
                   <th className="pb-2 text-right font-medium">Costo total</th>
                   <th className="pb-2 text-right font-medium">Proyectos</th>
                 </tr>
               </thead>
               <tbody>
-                {data.map((row, i) => (
-                  <tr key={i} className="border-b">
+                {data.map((row) => (
+                  <tr key={`${row.materialName}-${row.unit}`} className="border-b">
                     <td className="py-2">{row.materialName}</td>
                     <td className="py-2 text-right">{row.unit}</td>
                     <td className="py-2 text-right tabular-nums">
-                      {row.totalQuantity.toLocaleString('es-AR')}
-                    </td>
-                    <td className="py-2 text-right tabular-nums">
-                      {formatCurrency(row.avgUnitCost)}
+                      {row.totalQuantity.toFixed(2)}
                     </td>
                     <td className="py-2 text-right tabular-nums">
                       {formatCurrency(row.totalCost)}
                     </td>
-                    <td className="py-2 text-right">{row.projectCount}</td>
+                    <td className="py-2 text-right tabular-nums">{row.projectCount}</td>
                   </tr>
                 ))}
               </tbody>

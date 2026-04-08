@@ -4,7 +4,6 @@ import type { RefObject } from 'react'
 import { cn } from '@/lib/utils'
 import type { WorkingDayOptions } from '@/lib/schedule/working-days'
 import { GanttDataTable } from './gantt-data-table'
-import { GanttTimelineDynamic } from './gantt-timeline-dynamic'
 import { ScheduleCalendarView } from './schedule-calendar-view'
 
 export interface GanttDataTableTask {
@@ -24,26 +23,9 @@ export interface GanttDataTableTask {
   successorCount: number
 }
 
-export interface GanttTask {
-  id: string
-  wbsNodeId: string
-  name: string
-  startDate: Date
-  endDate: Date
-  progress: number
-  isCritical: boolean
-  level: number
-  taskType: 'TASK' | 'SUMMARY' | 'MILESTONE'
-  dependencies: Array<{
-    id: string
-    targetId: string
-    type: 'FS' | 'SS' | 'FF' | 'SF'
-  }>
-}
-
+/** WBS table + vista calendario (la vista Gantt va en `ScheduleSvarGantt`). */
 export interface ScheduleGanttBlockProps {
   tableTasks: GanttDataTableTask[]
-  ganttTasks: GanttTask[]
   allTableTasks: GanttDataTableTask[]
   expandedNodes: Set<string>
   onToggleExpand: (taskId: string) => void
@@ -52,7 +34,6 @@ export interface ScheduleGanttBlockProps {
   onTaskDatesChange?: (taskId: string, newStartDate: Date, newEndDate: Date) => void
   canEdit: boolean
   highlightedTask: string | null
-  onHighlightTask: (taskId: string | null) => void
   searchQuery?: string
   workingDaysPerWeek: number
   /** Feriados / excepciones al calendario laborable del cronograma. */
@@ -61,28 +42,15 @@ export interface ScheduleGanttBlockProps {
   visibleStartDate: Date
   visibleEndDate: Date
   zoom: 'day' | 'week' | 'month'
-  showCriticalPath: boolean
-  showDependencies: boolean
-  showTodayLine: boolean
-  showProgress: boolean
-  onTaskDragEnd: (taskId: string, newStartDate: Date, newEndDate: Date) => void
   weekStartsOn?: 0 | 1
-  viewMode?: 'gantt' | 'calendar'
   className?: string
-  ganttAriaLabel?: string
   scrollContainerRef?: RefObject<HTMLDivElement | null>
   showWbsDetailColumns?: boolean
   wbsMinimalStrip?: boolean
-  showBaseline?: boolean
-  baselinePlanByWbsNodeId?: Record<
-    string,
-    { plannedStartDate: string; plannedEndDate: string }
-  > | null
 }
 
 export function ScheduleGanttBlock({
   tableTasks,
-  ganttTasks,
   allTableTasks,
   expandedNodes,
   onToggleExpand,
@@ -91,7 +59,6 @@ export function ScheduleGanttBlock({
   onTaskDatesChange,
   canEdit,
   highlightedTask,
-  onHighlightTask,
   searchQuery = '',
   workingDaysPerWeek,
   calendarOptions,
@@ -99,22 +66,12 @@ export function ScheduleGanttBlock({
   visibleStartDate,
   visibleEndDate,
   zoom,
-  showCriticalPath,
-  showDependencies,
-  showTodayLine,
-  showProgress,
-  onTaskDragEnd,
   weekStartsOn = 1,
-  viewMode = 'gantt',
   className,
-  ganttAriaLabel,
   scrollContainerRef,
   showWbsDetailColumns = true,
   wbsMinimalStrip = false,
-  showBaseline = false,
-  baselinePlanByWbsNodeId = null,
 }: ScheduleGanttBlockProps) {
-  /* Anchos alineados con columnas fijas de GanttDataTable (code+task+detail cols = 520px). */
   const wbsMinClass = wbsMinimalStrip
     ? 'w-[72px] min-w-[72px] max-w-[72px]'
     : showWbsDetailColumns
@@ -147,47 +104,24 @@ export function ScheduleGanttBlock({
         />
       </div>
       <div className="min-h-0 min-w-0 flex-1">
-        {viewMode === 'calendar' ? (
-          <ScheduleCalendarView
-            tasks={tableTasks.map((t) => ({
-              id: t.id,
-              code: t.code,
-              name: t.name,
-              taskType: t.taskType,
-              startDate: t.startDate,
-              endDate: t.endDate,
-              isCritical: t.isCritical,
-            }))}
-            visibleStartDate={visibleStartDate}
-            visibleEndDate={visibleEndDate}
-            zoom={zoom}
-            weekStartsOn={weekStartsOn}
-            onTaskClick={onTaskClick}
-            highlightedTask={highlightedTask}
-            className="h-full"
-          />
-        ) : (
-          <GanttTimelineDynamic
-            tasks={ganttTasks}
-            visibleStartDate={visibleStartDate}
-            visibleEndDate={visibleEndDate}
-            zoom={zoom}
-            showCriticalPath={showCriticalPath}
-            showDependencies={showDependencies}
-            showTodayLine={showTodayLine}
-            showProgress={showProgress}
-            showBaseline={showBaseline}
-            baselinePlanByWbsNodeId={baselinePlanByWbsNodeId}
-            workingDaysPerWeek={workingDaysPerWeek}
-            calendarOptions={calendarOptions}
-            onTaskClick={onTaskClick}
-            onTaskDragEnd={onTaskDragEnd}
-            highlightedTask={highlightedTask}
-            onTaskHover={onHighlightTask}
-            ariaLabel={ganttAriaLabel}
-            weekStartsOn={weekStartsOn}
-          />
-        )}
+        <ScheduleCalendarView
+          tasks={tableTasks.map((t) => ({
+            id: t.id,
+            code: t.code,
+            name: t.name,
+            taskType: t.taskType,
+            startDate: t.startDate,
+            endDate: t.endDate,
+            isCritical: t.isCritical,
+          }))}
+          visibleStartDate={visibleStartDate}
+          visibleEndDate={visibleEndDate}
+          zoom={zoom}
+          weekStartsOn={weekStartsOn}
+          onTaskClick={onTaskClick}
+          highlightedTask={highlightedTask}
+          className="h-full"
+        />
       </div>
     </div>
   )
