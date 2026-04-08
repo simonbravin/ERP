@@ -61,16 +61,16 @@ export function ScheduleVersionSelector({
             <SelectValue />
           </SelectTrigger>
           <SelectContent className="max-h-[min(24rem,70vh)] w-[var(--radix-select-trigger-width)] min-w-[var(--radix-select-trigger-width)]">
-          {schedules.map((s) => (
-            <SelectItem key={s.id} value={s.id} className="min-h-9 py-2">
-              {s.name}
-              {' — '}
-              {s.status}
-              {s.isBaseline ? ` · ${t('baseline')}` : ''}
-              {` (${t('scheduleVersionTasks', { count: s.taskCount })})`}
-            </SelectItem>
-          ))}
-        </SelectContent>
+            {schedules.map((s) => (
+              <SelectItem key={s.id} value={s.id} className="min-h-9 py-2">
+                {s.name}
+                {' — '}
+                {s.status}
+                {s.isBaseline ? ` · ${t('baseline')}` : ''}
+                {` (${t('scheduleVersionTasks', { count: s.taskCount })})`}
+              </SelectItem>
+            ))}
+          </SelectContent>
         </Select>
       </div>
     </div>
