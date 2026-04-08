@@ -23,9 +23,12 @@ import {
   TrendingUp,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { GANTT_HEADER_HEIGHT, GANTT_ROW_HEIGHT } from '@/lib/schedule/gantt-constants'
+import {
+  SCHEDULE_WBS_HEADER_HEIGHT,
+  SCHEDULE_WBS_ROW_HEIGHT,
+} from '@/lib/schedule/schedule-wbs-layout'
 
-interface GanttDataTableTask {
+export interface ScheduleWbsPanelTask {
   id: string
   code: string
   name: string
@@ -42,9 +45,9 @@ interface GanttDataTableTask {
   successorCount: number
 }
 
-interface GanttDataTableProps {
-  tasks: GanttDataTableTask[]
-  allTasks?: GanttDataTableTask[]
+interface ScheduleWbsPanelProps {
+  tasks: ScheduleWbsPanelTask[]
+  allTasks?: ScheduleWbsPanelTask[]
   expandedNodes: Set<string>
   onToggleExpand: (taskId: string) => void
   onTaskClick: (taskId: string) => void
@@ -58,11 +61,11 @@ interface GanttDataTableProps {
   groupBy?: 'none' | 'phase' | 'assigned'
   showDetailColumns?: boolean
   minimalWbsOnly?: boolean
-  /** Falso en vista Gantt embebida: el pie extra desalineaba filas respecto al lienzo. */
+  /** Falso junto al calendario: el pie extra desalineaba filas respecto a la grilla. */
   showFooter?: boolean
 }
 
-export function GanttDataTable({
+export function ScheduleWbsPanel({
   tasks,
   allTasks: allTasksProp,
   expandedNodes,
@@ -79,7 +82,7 @@ export function GanttDataTable({
   showDetailColumns = true,
   minimalWbsOnly = false,
   showFooter = true,
-}: GanttDataTableProps) {
+}: ScheduleWbsPanelProps) {
   const allTasks = allTasksProp ?? tasks
   const t = useTranslations('schedule')
   const [editingCell, setEditingCell] = useState<{
@@ -103,13 +106,13 @@ export function GanttDataTable({
         >
           <TableHeader className="sticky top-0 z-10 bg-muted [&_tr]:border-0">
             <TableRow
-              style={{ height: GANTT_HEADER_HEIGHT }}
+              style={{ height: SCHEDULE_WBS_HEADER_HEIGHT }}
               className="[&>th]:!min-h-0 [&>th]:!py-0 [&>th]:align-middle [&>th]:leading-none"
             >
               {minimalWbsOnly ? (
                 <TableHead
                   className="w-full max-w-[72px] px-0.5 text-center text-[10px] text-muted-foreground"
-                  style={{ height: GANTT_HEADER_HEIGHT }}
+                  style={{ height: SCHEDULE_WBS_HEADER_HEIGHT }}
                 >
                   {t('code')}
                 </TableHead>
@@ -117,7 +120,7 @@ export function GanttDataTable({
                 <>
                   <TableHead
                     className="w-[72px] px-1 text-[10px] text-muted-foreground"
-                    style={{ height: GANTT_HEADER_HEIGHT }}
+                    style={{ height: SCHEDULE_WBS_HEADER_HEIGHT }}
                   >
                     {t('code')}
                   </TableHead>
@@ -127,7 +130,7 @@ export function GanttDataTable({
                         ? 'w-[140px] px-1 text-[10px] text-muted-foreground'
                         : 'w-[188px] px-1 text-[10px] text-muted-foreground'
                     }
-                    style={{ height: GANTT_HEADER_HEIGHT }}
+                    style={{ height: SCHEDULE_WBS_HEADER_HEIGHT }}
                   >
                     {t('task')}
                   </TableHead>
@@ -135,37 +138,37 @@ export function GanttDataTable({
                     <>
                       <TableHead
                         className="w-[72px] px-1 text-[10px] text-muted-foreground"
-                        style={{ height: GANTT_HEADER_HEIGHT }}
+                        style={{ height: SCHEDULE_WBS_HEADER_HEIGHT }}
                       >
                         {t('start')}
                       </TableHead>
                       <TableHead
                         className="w-[72px] px-1 text-[10px] text-muted-foreground"
-                        style={{ height: GANTT_HEADER_HEIGHT }}
+                        style={{ height: SCHEDULE_WBS_HEADER_HEIGHT }}
                       >
                         {t('end')}
                       </TableHead>
                       <TableHead
                         className="w-[44px] px-1 text-right text-[10px] text-muted-foreground"
-                        style={{ height: GANTT_HEADER_HEIGHT }}
+                        style={{ height: SCHEDULE_WBS_HEADER_HEIGHT }}
                       >
                         {t('days')}
                       </TableHead>
                       <TableHead
                         className="w-[40px] px-1 text-right text-[10px] text-muted-foreground"
-                        style={{ height: GANTT_HEADER_HEIGHT }}
+                        style={{ height: SCHEDULE_WBS_HEADER_HEIGHT }}
                       >
                         %
                       </TableHead>
                       <TableHead
                         className="w-[40px] px-1 text-center text-[10px] text-muted-foreground"
-                        style={{ height: GANTT_HEADER_HEIGHT }}
+                        style={{ height: SCHEDULE_WBS_HEADER_HEIGHT }}
                       >
                         {t('deps')}
                       </TableHead>
                       <TableHead
                         className="w-[40px] px-1 text-center text-[10px] text-muted-foreground"
-                        style={{ height: GANTT_HEADER_HEIGHT }}
+                        style={{ height: SCHEDULE_WBS_HEADER_HEIGHT }}
                       >
                         {t('actions')}
                       </TableHead>
@@ -192,11 +195,11 @@ export function GanttDataTable({
               return (
                 <TableRow
                   key={task.id}
-                  style={{ height: GANTT_ROW_HEIGHT }}
+                  style={{ height: SCHEDULE_WBS_ROW_HEIGHT }}
                   className={cn(
                     'transition-colors hover:bg-muted/50 [&>td]:py-0 [&>td]:leading-none',
-                    isHighlighted && 'bg-blue-50',
-                    task.isCritical && 'bg-red-50'
+                    isHighlighted && 'bg-primary/10',
+                    task.isCritical && 'bg-destructive/10'
                   )}
                 >
                   {minimalWbsOnly ? (
@@ -455,7 +458,7 @@ export function GanttDataTable({
             </span>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1">
-                <TrendingUp className="h-3 w-3 text-red-600" />
+                <TrendingUp className="h-3 w-3 text-destructive" />
                 <span>
                   {tasks.filter((x) => x.isCritical).length} {t('critical')}
                 </span>

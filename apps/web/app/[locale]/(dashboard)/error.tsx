@@ -20,15 +20,13 @@ export default function DashboardError({
   }, [error])
 
   return (
-    <div className="flex min-h-screen w-full items-center justify-center bg-background px-4">
-      <div className="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-sm">
-        <h1 className="text-lg font-semibold text-foreground">
-          Algo salió mal
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
+    <div className="flex w-full min-w-0 flex-col items-stretch justify-center bg-background px-4 py-10 sm:px-6">
+      <div className="erp-card mx-auto w-full max-w-2xl p-6 sm:p-8">
+        <h1 className="erp-page-title">Algo salió mal</h1>
+        <p className="mt-2 erp-section-desc max-w-prose">
           No se pudo cargar esta página. Puedes intentar de nuevo o volver al inicio.
         </p>
-        <div className="mt-6 flex gap-3">
+        <div className="mt-6 flex flex-wrap gap-3">
           <Button variant="outline" onClick={reset}>
             Reintentar
           </Button>

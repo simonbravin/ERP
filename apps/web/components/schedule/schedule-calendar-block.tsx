@@ -3,10 +3,10 @@
 import type { RefObject } from 'react'
 import { cn } from '@/lib/utils'
 import type { WorkingDayOptions } from '@/lib/schedule/working-days'
-import { GanttDataTable } from './gantt-data-table'
+import { ScheduleWbsPanel } from './schedule-wbs-panel'
 import { ScheduleCalendarView } from './schedule-calendar-view'
 
-export interface GanttDataTableTask {
+export interface ScheduleCalendarTableTask {
   id: string
   code: string
   name: string
@@ -23,10 +23,10 @@ export interface GanttDataTableTask {
   successorCount: number
 }
 
-/** WBS table + vista calendario (la vista Gantt va en `ScheduleSvarGantt`). */
-export interface ScheduleGanttBlockProps {
-  tableTasks: GanttDataTableTask[]
-  allTableTasks: GanttDataTableTask[]
+/** Panel WBS + vista calendario. La vista Gantt interactiva vive en `ScheduleSvarGantt`. */
+export interface ScheduleCalendarBlockProps {
+  tableTasks: ScheduleCalendarTableTask[]
+  allTableTasks: ScheduleCalendarTableTask[]
   expandedNodes: Set<string>
   onToggleExpand: (taskId: string) => void
   onTaskClick: (taskId: string) => void
@@ -36,7 +36,6 @@ export interface ScheduleGanttBlockProps {
   highlightedTask: string | null
   searchQuery?: string
   workingDaysPerWeek: number
-  /** Feriados / excepciones al calendario laborable del cronograma. */
   calendarOptions?: WorkingDayOptions
   groupBy: 'none' | 'phase' | 'assigned'
   visibleStartDate: Date
@@ -49,7 +48,7 @@ export interface ScheduleGanttBlockProps {
   wbsMinimalStrip?: boolean
 }
 
-export function ScheduleGanttBlock({
+export function ScheduleCalendarBlock({
   tableTasks,
   allTableTasks,
   expandedNodes,
@@ -71,7 +70,7 @@ export function ScheduleGanttBlock({
   scrollContainerRef,
   showWbsDetailColumns = true,
   wbsMinimalStrip = false,
-}: ScheduleGanttBlockProps) {
+}: ScheduleCalendarBlockProps) {
   const wbsMinClass = wbsMinimalStrip
     ? 'w-[72px] min-w-[72px] max-w-[72px]'
     : showWbsDetailColumns
@@ -84,7 +83,7 @@ export function ScheduleGanttBlock({
       className={className ?? 'flex min-h-0 flex-1 overflow-auto'}
     >
       <div className={cn('shrink-0 border-r border-border', wbsMinClass)}>
-        <GanttDataTable
+        <ScheduleWbsPanel
           tasks={tableTasks}
           allTasks={allTableTasks}
           expandedNodes={expandedNodes}

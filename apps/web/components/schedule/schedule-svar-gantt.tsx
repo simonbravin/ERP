@@ -156,9 +156,14 @@ export function ScheduleSvarGantt({
 
   const apiRef = useRef<SvarGanttApi | null>(null)
 
+  const sourceTasks = useMemo(
+    () => (Array.isArray(scheduleData.tasks) ? scheduleData.tasks : []),
+    [scheduleData.tasks]
+  )
+
   const { tasks, links: allLinks } = useMemo(
     () =>
-      scheduleTasksToSvar(scheduleData.tasks, {
+      scheduleTasksToSvar(sourceTasks, {
         visibleTaskIds,
         showCriticalPath,
         showProgress,
@@ -166,7 +171,7 @@ export function ScheduleSvarGantt({
         baselinePlanByWbsNodeId,
       }),
     [
-      scheduleData.tasks,
+      sourceTasks,
       visibleTaskIds,
       showCriticalPath,
       showProgress,
@@ -331,7 +336,7 @@ export function ScheduleSvarGantt({
     [readonly, onDependencyRemove]
   )
 
-  if (!columns) {
+  if (!columns || columns.length === 0) {
     return (
       <div
         className={cn(
@@ -340,6 +345,25 @@ export function ScheduleSvarGantt({
         )}
       >
         <SvarGanttSkeleton />
+      </div>
+    )
+  }
+
+  if (tasks.length === 0) {
+    const hasAnyTasks = sourceTasks.length > 0
+    return (
+      <div
+        className={cn(
+          'bloqer-svar-gantt flex min-h-[320px] min-w-0 flex-1 items-center justify-center rounded-lg border border-border bg-muted/20 px-4 py-12',
+          className
+        )}
+        role="status"
+      >
+        <p className="max-w-xl text-center text-sm text-muted-foreground">
+          {hasAnyTasks
+            ? t('ganttEmptyFiltered')
+            : t('ganttEmpty')}
+        </p>
       </div>
     )
   }

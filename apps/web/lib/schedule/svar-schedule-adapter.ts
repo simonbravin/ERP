@@ -82,12 +82,13 @@ export function scheduleTasksToSvar(
     > | null
   }
 ): { tasks: ITask[]; links: ILink[] } {
+  const source = Array.isArray(tasks) ? tasks : []
   const visible = options?.visibleTaskIds
   const showCritical = options?.showCriticalPath !== false
   const showProgress = options?.showProgress !== false
   const showBaseline = options?.showBaseline === true
   const baselineByWbs = showBaseline ? options?.baselinePlanByWbsNodeId : null
-  const list = visible ? tasks.filter((t) => visible.has(t.id)) : [...tasks]
+  const list = visible ? source.filter((t) => visible.has(t.id)) : [...source]
 
   const wbsToTaskId = new Map<string, string>()
   for (const t of list) {

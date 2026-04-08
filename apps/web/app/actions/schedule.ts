@@ -29,7 +29,7 @@ import {
   addTaskDependencySchema,
 } from '@/lib/schemas/schedule'
 import { createAuditLog } from '@/lib/audit-log'
-import { addDays, differenceInDays } from 'date-fns'
+import { addDays, differenceInDays, startOfDay } from 'date-fns'
 import { assertBillingWriteAllowed } from '@/lib/billing/guards'
 
 /**
@@ -919,9 +919,13 @@ async function recalculateCriticalPath(scheduleId: string) {
       new Date(schedule.projectStartDate)
     )
 
+    const currentEnd = new Date(schedule.projectEndDate)
+    const nextEnd =
+      maxFinish.getTime() > currentEnd.getTime() ? maxFinish : currentEnd
+
     await prisma.schedule.update({
       where: { id: scheduleId },
-      data: { projectEndDate: maxFinish },
+      data: { projectEndDate: nextEnd },
     })
   } catch (error) {
     console.error('Error recalculating critical path:', error)
@@ -1273,6 +1277,132 @@ export async function updateScheduleNonWorkingDates(scheduleId: string, text: st
   } catch (error) {
     console.error('Error updating schedule non-working dates:', error)
     return { success: false, error: 'Error al guardar el calendario' }
+  }
+}
+
+export type UpdateScheduleProjectWindowResult =
+  | { success: true }
+  | {
+      success: false
+      error: string
+      messageKey?: 'projectStartAfterTasksError' | 'projectEndBeforeTasksError'
+    }
+
+/**
+ * Actualizar fechas de inicio y fin del proyecto del cronograma (solo DRAFT).
+ * El inicio no puede ser posterior al comienzo de la tarea más temprana;
+ * el fin no puede ser anterior al fin de la tarea más tardía.
+ */
+export async function updateScheduleProjectWindow(
+  scheduleId: string,
+  data: { projectStartDate: Date; projectEndDate: Date }
+): Promise<UpdateScheduleProjectWindowResult> {
+  const parsed = parseScheduleId(scheduleId)
+  if (parsed.success === false) return { success: false, error: parsed.error }
+
+  const session = await getSession()
+  if (!session?.user?.id) {
+    return { success: false, error: 'Unauthorized' }
+  }
+
+  const org = await getOrgContext(session.user.id)
+  if (!org) return { success: false, error: 'Unauthorized' }
+  requireRole(org.role, 'EDITOR')
+  await assertBillingWriteAllowed(org.orgId, 'schedule.updateTaskDates')
+
+  try {
+    const schedule = await prisma.schedule.findFirst({
+      where: { id: parsed.scheduleId, orgId: org.orgId },
+      select: { id: true, projectId: true, status: true, name: true },
+    })
+
+    if (!schedule) {
+      return { success: false, error: 'Cronograma no encontrado' }
+    }
+    try {
+      const access = await assertProjectAccess(schedule.projectId, org)
+      if (!canEditSchedule(org, access.projectRole)) {
+        return {
+          success: false,
+          error: 'No tenés permiso para editar el cronograma de este proyecto',
+        }
+      }
+    } catch (e) {
+      return { success: false, error: e instanceof Error ? e.message : 'Acceso denegado' }
+    }
+
+    if (schedule.status !== 'DRAFT') {
+      return {
+        success: false,
+        error: 'Solo se pueden editar las fechas del proyecto en cronogramas en borrador.',
+      }
+    }
+
+    const start = startOfDay(data.projectStartDate)
+    const end = startOfDay(data.projectEndDate)
+    if (start.getTime() > end.getTime()) {
+      return {
+        success: false,
+        error: 'La fecha de fin debe ser posterior o igual a la de inicio.',
+      }
+    }
+
+    const tasks = await prisma.scheduleTask.findMany({
+      where: { scheduleId: parsed.scheduleId },
+      select: { plannedStartDate: true, plannedEndDate: true },
+    })
+
+    if (tasks.length > 0) {
+      let minPlanned = tasks[0].plannedStartDate
+      let maxPlanned = tasks[0].plannedEndDate
+      for (const t of tasks) {
+        if (t.plannedStartDate < minPlanned) minPlanned = t.plannedStartDate
+        if (t.plannedEndDate > maxPlanned) maxPlanned = t.plannedEndDate
+      }
+      const minD = startOfDay(minPlanned)
+      const maxD = startOfDay(maxPlanned)
+      if (minD.getTime() < start.getTime()) {
+        return {
+          success: false,
+          error: 'La fecha de inicio del proyecto es posterior al inicio de alguna tarea.',
+          messageKey: 'projectStartAfterTasksError',
+        }
+      }
+      if (maxD.getTime() > end.getTime()) {
+        return {
+          success: false,
+          error: 'La fecha de fin del proyecto es anterior al fin de alguna tarea.',
+          messageKey: 'projectEndBeforeTasksError',
+        }
+      }
+    }
+
+    await prisma.schedule.update({
+      where: { id: parsed.scheduleId },
+      data: {
+        projectStartDate: start,
+        projectEndDate: end,
+      },
+    })
+
+    await recalculateCriticalPath(parsed.scheduleId)
+
+    await createAuditLog({
+      orgId: org.orgId,
+      userId: session.user.id,
+      action: 'UPDATE',
+      entity: 'Schedule',
+      entityId: parsed.scheduleId,
+      projectId: schedule.projectId,
+      description: `Ventana del proyecto actualizada en cronograma "${schedule.name}"`,
+    })
+
+    revalidatePath(`/projects/${schedule.projectId}/schedule`)
+
+    return { success: true }
+  } catch (error) {
+    console.error('Error updating schedule project window:', error)
+    return { success: false, error: 'Error al actualizar las fechas del proyecto' }
   }
 }
 
