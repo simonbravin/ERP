@@ -1420,6 +1420,7 @@ export function ScheduleViewClient({
                     onDependencyAdd={handleSvarDependencyAdd}
                     onDependencyRemove={handleSvarDependencyRemove}
                     onTaskActivate={(taskId) => {
+                      setHighlightedTask(taskId)
                       setSelectedTaskForEdit(taskId)
                       handleCenterOnTask(taskId)
                     }}
@@ -1432,6 +1433,7 @@ export function ScheduleViewClient({
                   expandedNodes={expandedNodes}
                   onToggleExpand={handleToggleExpand}
                   onTaskClick={(taskId) => {
+                    setHighlightedTask(taskId)
                     setSelectedTaskForEdit(taskId)
                     handleCenterOnTask(taskId)
                   }}
@@ -1485,6 +1487,7 @@ export function ScheduleViewClient({
                   onDependencyAdd={handleSvarDependencyAdd}
                   onDependencyRemove={handleSvarDependencyRemove}
                   onTaskActivate={(taskId) => {
+                    setHighlightedTask(taskId)
                     setSelectedTaskForEdit(taskId)
                     handleCenterOnTask(taskId)
                   }}
@@ -1497,6 +1500,7 @@ export function ScheduleViewClient({
                 expandedNodes={expandedNodes}
                 onToggleExpand={handleToggleExpand}
                 onTaskClick={(taskId) => {
+                  setHighlightedTask(taskId)
                   setSelectedTaskForEdit(taskId)
                   handleCenterOnTask(taskId)
                 }}
@@ -1576,7 +1580,12 @@ export function ScheduleViewClient({
       {selectedTaskForEditData && (
         <TaskEditDialog
           open={!!selectedTaskForEdit}
-          onOpenChange={(open) => !open && setSelectedTaskForEdit(null)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setSelectedTaskForEdit(null)
+              setHighlightedTask(null)
+            }
+          }}
           task={{
             id: selectedTaskForEditData.id,
             code: selectedTaskForEditData.wbsNode.code,
@@ -1602,6 +1611,7 @@ export function ScheduleViewClient({
             if (selectedTaskForEdit) {
               setSelectedTaskForDependency(selectedTaskForEdit)
               setSelectedTaskForEdit(null)
+              setHighlightedTask(null)
             }
           }}
         />
