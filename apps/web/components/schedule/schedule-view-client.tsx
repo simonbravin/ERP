@@ -11,7 +11,7 @@ import {
   type RefObject,
 } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
-import { useRouter, Link } from '@/i18n/navigation'
+import { useRouter } from '@/i18n/navigation'
 import { useMessageBus } from '@/hooks/use-message-bus'
 import { ScheduleCalendarBlock } from './schedule-calendar-block'
 import { ScheduleSvarGantt } from './schedule-svar-gantt'
@@ -1305,131 +1305,6 @@ export function ScheduleViewClient({
         </Alert>
       )}
 
-      {workloadByAssigneeRows.length > 0 && (
-        <div className="erp-card overflow-hidden">
-          <div className="erp-card-header">
-            <h3 className="text-base font-semibold text-foreground">{t('workloadByAssigneeTitle')}</h3>
-            <p className="text-sm text-muted-foreground">{t('workloadByAssigneeHint')}</p>
-          </div>
-          <div className="erp-card-body pt-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t('taskAssignedTo')}</TableHead>
-                  <TableHead className="w-[120px] text-right">{t('workloadColTasks')}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {workloadByAssigneeRows.map((row) => (
-                  <TableRow key={row.key}>
-                    <TableCell className="text-sm">
-                      {row.key === '__unassigned__'
-                        ? t('workloadUnassigned')
-                        : row.key}
-                    </TableCell>
-                    <TableCell className="text-right text-sm tabular-nums">
-                      {t('workloadTaskCount', { count: row.count })}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </div>
-      )}
-
-      {!canEdit && schedule.status !== 'DRAFT' && canCreateVersion && (
-        <Alert>
-          <AlertTitle>{t('scheduleEditBlockedTitle')}</AlertTitle>
-          <AlertDescription className="space-y-2">
-            <p>{t('scheduleEditBlockedBody', { status: schedule.status })}</p>
-            <div className="mt-1 flex flex-wrap gap-2">
-              <Button asChild size="sm" variant="default">
-                <Link href={`/projects/${schedule.project.id}/schedule/new?from=${schedule.id}`}>
-                  {t('newRevisionFromPlan')}
-                </Link>
-              </Button>
-              <Button asChild size="sm" variant="outline">
-                <Link href={`/projects/${schedule.project.id}/schedule/new`}>
-                  {t('scheduleCreateNewVersionCta')}
-                </Link>
-              </Button>
-            </div>
-          </AlertDescription>
-        </Alert>
-      )}
-
-      <div className="erp-card overflow-hidden">
-        <div className="erp-card-header">
-          <h3 className="text-base font-semibold text-foreground">{t('calendarExceptionsTitle')}</h3>
-          <p className="text-sm text-muted-foreground">{t('calendarExceptionsHint')}</p>
-        </div>
-        <div className="erp-card-body space-y-3">
-          <div className="space-y-2">
-            <Label htmlFor="schedule-non-working-dates" className="text-sm">
-              {t('calendarExceptionsLabel')}
-            </Label>
-            <Textarea
-              id="schedule-non-working-dates"
-              value={exceptionsText}
-              onChange={(e) => setExceptionsText(e.target.value)}
-              placeholder={t('calendarExceptionsPlaceholder')}
-              rows={4}
-              disabled={!canEdit || schedule.status !== 'DRAFT' || calendarSavePending}
-              className="font-mono text-sm"
-            />
-          </div>
-          {(!canEdit || schedule.status !== 'DRAFT') && (
-            <p className="text-xs text-muted-foreground">{t('calendarExceptionsReadOnly')}</p>
-          )}
-          {canEdit && schedule.status === 'DRAFT' && (
-            <Button
-              type="button"
-              size="sm"
-              onClick={handleSaveCalendarExceptions}
-              disabled={calendarSavePending}
-            >
-              {calendarSavePending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {t('calendarExceptionsSaving')}
-                </>
-              ) : (
-                t('calendarExceptionsSave')
-              )}
-            </Button>
-          )}
-        </div>
-      </div>
-
-      <GanttControlPanel
-        showCriticalPath={showCriticalPath}
-        onShowCriticalPathChange={setShowCriticalPath}
-        showBaseline={showBaseline}
-        onShowBaselineChange={setShowBaseline}
-        baselineOverlayAvailable={baselineOverlayAvailable}
-        baselineChartOverlaySupported={baselineChartOverlaySupported}
-        showProgress={showProgress}
-        onShowProgressChange={setShowProgress}
-        showDependencies={showDependencies}
-        onShowDependenciesChange={setShowDependencies}
-        showTodayLine={showTodayLine}
-        onShowTodayLineChange={setShowTodayLine}
-        todayLineApplicable={viewMode === 'gantt'}
-        groupBy={groupBy}
-        onGroupByChange={setGroupBy}
-        weekStartsOn={weekStartsOn}
-        onWeekStartsOnChange={setWeekStartsOn}
-      />
-
-      <DateRangeSlider
-        projectStartDate={schedule.projectStartDate}
-        projectEndDate={schedule.projectEndDate}
-        currentStartDate={visibleStartDate}
-        currentEndDate={visibleEndDate}
-        onRangeChange={handleRangeChange}
-      />
-
       {isScheduleFullscreen && (
         <div className="fixed inset-0 z-50 flex flex-col bg-background">
           <div className="flex shrink-0 items-center justify-between border-b border-border bg-muted/30 px-4 py-3">
@@ -1598,6 +1473,39 @@ export function ScheduleViewClient({
             </div>
           </div>
 
+          <div className="border-t border-border bg-muted/10 px-4 py-3 sm:px-6">
+            <div className="space-y-3">
+              <DateRangeSlider
+                embedded
+                projectStartDate={schedule.projectStartDate}
+                projectEndDate={schedule.projectEndDate}
+                currentStartDate={visibleStartDate}
+                currentEndDate={visibleEndDate}
+                onRangeChange={handleRangeChange}
+              />
+              <GanttControlPanel
+                embedded
+                showCriticalPath={showCriticalPath}
+                onShowCriticalPathChange={setShowCriticalPath}
+                showBaseline={showBaseline}
+                onShowBaselineChange={setShowBaseline}
+                baselineOverlayAvailable={baselineOverlayAvailable}
+                baselineChartOverlaySupported={baselineChartOverlaySupported}
+                showProgress={showProgress}
+                onShowProgressChange={setShowProgress}
+                showDependencies={showDependencies}
+                onShowDependenciesChange={setShowDependencies}
+                showTodayLine={showTodayLine}
+                onShowTodayLineChange={setShowTodayLine}
+                todayLineApplicable={viewMode === 'gantt'}
+                groupBy={groupBy}
+                onGroupByChange={setGroupBy}
+                weekStartsOn={weekStartsOn}
+                onWeekStartsOnChange={setWeekStartsOn}
+              />
+            </div>
+          </div>
+
           <div
             className="flex min-h-0 flex-col"
             style={{ minHeight: 'max(520px, 60vh)', maxHeight: '85vh' }}
@@ -1662,6 +1570,82 @@ export function ScheduleViewClient({
           </div>
         </div>
       </Tabs>
+
+      {workloadByAssigneeRows.length > 0 && (
+        <div className="erp-card overflow-hidden">
+          <div className="erp-card-header">
+            <h3 className="text-base font-semibold text-foreground">{t('workloadByAssigneeTitle')}</h3>
+            <p className="text-sm text-muted-foreground">{t('workloadByAssigneeHint')}</p>
+          </div>
+          <div className="erp-card-body pt-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t('taskAssignedTo')}</TableHead>
+                  <TableHead className="w-[120px] text-right">{t('workloadColTasks')}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {workloadByAssigneeRows.map((row) => (
+                  <TableRow key={row.key}>
+                    <TableCell className="text-sm">
+                      {row.key === '__unassigned__'
+                        ? t('workloadUnassigned')
+                        : row.key}
+                    </TableCell>
+                    <TableCell className="text-right text-sm tabular-nums">
+                      {t('workloadTaskCount', { count: row.count })}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      )}
+
+      <div className="erp-card overflow-hidden">
+        <div className="erp-card-header">
+          <h3 className="text-base font-semibold text-foreground">{t('calendarExceptionsTitle')}</h3>
+          <p className="text-sm text-muted-foreground">{t('calendarExceptionsHint')}</p>
+        </div>
+        <div className="erp-card-body space-y-3">
+          <div className="space-y-2">
+            <Label htmlFor="schedule-non-working-dates" className="text-sm">
+              {t('calendarExceptionsLabel')}
+            </Label>
+            <Textarea
+              id="schedule-non-working-dates"
+              value={exceptionsText}
+              onChange={(e) => setExceptionsText(e.target.value)}
+              placeholder={t('calendarExceptionsPlaceholder')}
+              rows={4}
+              disabled={!canEdit || schedule.status !== 'DRAFT' || calendarSavePending}
+              className="font-mono text-sm"
+            />
+          </div>
+          {(!canEdit || schedule.status !== 'DRAFT') && (
+            <p className="text-xs text-muted-foreground">{t('calendarExceptionsReadOnly')}</p>
+          )}
+          {canEdit && schedule.status === 'DRAFT' && (
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleSaveCalendarExceptions}
+              disabled={calendarSavePending}
+            >
+              {calendarSavePending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {t('calendarExceptionsSaving')}
+                </>
+              ) : (
+                t('calendarExceptionsSave')
+              )}
+            </Button>
+          )}
+        </div>
+      </div>
 
       {selectedTaskForEditData && (
         <TaskEditDialog

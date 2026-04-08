@@ -33,6 +33,8 @@ interface GanttControlPanelProps {
   onGroupByChange: (groupBy: 'none' | 'phase' | 'assigned') => void
   weekStartsOn?: 0 | 1
   onWeekStartsOnChange?: (value: 0 | 1) => void
+  /** Sin borde de tarjeta: para incrustar bajo el cronograma (menos ruido visual). */
+  embedded?: boolean
 }
 
 export function GanttControlPanel({
@@ -53,6 +55,7 @@ export function GanttControlPanel({
   onGroupByChange,
   weekStartsOn = 1,
   onWeekStartsOnChange,
+  embedded = false,
 }: GanttControlPanelProps) {
   const t = useTranslations('schedule')
   const baselineToggleDisabled =
@@ -64,7 +67,7 @@ export function GanttControlPanel({
       : undefined
 
   return (
-    <div className="erp-card p-4 sm:p-5">
+    <div className={embedded ? 'pt-1' : 'erp-card p-4 sm:p-5'}>
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             <div className="space-y-3">
               <Label className="text-sm font-medium text-foreground">

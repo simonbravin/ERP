@@ -1,8 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from 'react'
 import dynamic from 'next/dynamic'
 import { useLocale, useTranslations } from 'next-intl'
+import { useTheme } from 'next-themes'
 import { endOfDay, format, startOfDay } from 'date-fns'
 import { enUS, es } from 'date-fns/locale'
 import type { Locale as DateFnsLocale } from 'date-fns'
@@ -40,11 +41,30 @@ function SvarGanttSkeleton() {
   )
 }
 
-const GanttClient = dynamic(
+/**
+ * SVAR aplica colores de barras vía variables CSS en `.wx-willow-theme` / tema oscuro.
+ * Sin `Willow`/`WillowDark`, `--wx-gantt-task-color` etc. quedan sin definir → barras “vacías”
+ * y solo se ve el texto de la tarea en la zona del timeline.
+ */
+const GanttThemed = dynamic(
   () =>
     import('@svar-ui/react-gantt/all.css')
       .then(() => import('@svar-ui/react-gantt'))
-      .then((m) => m.Gantt),
+      .then((m) => {
+        type GanttProps = ComponentProps<typeof m.Gantt>
+        function SvarGanttThemed(
+          props: GanttProps & { useDarkTheme?: boolean }
+        ) {
+          const { useDarkTheme, ...ganttProps } = props
+          const Theme = useDarkTheme ? m.WillowDark : m.Willow
+          return (
+            <Theme fonts={false}>
+              <m.Gantt {...ganttProps} />
+            </Theme>
+          )
+        }
+        return SvarGanttThemed
+      }),
   { ssr: false, loading: () => <SvarGanttSkeleton /> }
 )
 
@@ -139,6 +159,8 @@ export function ScheduleSvarGantt({
 }: ScheduleSvarGanttProps) {
   const intlLocale = useLocale()
   const t = useTranslations('schedule')
+  const { resolvedTheme } = useTheme()
+  const useDarkTheme = resolvedTheme === 'dark'
   const dateLocale: DateFnsLocale = intlLocale.startsWith('en') ? enUS : es
 
   const [rawColumns, setRawColumns] = useState<readonly RawColumn[] | null>(null)
@@ -375,7 +397,8 @@ export function ScheduleSvarGantt({
         className
       )}
     >
-      <GanttClient
+      <GanttThemed
+        useDarkTheme={useDarkTheme}
         tasks={tasks}
         links={links}
         columns={columns}

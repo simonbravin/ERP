@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
+import { cn } from '@/lib/utils'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -17,6 +18,8 @@ interface DateRangeSliderProps {
   currentStartDate: Date
   currentEndDate: Date
   onRangeChange: (startDate: Date, endDate: Date) => void
+  /** Sin caja propia: va dentro de la tarjeta del cronograma. */
+  embedded?: boolean
 }
 
 export function DateRangeSlider({
@@ -25,6 +28,7 @@ export function DateRangeSlider({
   currentStartDate,
   currentEndDate,
   onRangeChange,
+  embedded = false,
 }: DateRangeSliderProps) {
   const t = useTranslations('schedule')
   const intlLocale = useLocale()
@@ -102,7 +106,12 @@ export function DateRangeSlider({
   }
 
   return (
-    <div className="space-y-2 rounded-lg border border-border bg-card p-2">
+    <div
+      className={cn(
+        'space-y-2',
+        embedded ? 'pb-1' : 'rounded-lg border border-border bg-card p-2'
+      )}
+    >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Label className="text-xs font-semibold">{t('visibility')}</Label>
         <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={handleResetToProject}>

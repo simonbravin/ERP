@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { cn } from '@/lib/utils'
 
 export type ScheduleVersionOption = {
   id: string
@@ -26,6 +27,7 @@ type ScheduleVersionSelectorProps = {
   activeScheduleId: string
   /** Versión que elegiría el servidor sin `?schedule=` (DRAFT → baseline → más reciente) */
   defaultScheduleId: string
+  className?: string
 }
 
 export function ScheduleVersionSelector({
@@ -33,6 +35,7 @@ export function ScheduleVersionSelector({
   schedules,
   activeScheduleId,
   defaultScheduleId,
+  className,
 }: ScheduleVersionSelectorProps) {
   const t = useTranslations('schedule')
   const router = useRouter()
@@ -48,7 +51,12 @@ export function ScheduleVersionSelector({
   }
 
   return (
-    <div className="erp-form-group min-w-0 w-full max-w-2xl sm:flex-1 lg:max-w-3xl">
+    <div
+      className={cn(
+        'erp-form-group w-full min-w-0 max-w-none',
+        className
+      )}
+    >
       <Label htmlFor="schedule-version" className="erp-form-label">
         {t('scheduleVersionLabel')}
       </Label>
@@ -56,7 +64,7 @@ export function ScheduleVersionSelector({
         <Select value={activeScheduleId} onValueChange={navigateToVersion}>
           <SelectTrigger
             id="schedule-version"
-            className="h-10 min-h-10 w-full min-w-0 text-left text-sm font-normal"
+            className="h-11 min-h-11 w-full min-w-0 text-left text-base font-normal sm:text-sm"
           >
             <SelectValue />
           </SelectTrigger>

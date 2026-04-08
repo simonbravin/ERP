@@ -139,15 +139,16 @@ export default async function ProjectSchedulePage({
 
   return (
     <div className="erp-stack">
-      <div className="erp-header-row flex flex-col items-stretch gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex flex-col gap-3">
         <ScheduleVersionSelector
           projectId={id}
           schedules={versionOptions}
           activeScheduleId={activeSchedule.id}
           defaultScheduleId={defaultSchedule.id}
+          className="w-full"
         />
         {canCreateVersion && (
-          <div className="erp-header-actions flex shrink-0 flex-wrap gap-2 sm:justify-end">
+          <div className="erp-header-actions flex flex-wrap gap-2 sm:justify-end">
             {showRevisionFromPlan && (
               <Button variant="secondary" asChild>
                 <Link href={`/projects/${id}/schedule/new?from=${activeSchedule.id}`}>

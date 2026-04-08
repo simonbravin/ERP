@@ -50,6 +50,25 @@ function chunk<T>(arr: T[], size: number): T[][] {
   return out
 }
 
+/** Misma semántica de color que la leyenda del Gantt (tarea / hito / crítico). */
+function calendarTaskChipClass(
+  task: Pick<CalendarTask, 'isCritical' | 'taskType'>,
+  highlighted: boolean
+) {
+  return cn(
+    'w-full truncate rounded border border-border/70 bg-background text-left transition-colors hover:bg-muted/80',
+    'border-l-[3px]',
+    task.isCritical && 'border-l-red-600 bg-destructive/10',
+    !task.isCritical &&
+      task.taskType === 'MILESTONE' &&
+      'border-l-amber-500',
+    !task.isCritical &&
+      task.taskType !== 'MILESTONE' &&
+      'border-l-blue-500',
+    highlighted && 'ring-1 ring-primary'
+  )
+}
+
 const MONTH_CELL_MAX_TASKS = 4
 const DAY_LIST_MAX = 40
 
@@ -120,14 +139,12 @@ export function ScheduleCalendarView({
                       type="button"
                       onClick={() => onTaskClick?.(task.id)}
                       className={cn(
-                        'w-full rounded px-2 py-1 text-left text-xs transition-colors hover:bg-muted',
-                        task.isCritical &&
-                          'bg-red-100 text-red-900 dark:bg-red-950 dark:text-red-200',
-                        highlightedTask === task.id && 'ring-1 ring-primary'
+                        'px-2 py-1.5 text-xs',
+                        calendarTaskChipClass(task, highlightedTask === task.id)
                       )}
                       title={`${task.code} ${task.name}`}
                     >
-                      <span className="font-mono text-[10px] text-muted-foreground">
+                      <span className="font-mono text-[10px] text-muted-foreground tabular-nums">
                         {task.code}
                       </span>{' '}
                       <span className="line-clamp-2">
@@ -223,13 +240,14 @@ export function ScheduleCalendarView({
                               type="button"
                               onClick={() => onTaskClick?.(task.id)}
                               className={cn(
-                                'block w-full truncate rounded px-0.5 py-0.5 text-left text-[9px] transition-colors hover:bg-muted',
-                                task.isCritical &&
-                                  'bg-red-100 text-red-900 dark:bg-red-950 dark:text-red-200',
-                                highlightedTask === task.id && 'ring-1 ring-primary'
+                                'block px-0.5 py-0.5 text-[9px]',
+                                calendarTaskChipClass(task, highlightedTask === task.id)
                               )}
                               title={`${task.code} ${task.name}`}
                             >
+                              <span className="font-mono text-[8px] text-muted-foreground">
+                                {task.code}
+                              </span>{' '}
                               {task.taskType === 'MILESTONE' ? '◆ ' : ''}
                               {task.name}
                             </button>
@@ -301,13 +319,14 @@ export function ScheduleCalendarView({
                         type="button"
                         onClick={() => onTaskClick?.(task.id)}
                         className={cn(
-                          'block w-full truncate rounded px-1 py-0.5 text-left text-[10px] transition-colors hover:bg-muted',
-                          task.isCritical &&
-                            'bg-red-100 text-red-900 dark:bg-red-950 dark:text-red-200',
-                          highlightedTask === task.id && 'ring-1 ring-primary'
+                          'block px-1 py-0.5 text-[10px]',
+                          calendarTaskChipClass(task, highlightedTask === task.id)
                         )}
                         title={`${task.code} ${task.name}`}
                       >
+                        <span className="font-mono text-[9px] text-muted-foreground">
+                          {task.code}
+                        </span>{' '}
                         {task.taskType === 'MILESTONE' ? '◆ ' : ''}
                         {task.name}
                       </button>
