@@ -3,6 +3,7 @@
 import { redirectTo } from '@/lib/i18n-redirect'
 import { signIn } from '@/lib/auth'
 import { prisma } from '@repo/database'
+import { getTranslations } from 'next-intl/server'
 import {
   loginFormSchema,
   registerSchema,
@@ -60,7 +61,7 @@ async function resolveEmailFromLogin(value: string): Promise<string | null> {
 
 const CREDENTIALS_ERROR = { _form: ['Usuario o contraseña incorrectos'] as const }
 
-/** Valida credenciales Super Admin y devuelve el email si son correctas. El cliente hace signIn para que la sesión se establezca bien a la primera. */
+/** Valida credenciales Super Admin y establece sesión en el mismo request (evita fallos del primer intento por signIn desde el cliente). */
 export async function superAdminLogin(username: string, password: string) {
   const trimmedUser = username?.trim()
   const trimmedPassword = password?.trim()
@@ -98,15 +99,28 @@ export async function superAdminLogin(username: string, password: string) {
         data: { isSuperAdmin: true },
       })
     }
-    // Devolver éxito con email para que el cliente llame a signIn (evita fallo de sesión en primer intento)
-    return { ok: true, email: user.email }
+    const signInResult = await signIn('credentials', {
+      email: user.email,
+      password: trimmedPassword,
+      redirect: false,
+    })
+    if (
+      signInResult &&
+      typeof signInResult === 'object' &&
+      'ok' in signInResult &&
+      signInResult.ok === false
+    ) {
+      console.warn('[auth] superAdminLogin: signIn failed after validation', signInResult)
+      return { error: { _form: ['No se pudo iniciar sesión. Reintentá.'] as const } }
+    }
+    return { ok: true as const }
   } catch (err) {
     console.error('[auth] superAdminLogin error:', err)
     return { error: CREDENTIALS_ERROR }
   }
 }
 
-/** Valida credenciales y devuelve email + isSuperAdmin si son correctas. El cliente hace signIn para que la sesión se establezca bien a la primera. */
+/** Valida credenciales y establece sesión en el mismo request (evita cold start / CSRF en un segundo POST a /api/auth desde el cliente). */
 export async function login(credentials: LoginFormInput) {
   const parsed = loginFormSchema.safeParse(credentials)
   if (!parsed.success) {
@@ -129,8 +143,30 @@ export async function login(credentials: LoginFormInput) {
     if (!valid) {
       return { error: CREDENTIALS_ERROR }
     }
-    // Devolver éxito para que el cliente llame a signIn (evita fallo de sesión en primer intento)
-    return { ok: true, email, isSuperAdmin: user.isSuperAdmin === true }
+    const signInResult = await signIn('credentials', {
+      email,
+      password,
+      redirect: false,
+    })
+    if (
+      signInResult &&
+      typeof signInResult === 'object' &&
+      'ok' in signInResult &&
+      signInResult.ok === false
+    ) {
+      const err = (signInResult as { error?: string }).error
+      console.warn('[auth] login: signIn failed after credential check', { err, signInResult })
+      if (err === 'AccessDenied' || err === 'Callback') {
+        const t = await getTranslations('auth')
+        return {
+          error: {
+            _form: [t('noOrganization')],
+          },
+        }
+      }
+      return { error: CREDENTIALS_ERROR }
+    }
+    return { ok: true as const, isSuperAdmin: user.isSuperAdmin === true }
   } catch (err) {
     console.error('[auth] login error:', err)
     return { error: CREDENTIALS_ERROR }

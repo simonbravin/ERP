@@ -16,23 +16,15 @@ import { useMessageBus } from '@/hooks/use-message-bus'
 import { ScheduleCalendarBlock } from './schedule-calendar-block'
 import { ScheduleSvarGantt } from './schedule-svar-gantt'
 import { GanttControlPanel } from './gantt-control-panel'
+import { ScheduleChangeLogDialog } from './schedule-change-log-dialog'
 import { DependencyManager } from './dependency-manager'
 import { TaskEditDialog } from './task-edit-dialog'
 import { DateRangeSlider } from './date-range-slider'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import {
   Select,
   SelectContent,
@@ -64,15 +56,15 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
   Calendar,
-  TrendingUp,
   CheckCircle2,
   Download,
   Loader2,
-  AlertTriangle,
   ZoomIn,
   ZoomOut,
   Maximize2,
@@ -82,9 +74,11 @@ import {
   PanelLeft,
   FileSpreadsheet,
   FileCode2,
-  Upload,
+  Plug,
   Search,
   ChevronDown,
+  ChevronRight,
+  History,
 } from 'lucide-react'
 import { format, addDays, subDays, differenceInDays, startOfDay } from 'date-fns'
 import { enUS, es } from 'date-fns/locale'
@@ -171,27 +165,12 @@ export function ScheduleViewClient({
   const [importingMsXml, setImportingMsXml] = useState(false)
   const msXmlFileInputRef = useRef<HTMLInputElement>(null)
   const [approving, setApproving] = useState(false)
+  const [changeLogOpen, setChangeLogOpen] = useState(false)
 
   const [zoom, setZoom] = useState<'day' | 'week' | 'month'>('week')
-  const [showCriticalPath, setShowCriticalPath] = useState(true)
-  const [showBaseline, setShowBaseline] = useState(false)
-
-  const baselineOverlayAvailable = Boolean(
-    scheduleData.baselinePlanByWbsNodeId &&
-      Object.keys(scheduleData.baselinePlanByWbsNodeId).length > 0
-  )
-
-  useEffect(() => {
-    if (!baselineOverlayAvailable) setShowBaseline(false)
-  }, [baselineOverlayAvailable, scheduleData.id])
-  const [showProgress, setShowProgress] = useState(true)
-  const [showDependencies, setShowDependencies] = useState(true)
-  const [showTodayLine, setShowTodayLine] = useState(true)
   const [groupBy, setGroupBy] = useState<'none' | 'phase' | 'assigned'>('none')
   const [weekStartsOn, setWeekStartsOn] = useState<0 | 1>(1)
   const [viewMode, setViewMode] = useState<'gantt' | 'calendar'>('gantt')
-
-  const baselineChartOverlaySupported = viewMode === 'gantt'
   const [showWbsDetailColumns, setShowWbsDetailColumns] = useState(true)
   const [calendarWbsStrip, setCalendarWbsStrip] = useState(false)
 
@@ -205,11 +184,6 @@ export function ScheduleViewClient({
       if (!raw) return
       const stored = JSON.parse(raw) as Partial<{
         zoom: 'day' | 'week' | 'month'
-        showCriticalPath: boolean
-        showBaseline: boolean
-        showProgress: boolean
-        showDependencies: boolean
-        showTodayLine: boolean
         groupBy: 'none' | 'phase' | 'assigned'
         weekStartsOn: 0 | 1
         viewMode: 'gantt' | 'calendar'
@@ -217,16 +191,6 @@ export function ScheduleViewClient({
         calendarWbsStrip: boolean
       }>
       if (stored.zoom && ['day', 'week', 'month'].includes(stored.zoom)) setZoom(stored.zoom)
-      if (typeof stored.showCriticalPath === 'boolean') setShowCriticalPath(stored.showCriticalPath)
-      if (
-        typeof stored.showBaseline === 'boolean' &&
-        baselineOverlayAvailable
-      ) {
-        setShowBaseline(stored.showBaseline)
-      }
-      if (typeof stored.showProgress === 'boolean') setShowProgress(stored.showProgress)
-      if (typeof stored.showDependencies === 'boolean') setShowDependencies(stored.showDependencies)
-      if (typeof stored.showTodayLine === 'boolean') setShowTodayLine(stored.showTodayLine)
       if (stored.groupBy && ['none', 'phase', 'assigned'].includes(stored.groupBy)) setGroupBy(stored.groupBy)
       if (stored.weekStartsOn === 0 || stored.weekStartsOn === 1) setWeekStartsOn(stored.weekStartsOn)
       if (stored.viewMode && ['gantt', 'calendar'].includes(stored.viewMode)) setViewMode(stored.viewMode)
@@ -236,7 +200,7 @@ export function ScheduleViewClient({
     } catch {
       // ignore invalid stored prefs
     }
-  }, [schedulePrefsKey, baselineOverlayAvailable])
+  }, [schedulePrefsKey])
 
   const hasPersistedOnce = useRef(false)
   useEffect(() => {
@@ -248,11 +212,6 @@ export function ScheduleViewClient({
       schedulePrefsKey,
       JSON.stringify({
         zoom,
-        showCriticalPath,
-        showBaseline,
-        showProgress,
-        showDependencies,
-        showTodayLine,
         groupBy,
         weekStartsOn,
         viewMode,
@@ -263,11 +222,6 @@ export function ScheduleViewClient({
   }, [
     schedulePrefsKey,
     zoom,
-    showCriticalPath,
-    showBaseline,
-    showProgress,
-    showDependencies,
-    showTodayLine,
     groupBy,
     weekStartsOn,
     viewMode,
@@ -448,28 +402,9 @@ export function ScheduleViewClient({
     [visibleTableTasks]
   )
 
-  const svarGanttReadonly = !canEdit || schedule.status !== 'DRAFT'
-
-  const totalTasks = schedule.tasks.length
-  const criticalTasks = schedule.tasks.filter(
-    (t: (typeof schedule.tasks)[0]) => t.isCritical
-  ).length
-  const completedTasks = schedule.tasks.filter(
-    (t: (typeof schedule.tasks)[0]) => Number(t.progressPercent) === 100
-  ).length
-  const avgProgress =
-    totalTasks > 0
-      ? schedule.tasks.reduce(
-          (sum: number, t: (typeof schedule.tasks)[0]) =>
-            sum + Number(t.progressPercent),
-          0
-        ) / totalTasks
-      : 0
-
-  const projectDuration = Math.ceil(
-    (schedule.projectEndDate.getTime() - schedule.projectStartDate.getTime()) /
-      (1000 * 60 * 60 * 24)
-  )
+  const svarGanttReadonly = !canEdit
+  const planDatesEditable =
+    schedule.status === 'DRAFT' || schedule.status === 'BASELINE'
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -482,24 +417,15 @@ export function ScheduleViewClient({
     }
   )
 
-  const workloadByAssigneeRows = (() => {
-    const counts = new Map<string, number>()
-    for (const t of schedule.tasks) {
-      if (t.taskType === 'SUMMARY') continue
-      const raw =
-        typeof t.assignedTo === 'string' ? t.assignedTo.trim() : ''
-      const k = raw || '__unassigned__'
-      counts.set(k, (counts.get(k) ?? 0) + 1)
-    }
-    return [...counts.entries()]
-      .map(([key, count]) => ({ key, count }))
-      .sort((a, b) => {
-        if (a.key === '__unassigned__' && b.key !== '__unassigned__') return 1
-        if (b.key === '__unassigned__' && a.key !== '__unassigned__') return -1
-        if (b.count !== a.count) return b.count - a.count
-        return a.key.localeCompare(b.key, undefined, { sensitivity: 'base' })
-      })
-  })()
+  const delayedScheduleToastShown = useRef<string | null>(null)
+  useEffect(() => {
+    if (delayedTasks.length === 0) return
+    if (delayedScheduleToastShown.current === scheduleData.id) return
+    delayedScheduleToastShown.current = scheduleData.id
+    toast.warning(t('delayedTasksToastTitle'), {
+      description: t('delayedTasksToastDesc', { count: delayedTasks.length }),
+    })
+  }, [scheduleData.id, delayedTasks.length, t])
 
   async function handleExportPDF() {
     setExporting(true)
@@ -673,7 +599,7 @@ export function ScheduleViewClient({
   }
 
   function handleSaveCalendarExceptions() {
-    if (!canEdit || schedule.status !== 'DRAFT') return
+    if (!canEdit || !planDatesEditable) return
     startCalendarSave(async () => {
       try {
         const result = await updateScheduleNonWorkingDates(schedule.id, exceptionsText)
@@ -721,7 +647,7 @@ export function ScheduleViewClient({
   }
 
   async function handleSaveProjectWindow() {
-    if (!canEdit || schedule.status !== 'DRAFT') return
+    if (!canEdit || !planDatesEditable) return
     setProjectWindowSaving(true)
     try {
       const [ys, ms, ds] = projectWindowStart.split('-').map(Number)
@@ -1049,12 +975,6 @@ export function ScheduleViewClient({
     zoom,
     weekStartsOn,
     readonly: svarGanttReadonly,
-    showCriticalPath,
-    showDependencies,
-    showProgress,
-    showTodayLine,
-    showBaseline: showBaseline && baselineOverlayAvailable,
-    baselinePlanByWbsNodeId: scheduleData.baselinePlanByWbsNodeId,
     onTaskDatesPersist: handleTaskDragEnd,
     onTaskProgressPersist: handleSvarProgressPersist,
     onDependencyAdd: handleSvarDependencyAdd,
@@ -1067,53 +987,7 @@ export function ScheduleViewClient({
   }
 
   return (
-    <div className="erp-stack space-y-6">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="erp-card erp-card-body">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-sm font-medium text-muted-foreground">{t('totalTasks')}</p>
-            <Calendar className="h-4 w-4 shrink-0 text-muted-foreground" />
-          </div>
-          <p className="mt-2 text-2xl font-semibold tabular-nums text-foreground">{totalTasks}</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {completedTasks} {t('completed')}
-          </p>
-        </div>
-        <div className="erp-card erp-card-body">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-sm font-medium text-muted-foreground">{t('criticalPath')}</p>
-            <TrendingUp className="h-4 w-4 shrink-0 text-destructive" />
-          </div>
-          <p className="mt-2 text-2xl font-semibold tabular-nums text-destructive">{criticalTasks}</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {totalTasks > 0 ? ((criticalTasks / totalTasks) * 100).toFixed(1) : 0}% {t('ofTotal')}
-          </p>
-        </div>
-        <div className="erp-card erp-card-body">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-sm font-medium text-muted-foreground">{t('duration')}</p>
-            <Calendar className="h-4 w-4 shrink-0 text-primary" />
-          </div>
-          <p className="mt-2 text-2xl font-semibold tabular-nums text-foreground">{projectDuration}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{t('workingDays')}</p>
-        </div>
-        <div className="erp-card erp-card-body">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-sm font-medium text-muted-foreground">{t('progress')}</p>
-            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-          </div>
-          <p className="mt-2 text-2xl font-semibold tabular-nums text-foreground">
-            {avgProgress.toFixed(1)}%
-          </p>
-          <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-muted">
-            <div
-              className="h-full bg-emerald-600 transition-all dark:bg-emerald-500"
-              style={{ width: `${Math.min(100, avgProgress)}%` }}
-            />
-          </div>
-        </div>
-      </div>
-
+    <div className="erp-stack space-y-4">
       <div className="erp-card erp-card-body">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex min-w-0 flex-1 flex-wrap items-start gap-6">
@@ -1134,8 +1008,10 @@ export function ScheduleViewClient({
               >
                 {schedule.status}
               </Badge>
-              {!canEdit && schedule.status !== 'DRAFT' && (
-                <p className="mt-1 text-xs text-muted-foreground">{t('editOnlyInDraft')}</p>
+              {!canEdit && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {t('scheduleViewReadOnlyHint')}
+                </p>
               )}
             </div>
             {schedule.isBaseline && (
@@ -1145,7 +1021,7 @@ export function ScheduleViewClient({
             )}
             <div className="min-w-0">
               <p className="text-sm font-medium text-muted-foreground">{t('dateRange')}</p>
-              {canEdit && schedule.status === 'DRAFT' ? (
+              {canEdit && planDatesEditable ? (
                 <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
                   <div className="space-y-1.5">
                     <Label htmlFor="schedule-project-start" className="text-xs text-muted-foreground">
@@ -1222,15 +1098,25 @@ export function ScheduleViewClient({
                   {t('approveSchedule')}
                 </Button>
               )}
+            <input
+              ref={msXmlFileInputRef}
+              type="file"
+              accept=".xml,application/xml,text/xml"
+              className="hidden"
+              onChange={handleMsXmlFileSelected}
+            />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="h-10 gap-1">
-                  <Download className="h-4 w-4" />
-                  {t('exportMenuLabel')}
+                  <Plug className="h-4 w-4" />
+                  {t('integrationsMenu')}
                   <ChevronDown className="h-4 w-4 opacity-70" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-[220px]">
+              <DropdownMenuContent align="end" className="min-w-[240px]">
+                <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+                  {t('integrationsSectionExport')}
+                </DropdownMenuLabel>
                 <DropdownMenuItem
                   disabled={exporting}
                   onSelect={() => {
@@ -1267,43 +1153,47 @@ export function ScheduleViewClient({
                   <FileCode2 className="mr-2 h-4 w-4" />
                   {exportingMsXml ? t('exportingMsProjectXml') : t('exportMsProjectXml')}
                 </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+                  {t('integrationsSectionImport')}
+                </DropdownMenuLabel>
+                <DropdownMenuItem
+                  disabled={importingMsXml || !canEdit || schedule.status !== 'DRAFT'}
+                  onSelect={() => {
+                    setTimeout(() => msXmlFileInputRef.current?.click(), 0)
+                  }}
+                >
+                  {importingMsXml ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <FileCode2 className="mr-2 h-4 w-4" />
+                  )}
+                  {importingMsXml ? t('importingMsProjectXml') : t('importMsProjectXml')}
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <input
-              ref={msXmlFileInputRef}
-              type="file"
-              accept=".xml,application/xml,text/xml"
-              className="hidden"
-              onChange={handleMsXmlFileSelected}
-            />
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="h-10"
-              disabled={importingMsXml || !canEdit || schedule.status !== 'DRAFT'}
-              onClick={() => msXmlFileInputRef.current?.click()}
+              className="h-10 gap-1.5"
+              onClick={() => setChangeLogOpen(true)}
             >
-              {importingMsXml ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Upload className="mr-2 h-4 w-4" />
-              )}
-              {importingMsXml ? t('importingMsProjectXml') : t('importMsProjectXml')}
+              <History className="h-4 w-4" />
+              {t('scheduleChangeLogOpen')}
             </Button>
           </div>
         </div>
+        <p className="mt-3 border-t border-border pt-3 text-xs leading-relaxed text-muted-foreground">
+          {t('exportScopeHint')}
+        </p>
       </div>
 
-      {delayedTasks.length > 0 && (
-        <Alert variant="destructive" className="border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>{t('delayedTasksAlert')}</AlertTitle>
-          <AlertDescription>
-            {t('delayedTasksAlertDesc', { count: delayedTasks.length })}
-          </AlertDescription>
-        </Alert>
-      )}
+      <ScheduleChangeLogDialog
+        scheduleId={schedule.id}
+        open={changeLogOpen}
+        onOpenChange={setChangeLogOpen}
+      />
 
       {isScheduleFullscreen && (
         <div className="fixed inset-0 z-50 flex flex-col bg-background">
@@ -1337,14 +1227,14 @@ export function ScheduleViewClient({
         onValueChange={(v) => setViewMode(v as 'gantt' | 'calendar')}
         className="space-y-0"
       >
-        <div className="erp-card">
-          <div className="border-b border-border bg-muted/20 px-4 py-4 sm:px-6">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div className="min-w-0 space-y-1">
+        <div className="erp-card overflow-hidden">
+          <div className="border-b border-border bg-muted/20 px-4 py-3 sm:px-6">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0 space-y-0.5">
                 <h3 className="text-base font-semibold text-foreground">{t('scheduleWorkspaceTitle')}</h3>
-                <p className="text-sm text-muted-foreground">{t('scheduleWorkspaceHint')}</p>
+                <p className="text-xs text-muted-foreground">{t('scheduleWorkspaceHint')}</p>
               </div>
-              <TabsList className="grid h-10 w-full grid-cols-2 gap-1 rounded-lg border border-border bg-background p-1 sm:flex sm:w-auto">
+              <TabsList className="grid h-10 w-full shrink-0 grid-cols-2 gap-1 rounded-lg border border-border bg-background p-1 sm:flex sm:w-auto">
                 <TabsTrigger
                   value="gantt"
                   className="rounded-md px-4 py-2 text-sm font-medium data-[state=active]:bg-muted"
@@ -1359,7 +1249,7 @@ export function ScheduleViewClient({
                 </TabsTrigger>
               </TabsList>
             </div>
-            <div className="mt-4 flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center">
+            <div className="mt-3 flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center">
               <div className="relative min-w-0 flex-1 lg:max-w-md">
                 <Search
                   className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
@@ -1485,19 +1375,6 @@ export function ScheduleViewClient({
               />
               <GanttControlPanel
                 embedded
-                showCriticalPath={showCriticalPath}
-                onShowCriticalPathChange={setShowCriticalPath}
-                showBaseline={showBaseline}
-                onShowBaselineChange={setShowBaseline}
-                baselineOverlayAvailable={baselineOverlayAvailable}
-                baselineChartOverlaySupported={baselineChartOverlaySupported}
-                showProgress={showProgress}
-                onShowProgressChange={setShowProgress}
-                showDependencies={showDependencies}
-                onShowDependenciesChange={setShowDependencies}
-                showTodayLine={showTodayLine}
-                onShowTodayLineChange={setShowTodayLine}
-                todayLineApplicable={viewMode === 'gantt'}
                 groupBy={groupBy}
                 onGroupByChange={setGroupBy}
                 weekStartsOn={weekStartsOn}
@@ -1507,7 +1384,7 @@ export function ScheduleViewClient({
           </div>
 
           <div
-            className="flex min-h-0 flex-col"
+            className="flex min-h-0 flex-col border-t border-border"
             style={{ minHeight: 'max(520px, 60vh)', maxHeight: '85vh' }}
           >
             <ScheduleMainChart
@@ -1518,98 +1395,19 @@ export function ScheduleViewClient({
               calendarProps={calendarBlockProps}
             />
           </div>
-          <div
-            className="flex flex-wrap items-center gap-4 border-t border-border bg-muted/30 px-4 py-3 text-xs text-muted-foreground sm:px-6"
-            role="img"
-            aria-label={t('legendCriticalPath')}
-          >
-            <span className="flex items-center gap-1.5">
-              <span
-                className="h-3 w-6 rounded-sm border border-red-800 bg-red-500"
-                aria-hidden
-              />
-              {t('legendCriticalPath')}
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span
-                className="h-0.5 w-4 border-t-2 border-dashed border-red-600"
-                aria-hidden
-              />
-              {t('legendToday')}
-            </span>
-            {baselineOverlayAvailable && (
-              <span className="flex items-center gap-1.5">
-                <span
-                  className="h-3 w-6 rounded-sm border border-dashed border-slate-500 bg-slate-300/50 dark:border-slate-600 dark:bg-slate-600/40"
-                  aria-hidden
-                />
-                {t('legendBaseline')}
-              </span>
-            )}
-            <span className="flex items-center gap-1.5">
-              <span
-                className="h-3 w-6 rounded-sm border border-blue-800 bg-blue-500"
-                aria-hidden
-              />
-              {t('legendTask')}
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span
-                className="h-3 w-5 rounded-sm border border-cyan-800 bg-cyan-500"
-                aria-hidden
-              />
-              {t('legendSummary')}
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span
-                className="inline-block h-3 w-3 rotate-45 border border-amber-700 bg-amber-500"
-                aria-hidden
-              />
-              {t('legendMilestone')}
-            </span>
-          </div>
         </div>
       </Tabs>
 
-      {workloadByAssigneeRows.length > 0 && (
-        <div className="erp-card overflow-hidden">
-          <div className="erp-card-header">
-            <h3 className="text-base font-semibold text-foreground">{t('workloadByAssigneeTitle')}</h3>
-            <p className="text-sm text-muted-foreground">{t('workloadByAssigneeHint')}</p>
+      <details className="schedule-calendar-details erp-card overflow-hidden rounded-lg border border-border bg-card">
+        <summary className="erp-card-header flex cursor-pointer list-none items-center gap-2 select-none hover:bg-muted/30 [&::-webkit-details-marker]:hidden">
+          <ChevronRight className="schedule-calendar-chevron h-4 w-4 shrink-0 text-muted-foreground" />
+          <div className="min-w-0 flex-1">
+            <h3 className="text-base font-semibold text-foreground">{t('calendarExceptionsTitle')}</h3>
+            <p className="text-sm text-muted-foreground">{t('calendarExceptionsSummary')}</p>
           </div>
-          <div className="erp-card-body pt-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t('taskAssignedTo')}</TableHead>
-                  <TableHead className="w-[120px] text-right">{t('workloadColTasks')}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {workloadByAssigneeRows.map((row) => (
-                  <TableRow key={row.key}>
-                    <TableCell className="text-sm">
-                      {row.key === '__unassigned__'
-                        ? t('workloadUnassigned')
-                        : row.key}
-                    </TableCell>
-                    <TableCell className="text-right text-sm tabular-nums">
-                      {t('workloadTaskCount', { count: row.count })}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </div>
-      )}
-
-      <div className="erp-card overflow-hidden">
-        <div className="erp-card-header">
-          <h3 className="text-base font-semibold text-foreground">{t('calendarExceptionsTitle')}</h3>
+        </summary>
+        <div className="erp-card-body space-y-3 border-t border-border">
           <p className="text-sm text-muted-foreground">{t('calendarExceptionsHint')}</p>
-        </div>
-        <div className="erp-card-body space-y-3">
           <div className="space-y-2">
             <Label htmlFor="schedule-non-working-dates" className="text-sm">
               {t('calendarExceptionsLabel')}
@@ -1620,14 +1418,14 @@ export function ScheduleViewClient({
               onChange={(e) => setExceptionsText(e.target.value)}
               placeholder={t('calendarExceptionsPlaceholder')}
               rows={4}
-              disabled={!canEdit || schedule.status !== 'DRAFT' || calendarSavePending}
+              disabled={!canEdit || !planDatesEditable || calendarSavePending}
               className="font-mono text-sm"
             />
           </div>
-          {(!canEdit || schedule.status !== 'DRAFT') && (
+          {(!canEdit || !planDatesEditable) && (
             <p className="text-xs text-muted-foreground">{t('calendarExceptionsReadOnly')}</p>
           )}
-          {canEdit && schedule.status === 'DRAFT' && (
+          {canEdit && planDatesEditable && (
             <Button
               type="button"
               size="sm"
@@ -1645,7 +1443,7 @@ export function ScheduleViewClient({
             </Button>
           )}
         </div>
-      </div>
+      </details>
 
       {selectedTaskForEditData && (
         <TaskEditDialog

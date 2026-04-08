@@ -32,6 +32,11 @@ import { createAuditLog } from '@/lib/audit-log'
 import { addDays, differenceInDays, startOfDay } from 'date-fns'
 import { assertBillingWriteAllowed } from '@/lib/billing/guards'
 
+/** Fechas plan, progreso y dependencias en el Gantt (DRAFT o baseline del proyecto). */
+function isScheduleInteractivePlanStatus(status: string): boolean {
+  return status === 'DRAFT' || status === 'BASELINE'
+}
+
 /**
  * Crear nuevo cronograma desde WBS.
  * Duración: cada TASK recibe 1 día inicial; las SUMMARY se recalculan después con el
@@ -472,8 +477,12 @@ export async function updateTaskDates(
       return { success: false, error: e instanceof Error ? e.message : 'Acceso denegado' }
     }
 
-    if (task.schedule.status !== 'DRAFT') {
-      return { success: false, error: 'Solo se puede editar cronogramas en DRAFT' }
+    if (!isScheduleInteractivePlanStatus(task.schedule.status)) {
+      return {
+        success: false,
+        error:
+          'Solo se puede editar el plan en borrador (DRAFT) o en versión baseline del proyecto',
+      }
     }
 
     const calendarOptions = workingDayOptionsFromStrings(
@@ -574,10 +583,12 @@ export async function updateTaskDates(
       }
     }
 
-    const beforeDates = {
+    const beforeSnapshot = {
       plannedStartDate: task.plannedStartDate,
       plannedEndDate: task.plannedEndDate,
       plannedDuration: task.plannedDuration,
+      notes: task.notes ?? null,
+      assignedTo: task.assignedTo ?? null,
     }
 
     await prisma.scheduleTask.update({
@@ -602,6 +613,8 @@ export async function updateTaskDates(
         plannedStartDate: true,
         plannedEndDate: true,
         plannedDuration: true,
+        notes: true,
+        assignedTo: true,
       },
     })
 
@@ -612,9 +625,9 @@ export async function updateTaskDates(
       entity: 'ScheduleTask',
       entityId: parsedTask.taskId,
       projectId: task.schedule.projectId,
-      oldValues: beforeDates,
+      oldValues: beforeSnapshot,
       newValues: afterTask ?? undefined,
-      description: `Fechas de tarea actualizadas: ${task.wbsNode.code}`,
+      description: `Plan de tarea actualizado: ${task.wbsNode.code}`,
     })
 
     revalidatePath(`/projects/${task.schedule.projectId}/schedule`)
@@ -669,8 +682,12 @@ export async function addTaskDependency(data: {
       return { success: false, error: e instanceof Error ? e.message : 'Acceso denegado' }
     }
 
-    if (schedule.status !== 'DRAFT') {
-      return { success: false, error: 'Solo se puede editar en DRAFT' }
+    if (!isScheduleInteractivePlanStatus(schedule.status)) {
+      return {
+        success: false,
+        error:
+          'Solo se puede editar dependencias en borrador (DRAFT) o en versión baseline',
+      }
     }
 
     const createsCycle = await checkForCycle(
@@ -685,6 +702,25 @@ export async function addTaskDependency(data: {
         error: 'Esta dependencia crearía un ciclo. No es permitido.',
       }
     }
+
+    const [predTask, succTask] = await Promise.all([
+      prisma.scheduleTask.findFirst({
+        where: {
+          id: parsed.data.predecessorId,
+          scheduleId: parsed.data.scheduleId,
+        },
+        include: { wbsNode: { select: { code: true } } },
+      }),
+      prisma.scheduleTask.findFirst({
+        where: {
+          id: parsed.data.successorId,
+          scheduleId: parsed.data.scheduleId,
+        },
+        include: { wbsNode: { select: { code: true } } },
+      }),
+    ])
+    const predCode = predTask?.wbsNode?.code ?? '?'
+    const succCode = succTask?.wbsNode?.code ?? '?'
 
     const dependency = await prisma.taskDependency.create({
       data: {
@@ -705,7 +741,13 @@ export async function addTaskDependency(data: {
       entity: 'TaskDependency',
       entityId: dependency.id,
       projectId: schedule.projectId,
-      description: `Dependencia ${parsed.data.dependencyType} agregada`,
+      newValues: {
+        predecessorCode: predCode,
+        successorCode: succCode,
+        dependencyType: parsed.data.dependencyType,
+        lagDays: parsed.data.lagDays ?? 0,
+      },
+      description: `Dependencia ${parsed.data.dependencyType}: ${predCode} → ${succCode}`,
     })
 
     revalidatePath(`/projects/${schedule.projectId}/schedule`)
@@ -739,6 +781,8 @@ export async function removeTaskDependency(dependencyId: string) {
       where: { id: parsed.dependencyId },
       include: {
         schedule: { select: { id: true, orgId: true, projectId: true, status: true } },
+        predecessor: { include: { wbsNode: { select: { code: true, name: true } } } },
+        successor: { include: { wbsNode: { select: { code: true, name: true } } } },
       },
     })
 
@@ -754,13 +798,34 @@ export async function removeTaskDependency(dependencyId: string) {
       return { success: false, error: e instanceof Error ? e.message : 'Acceso denegado' }
     }
 
-    if (dependency.schedule.status !== 'DRAFT') {
-      return { success: false, error: 'Solo se puede editar en DRAFT' }
+    if (!isScheduleInteractivePlanStatus(dependency.schedule.status)) {
+      return {
+        success: false,
+        error:
+          'Solo se puede editar dependencias en borrador (DRAFT) o en versión baseline',
+      }
     }
 
     await prisma.taskDependency.delete({ where: { id: parsed.dependencyId } })
 
     await recalculateCriticalPath(dependency.schedule.id)
+
+    await createAuditLog({
+      orgId: org.orgId,
+      userId: session.user.id,
+      action: 'DELETE',
+      entity: 'TaskDependency',
+      entityId: parsed.dependencyId,
+      projectId: dependency.schedule.projectId,
+      oldValues: {
+        scheduleId: dependency.schedule.id,
+        dependencyType: dependency.dependencyType,
+        lagDays: dependency.lagDays,
+        predecessorCode: dependency.predecessor.wbsNode.code,
+        successorCode: dependency.successor.wbsNode.code,
+      },
+      description: `Dependencia eliminada: ${dependency.predecessor.wbsNode.code} → ${dependency.successor.wbsNode.code}`,
+    })
 
     revalidatePath(`/projects/${dependency.schedule.projectId}/schedule`)
 
@@ -800,6 +865,7 @@ export async function updateTaskProgress(
       where: { id: parsedTask.taskId },
       include: {
         schedule: { select: { orgId: true, projectId: true, status: true } },
+        wbsNode: { select: { code: true, name: true } },
       },
     })
 
@@ -815,8 +881,12 @@ export async function updateTaskProgress(
       return { success: false, error: e instanceof Error ? e.message : 'Acceso denegado' }
     }
 
-    if (task.schedule.status !== 'DRAFT') {
-      return { success: false, error: 'Solo se puede editar cronogramas en DRAFT' }
+    if (!isScheduleInteractivePlanStatus(task.schedule.status)) {
+      return {
+        success: false,
+        error:
+          'Solo se puede editar el progreso en borrador (DRAFT) o en versión baseline',
+      }
     }
 
     if (data.progressPercent < 0 || data.progressPercent > 100) {
@@ -840,9 +910,43 @@ export async function updateTaskProgress(
       )
     }
 
+    const beforeProgress = Number(task.progressPercent)
+    const beforeSnapshot = {
+      progressPercent: beforeProgress,
+      actualStartDate: task.actualStartDate?.toISOString() ?? null,
+      actualEndDate: task.actualEndDate?.toISOString() ?? null,
+    }
+
     await prisma.scheduleTask.update({
       where: { id: parsedTask.taskId },
       data: updateData,
+    })
+
+    const afterRow = await prisma.scheduleTask.findUnique({
+      where: { id: parsedTask.taskId },
+      select: {
+        progressPercent: true,
+        actualStartDate: true,
+        actualEndDate: true,
+      },
+    })
+
+    await createAuditLog({
+      orgId: org.orgId,
+      userId: session.user.id,
+      action: 'UPDATE_TASK_PROGRESS',
+      entity: 'ScheduleTask',
+      entityId: parsedTask.taskId,
+      projectId: task.schedule.projectId,
+      oldValues: beforeSnapshot,
+      newValues: afterRow
+        ? {
+            progressPercent: Number(afterRow.progressPercent),
+            actualStartDate: afterRow.actualStartDate?.toISOString() ?? null,
+            actualEndDate: afterRow.actualEndDate?.toISOString() ?? null,
+          }
+        : { progressPercent: data.progressPercent },
+      description: `Progreso ${task.wbsNode.code}: ${beforeProgress}% → ${data.progressPercent}%`,
     })
 
     revalidatePath(`/projects/${task.schedule.projectId}/schedule`)
@@ -851,6 +955,78 @@ export async function updateTaskProgress(
   } catch (error) {
     console.error('Error updating task progress:', error)
     return { success: false, error: 'Error al actualizar progreso' }
+  }
+}
+
+/**
+ * Historial de cambios del cronograma (auditoría en `audit_logs`).
+ */
+export async function getScheduleAuditLogs(scheduleId: string) {
+  const parsed = parseScheduleId(scheduleId)
+  if (parsed.success === false) {
+    return { success: false as const, error: parsed.error, logs: [] }
+  }
+
+  const session = await getSession()
+  if (!session?.user?.id) {
+    return { success: false as const, error: 'Unauthorized', logs: [] }
+  }
+
+  const org = await getOrgContext(session.user.id)
+  if (!org) return { success: false as const, error: 'Unauthorized', logs: [] }
+
+  try {
+    const schedule = await prisma.schedule.findFirst({
+      where: { id: parsed.scheduleId, orgId: org.orgId },
+      select: { id: true, projectId: true },
+    })
+    if (!schedule) {
+      return { success: false as const, error: 'Schedule not found', logs: [] }
+    }
+    await assertProjectAccess(schedule.projectId, org)
+
+    const [taskIds, depIds] = await Promise.all([
+      prisma.scheduleTask.findMany({
+        where: { scheduleId: schedule.id },
+        select: { id: true },
+      }),
+      prisma.taskDependency.findMany({
+        where: { scheduleId: schedule.id },
+        select: { id: true },
+      }),
+    ])
+
+    const logs = await prisma.auditLog.findMany({
+      where: {
+        orgId: org.orgId,
+        OR: [
+          { entityType: 'Schedule', entityId: schedule.id },
+          {
+            entityType: 'ScheduleTask',
+            entityId: { in: taskIds.map((t) => t.id) },
+          },
+          {
+            entityType: 'TaskDependency',
+            entityId: { in: depIds.map((d) => d.id) },
+          },
+        ],
+      },
+      include: {
+        actor: {
+          select: { fullName: true, email: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    })
+
+    return { success: true as const, logs }
+  } catch (e) {
+    return {
+      success: false as const,
+      error: e instanceof Error ? e.message : 'Error',
+      logs: [],
+    }
   }
 }
 
@@ -1132,7 +1308,12 @@ export async function setScheduleAsBaseline(scheduleId: string) {
       entity: 'Schedule',
       entityId: parsed.scheduleId,
       projectId: schedule.projectId,
-      description: `Cronograma establecido como BASELINE en proyecto "${schedule.project.name}"`,
+      oldValues: {
+        status: schedule.status,
+        isBaseline: schedule.isBaseline,
+      },
+      newValues: { status: 'BASELINE', isBaseline: true },
+      description: `Cronograma "${schedule.name}" establecido como BASELINE en proyecto "${schedule.project.name}"`,
     })
 
     revalidatePath(`/projects/${schedule.projectId}/schedule`)
@@ -1185,12 +1366,13 @@ export async function approveSchedule(scheduleId: string) {
       return { success: false, error: 'Este cronograma ya está aprobado.' }
     }
 
+    const approvedAt = new Date()
     await prisma.schedule.update({
       where: { id: parsed.scheduleId },
       data: {
         status: 'APPROVED',
         approvedByOrgMemberId: org.memberId,
-        approvedAt: new Date(),
+        approvedAt,
       },
     })
 
@@ -1201,7 +1383,9 @@ export async function approveSchedule(scheduleId: string) {
       entity: 'Schedule',
       entityId: parsed.scheduleId,
       projectId: schedule.projectId,
-      description: `Cronograma aprobado en proyecto "${schedule.project.name}"`,
+      oldValues: { status: schedule.status },
+      newValues: { status: 'APPROVED', approvedAt: approvedAt.toISOString() },
+      description: `Cronograma "${schedule.name}" aprobado en proyecto "${schedule.project.name}"`,
     })
 
     revalidatePath(`/projects/${schedule.projectId}/schedule`)
@@ -1215,7 +1399,7 @@ export async function approveSchedule(scheduleId: string) {
 }
 
 /**
- * Guardar feriados / días no laborables del cronograma (solo DRAFT).
+ * Guardar feriados / días no laborables (DRAFT o baseline editable del proyecto).
  * Recalcula ruta crítica y fechas de resumen para reflejar el calendario.
  */
 export async function updateScheduleNonWorkingDates(scheduleId: string, text: string) {
@@ -1235,7 +1419,7 @@ export async function updateScheduleNonWorkingDates(scheduleId: string, text: st
   try {
     const schedule = await prisma.schedule.findFirst({
       where: { id: parsed.scheduleId, orgId: org.orgId },
-      select: { id: true, projectId: true, status: true },
+      select: { id: true, projectId: true, status: true, name: true, nonWorkingDates: true },
     })
 
     if (!schedule) {
@@ -1253,13 +1437,15 @@ export async function updateScheduleNonWorkingDates(scheduleId: string, text: st
       return { success: false, error: e instanceof Error ? e.message : 'Acceso denegado' }
     }
 
-    if (schedule.status !== 'DRAFT') {
+    if (!isScheduleInteractivePlanStatus(schedule.status)) {
       return {
         success: false,
-        error: 'Solo se pueden editar excepciones de calendario en cronogramas en borrador.',
+        error:
+          'Solo se pueden editar excepciones de calendario en borrador (DRAFT) o en versión baseline del proyecto.',
       }
     }
 
+    const previousDates = parseNonWorkingDatesFromJson(schedule.nonWorkingDates)
     const dates = parseNonWorkingDatesFromUserInput(text)
 
     await prisma.schedule.update({
@@ -1270,6 +1456,18 @@ export async function updateScheduleNonWorkingDates(scheduleId: string, text: st
     })
 
     await recalculateCriticalPath(parsed.scheduleId)
+
+    await createAuditLog({
+      orgId: org.orgId,
+      userId: session.user.id,
+      action: 'UPDATE',
+      entity: 'Schedule',
+      entityId: parsed.scheduleId,
+      projectId: schedule.projectId,
+      oldValues: { nonWorkingDates: previousDates },
+      newValues: { nonWorkingDates: dates, count: dates.length },
+      description: `Calendario (no laborables) actualizado en "${schedule.name}" (${dates.length} fechas)`,
+    })
 
     revalidatePath(`/projects/${schedule.projectId}/schedule`)
 
@@ -1289,7 +1487,7 @@ export type UpdateScheduleProjectWindowResult =
     }
 
 /**
- * Actualizar fechas de inicio y fin del proyecto del cronograma (solo DRAFT).
+ * Actualizar fechas de inicio y fin del proyecto del cronograma (DRAFT o baseline editable).
  * El inicio no puede ser posterior al comienzo de la tarea más temprana;
  * el fin no puede ser anterior al fin de la tarea más tardía.
  */
@@ -1313,7 +1511,14 @@ export async function updateScheduleProjectWindow(
   try {
     const schedule = await prisma.schedule.findFirst({
       where: { id: parsed.scheduleId, orgId: org.orgId },
-      select: { id: true, projectId: true, status: true, name: true },
+      select: {
+        id: true,
+        projectId: true,
+        status: true,
+        name: true,
+        projectStartDate: true,
+        projectEndDate: true,
+      },
     })
 
     if (!schedule) {
@@ -1331,10 +1536,11 @@ export async function updateScheduleProjectWindow(
       return { success: false, error: e instanceof Error ? e.message : 'Acceso denegado' }
     }
 
-    if (schedule.status !== 'DRAFT') {
+    if (!isScheduleInteractivePlanStatus(schedule.status)) {
       return {
         success: false,
-        error: 'Solo se pueden editar las fechas del proyecto en cronogramas en borrador.',
+        error:
+          'Solo se pueden editar las fechas del proyecto en borrador (DRAFT) o en versión baseline.',
       }
     }
 
@@ -1394,7 +1600,15 @@ export async function updateScheduleProjectWindow(
       entity: 'Schedule',
       entityId: parsed.scheduleId,
       projectId: schedule.projectId,
-      description: `Ventana del proyecto actualizada en cronograma "${schedule.name}"`,
+      oldValues: {
+        projectStartDate: schedule.projectStartDate.toISOString(),
+        projectEndDate: schedule.projectEndDate.toISOString(),
+      },
+      newValues: {
+        projectStartDate: start.toISOString(),
+        projectEndDate: end.toISOString(),
+      },
+      description: `Ventana del proyecto actualizada en "${schedule.name}"`,
     })
 
     revalidatePath(`/projects/${schedule.projectId}/schedule`)
@@ -1558,6 +1772,11 @@ export async function importScheduleFromMsProjectXml(scheduleId: string, xml: st
     }
     const depList = Array.from(depMap.values())
 
+    const previousDependencyCount = await prisma.taskDependency.count({
+      where: { scheduleId: parsed.scheduleId },
+    })
+    const previousXmlMappedTaskCount = uidToTaskId.size
+
     const { createdDeps, skippedDeps } = await prisma.$transaction(async (tx) => {
       for (const u of updates) {
         await tx.scheduleTask.update({
@@ -1603,14 +1822,32 @@ export async function importScheduleFromMsProjectXml(scheduleId: string, xml: st
     )
     await recalculateCriticalPath(parsed.scheduleId)
 
+    const dependenciesAfterCount = await prisma.taskDependency.count({
+      where: { scheduleId: parsed.scheduleId },
+    })
+
     await createAuditLog({
       orgId: org.orgId,
       userId: session.user.id,
-      action: 'UPDATE',
+      action: 'IMPORT_MS_PROJECT_XML',
       entity: 'Schedule',
       entityId: parsed.scheduleId,
       projectId: schedule.projectId,
-      description: `Importación MS Project XML: ${updates.length} tareas actualizadas, ${createdDeps} dependencias (${skippedDeps} omitidas por ciclo)`,
+      oldValues: {
+        scheduleName: schedule.name,
+        taskCount: schedule.tasks.length,
+        dependencyCount: previousDependencyCount,
+        xmlSizeBytes: xml.length,
+        xmlTaskRowCount: parsedXml.tasks.length,
+        xmlMappedTaskCount: previousXmlMappedTaskCount,
+      },
+      newValues: {
+        tasksUpdated: updates.length,
+        dependenciesCreated: createdDeps,
+        dependenciesSkippedCycle: skippedDeps,
+        dependencyCountAfter: dependenciesAfterCount,
+      },
+      description: `Importación MS Project XML en "${schedule.name}": ${updates.length} tareas actualizadas, ${createdDeps} dependencias (${skippedDeps} omitidas por ciclo); antes ${previousDependencyCount} deps, después ${dependenciesAfterCount}`,
     })
 
     revalidatePath(`/projects/${schedule.projectId}/schedule`)

@@ -932,6 +932,50 @@
   }
 }
 
+/* Cronograma: chevron en <details> de excepciones de calendario */
+.schedule-calendar-details > summary .schedule-calendar-chevron {
+  transition: transform 0.15s ease;
+}
+.schedule-calendar-details[open] > summary .schedule-calendar-chevron {
+  transform: rotate(90deg);
+}
+
+/* SVAR Gantt dentro de Bloqer: alinear bordes y superficies con tokens del tema */
+.bloqer-svar-gantt .wx-willow-theme {
+  --wx-border: 1px solid hsl(var(--border));
+  --wx-border-medium: 1px solid hsl(var(--border));
+  --wx-background: hsl(var(--card));
+  --wx-background-alt: hsl(var(--muted));
+  --wx-background-hover: hsl(var(--accent));
+  --wx-color-font: hsl(var(--foreground));
+  --wx-color-font-alt: hsl(var(--muted-foreground));
+  --wx-color-primary: hsl(var(--primary));
+  --wx-color-primary-font: hsl(var(--primary-foreground));
+  --wx-color-primary-selected: hsl(var(--accent));
+  --wx-color-link: hsl(var(--primary));
+  --wx-shadow-light: none;
+  --wx-shadow-medium: none;
+  --wx-box-shadow: none;
+  --wx-box-shadow-strong: none;
+}
+.dark .bloqer-svar-gantt .wx-willow-dark-theme {
+  --wx-border: 1px solid hsl(var(--border));
+  --wx-border-medium: 1px solid hsl(var(--border));
+  --wx-background: hsl(var(--card));
+  --wx-background-alt: hsl(var(--muted));
+  --wx-background-hover: hsl(var(--accent));
+  --wx-color-font: hsl(var(--foreground));
+  --wx-color-font-alt: hsl(var(--muted-foreground));
+  --wx-color-primary: hsl(var(--primary));
+  --wx-color-primary-font: hsl(var(--primary-foreground));
+  --wx-color-primary-selected: hsl(var(--accent));
+  --wx-color-link: hsl(var(--primary));
+  --wx-shadow-light: none;
+  --wx-shadow-medium: none;
+  --wx-box-shadow: none;
+  --wx-box-shadow-strong: none;
+}
+
 /* SVAR Gantt: marcador "hoy" (class from schedule-svar-gantt markers) */
 .bloqer-svar-gantt .bloqer-svar-gantt-marker-today {
   border-left: 2px dashed hsl(var(--destructive) / 0.85);

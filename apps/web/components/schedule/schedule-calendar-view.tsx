@@ -220,7 +220,7 @@ export function ScheduleCalendarView({
                       <div
                         key={day.toISOString()}
                         className={cn(
-                          'flex min-h-[72px] flex-col border-r border-border p-1 last:border-r-0',
+                          'flex min-h-[80px] flex-col border-r border-border p-1 last:border-r-0',
                           !inMonth && 'bg-muted/30',
                           !inVisible && 'opacity-50'
                         )}
@@ -233,28 +233,30 @@ export function ScheduleCalendarView({
                         >
                           {format(day, 'd', { locale: localeObj })}
                         </div>
-                        <div className="max-h-20 min-h-0 flex-1 space-y-0.5 overflow-y-auto">
+                        <div className="max-h-[5.5rem] min-h-0 flex-1 space-y-0.5 overflow-y-auto">
                           {shown.map((task) => (
                             <button
                               key={task.id}
                               type="button"
                               onClick={() => onTaskClick?.(task.id)}
                               className={cn(
-                                'block px-0.5 py-0.5 text-[9px]',
+                                'block w-full px-0.5 py-0.5 text-left text-[10px] leading-tight',
                                 calendarTaskChipClass(task, highlightedTask === task.id)
                               )}
                               title={`${task.code} ${task.name}`}
                             >
-                              <span className="font-mono text-[8px] text-muted-foreground">
+                              <span className="block font-mono text-[10px] text-muted-foreground tabular-nums">
                                 {task.code}
-                              </span>{' '}
-                              {task.taskType === 'MILESTONE' ? '◆ ' : ''}
-                              {task.name}
+                              </span>
+                              <span className="line-clamp-2 break-words">
+                                {task.taskType === 'MILESTONE' ? '◆ ' : ''}
+                                {task.name}
+                              </span>
                             </button>
                           ))}
                         </div>
                         {extra > 0 && (
-                          <span className="text-[8px] text-muted-foreground">
+                          <span className="text-[10px] text-muted-foreground">
                             +{extra}
                           </span>
                         )}

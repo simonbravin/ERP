@@ -17,6 +17,7 @@ import {
 import {
   buildSvarScalesForBloqerZoom,
   parseSchedulePlanDate,
+  svarCellWidthForZoom,
 } from '@/lib/schedule/svar-gantt-scales'
 
 /** Sin import estático de @svar-ui (webpack en CI); mismo shape que IApi.getTask. */
@@ -58,7 +59,7 @@ const GanttThemed = dynamic(
           const { useDarkTheme, ...ganttProps } = props
           const Theme = useDarkTheme ? m.WillowDark : m.Willow
           return (
-            <Theme fonts={false}>
+            <Theme fonts>
               <m.Gantt {...ganttProps} />
             </Theme>
           )
@@ -113,16 +114,6 @@ export interface ScheduleSvarGanttProps {
   zoom: 'day' | 'week' | 'month'
   weekStartsOn: 0 | 1
   readonly: boolean
-  showCriticalPath: boolean
-  showDependencies: boolean
-  showProgress: boolean
-  showTodayLine: boolean
-  /** Comparar barras actuales con fechas plan del cronograma baseline (por WBS). */
-  showBaseline: boolean
-  baselinePlanByWbsNodeId: Record<
-    string,
-    { plannedStartDate: string; plannedEndDate: string }
-  > | null
   className?: string
   onTaskActivate?: (taskId: string) => void
   onTaskDatesPersist: (taskId: string, start: Date, end: Date) => Promise<void>
@@ -144,12 +135,6 @@ export function ScheduleSvarGantt({
   zoom,
   weekStartsOn,
   readonly,
-  showCriticalPath,
-  showDependencies,
-  showProgress,
-  showTodayLine,
-  showBaseline,
-  baselinePlanByWbsNodeId,
   className,
   onTaskActivate,
   onTaskDatesPersist,
@@ -183,38 +168,12 @@ export function ScheduleSvarGantt({
     [scheduleData.tasks]
   )
 
-  const { tasks, links: allLinks } = useMemo(
+  const { tasks, links } = useMemo(
     () =>
       scheduleTasksToSvar(sourceTasks, {
         visibleTaskIds,
-        showCriticalPath,
-        showProgress,
-        showBaseline,
-        baselinePlanByWbsNodeId,
       }),
-    [
-      sourceTasks,
-      visibleTaskIds,
-      showCriticalPath,
-      showProgress,
-      showBaseline,
-      baselinePlanByWbsNodeId,
-    ]
-  )
-
-  const baselinesEnabled = useMemo(
-    () =>
-      showBaseline &&
-      Boolean(
-        baselinePlanByWbsNodeId &&
-          Object.keys(baselinePlanByWbsNodeId).length > 0
-      ),
-    [showBaseline, baselinePlanByWbsNodeId]
-  )
-
-  const links = useMemo(
-    () => (showDependencies ? allLinks : []),
-    [allLinks, showDependencies]
+    [sourceTasks, visibleTaskIds]
   )
 
   const scales = useMemo(
@@ -222,20 +181,25 @@ export function ScheduleSvarGantt({
     [zoom, weekStartsOn, dateLocale]
   )
 
+  const cellWidth = useMemo(() => svarCellWidthForZoom(zoom), [zoom])
+
   const columns = useMemo(() => {
     if (!rawColumns) return null
-    return rawColumns.map((col) => {
-      if (col.id !== 'start' && col.id !== 'end') {
-        return col
-      }
-      return {
-        ...col,
-        template: (value: unknown) => {
-          const d = value instanceof Date ? value : null
-          return d ? format(d, 'dd/MM/yyyy', { locale: dateLocale }) : ''
-        },
-      }
-    })
+    return rawColumns
+      .filter((col) => col.id !== 'add-task')
+      .map((col) => {
+        if (col.id !== 'start' && col.id !== 'end') {
+          return col
+        }
+        return {
+          ...col,
+          /** Formato alineado al demo SVAR (https://svar.dev/react/gantt/). */
+          template: (value: unknown) => {
+            const d = value instanceof Date ? value : null
+            return d ? format(d, 'yyyy-MM-dd', { locale: dateLocale }) : ''
+          },
+        }
+      })
   }, [rawColumns, dateLocale])
 
   const rangeStart = useMemo(
@@ -256,16 +220,16 @@ export function ScheduleSvarGantt({
     [scheduleData.projectEndDate]
   )
 
-  const markers = useMemo(() => {
-    if (!showTodayLine) return []
-    return [
+  const markers = useMemo(
+    () => [
       {
         start: startOfDay(new Date()),
         text: t('legendToday'),
         css: 'bloqer-svar-gantt-marker-today',
       },
-    ]
-  }, [showTodayLine, t])
+    ],
+    [t]
+  )
 
   const persistDatesIfNeeded = useCallback(
     async (taskId: string) => {
@@ -362,7 +326,7 @@ export function ScheduleSvarGantt({
     return (
       <div
         className={cn(
-          'bloqer-svar-gantt min-h-0 min-w-0 flex-1 overflow-auto',
+          'bloqer-svar-gantt min-h-0 min-w-0 flex-1 overflow-auto rounded-lg border border-border bg-card',
           className
         )}
       >
@@ -376,7 +340,7 @@ export function ScheduleSvarGantt({
     return (
       <div
         className={cn(
-          'bloqer-svar-gantt flex min-h-[320px] min-w-0 flex-1 items-center justify-center rounded-lg border border-border bg-muted/20 px-4 py-12',
+          'bloqer-svar-gantt flex min-h-[320px] min-w-0 flex-1 items-center justify-center overflow-hidden rounded-lg border border-border bg-muted/20 px-4 py-12',
           className
         )}
         role="status"
@@ -393,7 +357,7 @@ export function ScheduleSvarGantt({
   return (
     <div
       className={cn(
-        'bloqer-svar-gantt min-h-0 min-w-0 flex-1 overflow-auto',
+        'bloqer-svar-gantt min-h-0 min-w-0 flex-1 overflow-auto rounded-lg border border-border bg-card',
         className
       )}
     >
@@ -408,10 +372,13 @@ export function ScheduleSvarGantt({
         projectStart={projectStart}
         projectEnd={projectEnd}
         scales={scales}
-        autoScale
+        autoScale={false}
+        cellWidth={cellWidth}
         lengthUnit="day"
         durationUnit="day"
-        baselines={baselinesEnabled}
+        cellBorders="full"
+        criticalPath={{ type: 'strict' }}
+        baselines={false}
         readonly={readonly}
         init={(api: SvarGanttApi) => {
           apiRef.current = api

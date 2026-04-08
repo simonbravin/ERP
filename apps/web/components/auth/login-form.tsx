@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { signIn } from 'next-auth/react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslations } from 'next-intl'
@@ -48,24 +47,9 @@ export function LoginForm() {
       if (err.password) setError('password', { message: err.password[0] })
       return
     }
-    if ('ok' in result && result.ok && result.email) {
-      const signInResult = await signIn('credentials', {
-        email: result.email,
-        password: data.password.trim(),
-        redirect: false,
-      })
-      if (signInResult?.ok) {
-        const path = result.isSuperAdmin ? '/super-admin' : '/dashboard'
-        window.location.href = `/${locale}${path}`
-        return
-      }
-      // Credenciales válidas pero NextAuth rechazó (ej. usuario sin organización)
-      const accessDenied = signInResult?.error === 'AccessDenied' || signInResult?.error === 'Callback'
-      setError('root', {
-        message: accessDenied
-          ? t('noOrganization', { defaultValue: 'Tu cuenta no tiene una organización asignada. Contactá al administrador.' })
-          : t('invalidCredentials', { defaultValue: 'Usuario o contraseña incorrectos' }),
-      })
+    if ('ok' in result && result.ok) {
+      const path = result.isSuperAdmin ? '/super-admin' : '/dashboard'
+      window.location.href = `/${locale}${path}`
       return
     }
     setError('root', { message: t('invalidCredentials', { defaultValue: 'Usuario o contraseña incorrectos' }) })

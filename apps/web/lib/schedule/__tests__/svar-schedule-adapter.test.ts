@@ -4,8 +4,6 @@ import {
   scheduleTasksToSvar,
   type ScheduleViewTaskLike,
 } from '../svar-schedule-adapter'
-import { parseSchedulePlanDate } from '../svar-gantt-scales'
-
 describe('bloqerDependencyTypeToSvar', () => {
   it('maps FS/SS/FF/SF to SVAR link anchors', () => {
     expect(bloqerDependencyTypeToSvar('FS')).toBe('e2s')
@@ -58,50 +56,6 @@ describe('scheduleTasksToSvar', () => {
     })
     expect(out).toHaveLength(1)
     expect(out[0].id).toBe('a')
-  })
-
-  it('sets base_start/base_end from baselinePlanByWbsNodeId when showBaseline', () => {
-    const tasks: ScheduleViewTaskLike[] = [
-      base({
-        wbsNodeId: 'w1',
-        wbsNode: { id: 'w1', code: '1', name: 'A', parentId: null },
-      }),
-    ]
-    const { tasks: out } = scheduleTasksToSvar(tasks, {
-      showBaseline: true,
-      baselinePlanByWbsNodeId: {
-        w1: {
-          plannedStartDate: '2025-01-01T00:00:00.000Z',
-          plannedEndDate: '2025-01-05T00:00:00.000Z',
-        },
-      },
-    })
-    expect(out[0].base_start).toEqual(
-      parseSchedulePlanDate('2025-01-01T00:00:00.000Z')
-    )
-    expect(out[0].base_end).toEqual(
-      parseSchedulePlanDate('2025-01-05T00:00:00.000Z')
-    )
-  })
-
-  it('omits baseline fields when showBaseline is false', () => {
-    const tasks: ScheduleViewTaskLike[] = [
-      base({
-        wbsNodeId: 'w1',
-        wbsNode: { id: 'w1', code: '1', name: 'A', parentId: null },
-      }),
-    ]
-    const { tasks: out } = scheduleTasksToSvar(tasks, {
-      showBaseline: false,
-      baselinePlanByWbsNodeId: {
-        w1: {
-          plannedStartDate: '2025-01-01T00:00:00.000Z',
-          plannedEndDate: '2025-01-05T00:00:00.000Z',
-        },
-      },
-    })
-    expect(out[0].base_start).toBeUndefined()
-    expect(out[0].base_end).toBeUndefined()
   })
 
   it('sets open false for leaf tasks (SVAR store crashes if open true with null data)', () => {

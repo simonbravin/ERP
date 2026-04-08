@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { signIn } from 'next-auth/react'
 import { useForm } from 'react-hook-form'
 import { usePathname } from '@/i18n/navigation'
 import { superAdminLogin } from '@/app/actions/auth'
@@ -37,17 +36,8 @@ export function SuperAdminLoginForm() {
       if (err._form) setError('root', { message: err._form[0] })
       return
     }
-    if ('ok' in result && result.ok && result.email) {
-      const signInResult = await signIn('credentials', {
-        email: result.email,
-        password: data.password.trim(),
-        redirect: false,
-      })
-      if (signInResult?.ok) {
-        window.location.href = `/${locale}/super-admin`
-        return
-      }
-      setError('root', { message: 'No se pudo iniciar sesión. Reintentá.' })
+    if ('ok' in result && result.ok) {
+      window.location.href = `/${locale}/super-admin`
       return
     }
     setError('root', { message: 'Usuario o contraseña incorrectos' })

@@ -24,7 +24,6 @@ import {
 } from '@/components/ui/select'
 import { toast } from 'sonner'
 import { updateTaskDates, updateTaskProgress } from '@/app/actions/schedule'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Loader2, Calendar, Clock, GitBranch } from 'lucide-react'
 import { format } from 'date-fns'
 import { enUS, es } from 'date-fns/locale'
@@ -85,7 +84,9 @@ export function TaskEditDialog({
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
-  const mayEdit = canEdit && scheduleStatus === 'DRAFT'
+  const planEditableInView =
+    scheduleStatus === 'DRAFT' || scheduleStatus === 'BASELINE'
+  const mayEdit = canEdit && planEditableInView
 
   const [startDate, setStartDate] = useState(format(task.startDate, 'yyyy-MM-dd'))
   const [endDate, setEndDate] = useState(format(task.endDate, 'yyyy-MM-dd'))
@@ -144,7 +145,9 @@ export function TaskEditDialog({
   function handleSave() {
     if (!mayEdit) {
       toast.error(
-        scheduleStatus !== 'DRAFT' ? t('editOnlyInDraft') : t('cannotEditTask')
+        !canEdit
+          ? t('cannotEditTask')
+          : t('editApprovedFrozen')
       )
       return
     }
@@ -200,19 +203,15 @@ export function TaskEditDialog({
         </DialogHeader>
 
         {!mayEdit && (
-          <Alert variant="default" className="border-amber-200 bg-amber-50 text-amber-900">
-            <AlertDescription>
-              {scheduleStatus !== 'DRAFT'
-                ? t('editOnlyInDraft')
-                : t('cannotEditTask')}
-            </AlertDescription>
-          </Alert>
+          <p className="rounded-md border border-border bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+            {!canEdit ? t('cannotEditTask') : t('editApprovedFrozen')}
+          </p>
         )}
 
         <div className="space-y-4">
           {isSummary && (
-            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
-              <p className="text-sm text-blue-900">ℹ️ {t('summaryTaskNote')}</p>
+            <div className="rounded-lg border border-border bg-muted/40 p-3">
+              <p className="text-sm text-foreground">{t('summaryTaskNote')}</p>
             </div>
           )}
 

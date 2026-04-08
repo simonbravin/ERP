@@ -70,24 +70,10 @@ export function scheduleTasksToSvar(
   tasks: ScheduleViewTaskLike[],
   options?: {
     visibleTaskIds?: Set<string>
-    /** Si false, no marcamos crítico en la vista (SVAR OSS colorea según `critical`). */
-    showCriticalPath?: boolean
-    /** Si false, ocultamos % en barra (no altera datos persistidos). */
-    showProgress?: boolean
-    /** Comparar con fechas plan del cronograma baseline del proyecto (`getScheduleForView`). */
-    showBaseline?: boolean
-    baselinePlanByWbsNodeId?: Record<
-      string,
-      { plannedStartDate: string; plannedEndDate: string }
-    > | null
   }
 ): { tasks: ITask[]; links: ILink[] } {
   const source = Array.isArray(tasks) ? tasks : []
   const visible = options?.visibleTaskIds
-  const showCritical = options?.showCriticalPath !== false
-  const showProgress = options?.showProgress !== false
-  const showBaseline = options?.showBaseline === true
-  const baselineByWbs = showBaseline ? options?.baselinePlanByWbsNodeId : null
   const list = visible ? source.filter((t) => visible.has(t.id)) : [...source]
 
   const wbsToTaskId = new Map<string, string>()
@@ -121,18 +107,13 @@ export function scheduleTasksToSvar(
       start: parseSchedulePlanDate(t.plannedStartDate),
       end: parseSchedulePlanDate(t.plannedEndDate),
       duration: t.plannedDuration,
-      progress: showProgress ? Number(t.progressPercent) : 0,
+      progress: Number(t.progressPercent),
       type,
       open,
-      critical: showCritical && t.isCritical,
+      critical: t.isCritical,
     }
     if (parentTaskId) {
       row.parent = parentTaskId
-    }
-    const bl = baselineByWbs?.[t.wbsNodeId]
-    if (bl) {
-      row.base_start = parseSchedulePlanDate(bl.plannedStartDate)
-      row.base_end = parseSchedulePlanDate(bl.plannedEndDate)
     }
     return row
   })

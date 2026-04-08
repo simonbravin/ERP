@@ -88,7 +88,11 @@ export function buildSvarScalesForBloqerZoom(
   ]
 }
 
-/** Ancho de celda por zoom (día = más ancho; mes = más fino), coherente con “más días visibles = celdas más angostas”. */
+/**
+ * Ancho en px por día en el canvas del Gantt (SVAR `cellWidth`).
+ * Día = columnas anchas; mes = más días por pantalla con scroll horizontal si hace falta.
+ * Requiere `autoScale={false}` en el componente para que se respete.
+ */
 export function svarCellWidthForZoom(zoom: 'day' | 'week' | 'month'): number {
   switch (zoom) {
     case 'day':
