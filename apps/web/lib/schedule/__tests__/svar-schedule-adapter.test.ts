@@ -104,6 +104,57 @@ describe('scheduleTasksToSvar', () => {
     expect(out[0].base_end).toBeUndefined()
   })
 
+  it('sets open false for leaf tasks (SVAR store crashes if open true with null data)', () => {
+    const tasks: ScheduleViewTaskLike[] = [
+      base({
+        wbsNodeId: 'w1',
+        wbsNode: { id: 'w1', code: '1', name: 'Leaf', parentId: null },
+      }),
+    ]
+    const { tasks: out } = scheduleTasksToSvar(tasks)
+    expect(out[0].open).toBe(false)
+  })
+
+  it('sets open true only for SUMMARY rows that have a visible child in the list', () => {
+    const tasks: ScheduleViewTaskLike[] = [
+      base({
+        id: 'parent',
+        wbsNodeId: 'wp',
+        taskType: 'SUMMARY',
+        wbsNode: { id: 'wp', code: '1', name: 'P', parentId: null },
+      }),
+      base({
+        id: 'child',
+        wbsNodeId: 'wc',
+        wbsNode: { id: 'wc', code: '1.1', name: 'C', parentId: 'wp' },
+      }),
+    ]
+    const { tasks: out } = scheduleTasksToSvar(tasks)
+    expect(out.find((x) => x.id === 'parent')?.open).toBe(true)
+    expect(out.find((x) => x.id === 'child')?.open).toBe(false)
+  })
+
+  it('sets open false for SUMMARY when children are filtered out by visibleTaskIds', () => {
+    const tasks: ScheduleViewTaskLike[] = [
+      base({
+        id: 'parent',
+        wbsNodeId: 'wp',
+        taskType: 'SUMMARY',
+        wbsNode: { id: 'wp', code: '1', name: 'P', parentId: null },
+      }),
+      base({
+        id: 'child',
+        wbsNodeId: 'wc',
+        wbsNode: { id: 'wc', code: '1.1', name: 'C', parentId: 'wp' },
+      }),
+    ]
+    const { tasks: out } = scheduleTasksToSvar(tasks, {
+      visibleTaskIds: new Set(['parent']),
+    })
+    expect(out).toHaveLength(1)
+    expect(out[0].open).toBe(false)
+  })
+
   it('emits links from successors with correct SVAR type', () => {
     const tasks: ScheduleViewTaskLike[] = [
       base({

@@ -48,15 +48,19 @@ export function ScheduleVersionSelector({
   }
 
   return (
-    <div className="min-w-0 space-y-1.5 sm:max-w-md sm:flex-1">
-      <Label htmlFor="schedule-version" className="text-xs text-muted-foreground">
+    <div className="erp-form-group min-w-0 w-full max-w-2xl sm:flex-1 lg:max-w-3xl">
+      <Label htmlFor="schedule-version" className="erp-form-label">
         {t('scheduleVersionLabel')}
       </Label>
-      <Select value={activeScheduleId} onValueChange={navigateToVersion}>
-        <SelectTrigger id="schedule-version" className="h-9 w-full min-w-0 text-left text-sm">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
+      <div className="erp-form-input">
+        <Select value={activeScheduleId} onValueChange={navigateToVersion}>
+          <SelectTrigger
+            id="schedule-version"
+            className="h-10 min-h-10 w-full min-w-0 text-left text-sm font-normal"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="max-h-[min(24rem,70vh)] w-[var(--radix-select-trigger-width)] min-w-[var(--radix-select-trigger-width)]">
           {schedules.map((s) => (
             <SelectItem key={s.id} value={s.id} className="min-h-9 py-2">
               {s.name}
@@ -67,7 +71,8 @@ export function ScheduleVersionSelector({
             </SelectItem>
           ))}
         </SelectContent>
-      </Select>
+        </Select>
+      </div>
     </div>
   )
 }

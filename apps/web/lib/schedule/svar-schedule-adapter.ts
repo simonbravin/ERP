@@ -95,12 +95,25 @@ export function scheduleTasksToSvar(
     wbsToTaskId.set(t.wbsNodeId, t.id)
   }
 
+  /** WBS nodes that appear as parent of at least one task in the current list (visible set). */
+  const wbsIdsWithChildren = new Set<string>()
+  for (const t of list) {
+    const pid = t.wbsNode.parentId
+    if (pid != null) wbsIdsWithChildren.add(pid)
+  }
+
   const svarTasks: ITask[] = list.map((t) => {
     const parentWbsId = t.wbsNode.parentId
     const parentTaskId =
       parentWbsId != null ? wbsToTaskId.get(parentWbsId) : undefined
 
     const type = (t.taskType || 'TASK').toLowerCase() as ITask['type']
+    /**
+     * SVAR `toArray()` recurses with `n.open && Ct(n.data)`. Leaf nodes keep `data: null` after parse;
+     * `open: true` on a leaf causes `null.forEach` → crash. Only summaries with visible children may open.
+     */
+    const open =
+      type === 'summary' && wbsIdsWithChildren.has(t.wbsNode.id)
 
     const row: ITask = {
       id: t.id,
@@ -110,7 +123,7 @@ export function scheduleTasksToSvar(
       duration: t.plannedDuration,
       progress: showProgress ? Number(t.progressPercent) : 0,
       type,
-      open: true,
+      open,
       critical: showCritical && t.isCritical,
     }
     if (parentTaskId) {
