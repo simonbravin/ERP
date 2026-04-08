@@ -13,7 +13,7 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: false,
   },
   reactStrictMode: true,
-  transpilePackages: ['@repo/validators'],
+  transpilePackages: ['@repo/validators', '@svar-ui/react-gantt'],
 
   serverExternalPackages: ['@prisma/client', '@sparticuz/chromium', 'puppeteer-core'],
 
