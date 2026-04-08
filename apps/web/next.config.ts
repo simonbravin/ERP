@@ -1,9 +1,28 @@
+import fs from 'fs'
+import path from 'path'
 import type { NextConfig } from 'next'
 import createNextIntlPlugin from 'next-intl/plugin'
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { PrismaPlugin } = require('@prisma/nextjs-monorepo-workaround-plugin')
 
 const withNextIntl = createNextIntlPlugin('./i18n/request.ts')
+
+/** pnpm + monorepo: forzar ruta física para que webpack resuelva en CI/Vercel. */
+function resolveSvarReactGanttDir(): string {
+  const segments = ['node_modules', '@svar-ui', 'react-gantt'] as const
+  const candidates = [
+    path.join(process.cwd(), ...segments),
+    path.resolve(process.cwd(), '..', '..', ...segments),
+  ]
+  for (const dir of candidates) {
+    try {
+      if (fs.existsSync(path.join(dir, 'package.json'))) return dir
+    } catch {
+      /* ignore */
+    }
+  }
+  return candidates[0]
+}
 
 const nextConfig: NextConfig = {
   typescript: {
@@ -33,6 +52,15 @@ const nextConfig: NextConfig = {
   webpack: (config, { isServer }) => {
     if (isServer) {
       config.plugins = [...(config.plugins ?? []), new PrismaPlugin()]
+    }
+    const svarDir = resolveSvarReactGanttDir()
+    const cssPath = path.join(svarDir, 'dist-full', 'index.css')
+    const alias = config.resolve?.alias as Record<string, string | string[] | false> | undefined
+    config.resolve = config.resolve ?? {}
+    config.resolve.alias = {
+      ...alias,
+      '@svar-ui/react-gantt/all.css': cssPath,
+      '@svar-ui/react-gantt': svarDir,
     }
     config.watchOptions = {
       ...(config.watchOptions ?? {}),

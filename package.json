@@ -12,6 +12,9 @@
     "packages/*",
     "tooling/*"
   ],
+  "dependencies": {
+    "@svar-ui/react-gantt": "^2.6.1"
+  },
   "scripts": {
     "postinstall": "pnpm run db:generate",
     "dev": "turbo run dev",

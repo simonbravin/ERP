@@ -1,13 +1,11 @@
 'use client'
 
-import { useCallback, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { useLocale, useTranslations } from 'next-intl'
 import { endOfDay, format, startOfDay } from 'date-fns'
 import { enUS, es } from 'date-fns/locale'
 import type { Locale as DateFnsLocale } from 'date-fns'
-
-import '@svar-ui/react-gantt/all.css'
 
 import { cn } from '@/lib/utils'
 import {
@@ -20,8 +18,14 @@ import {
   parseSchedulePlanDate,
 } from '@/lib/schedule/svar-gantt-scales'
 
-import type { IApi } from '@svar-ui/react-gantt'
-import { defaultColumns } from '@svar-ui/react-gantt'
+/** Sin import estático de @svar-ui (webpack en CI); mismo shape que IApi.getTask. */
+type SvarGanttApi = {
+  getTask: (id: string | number) => {
+    type?: string
+    start?: Date
+    end?: Date
+  }
+}
 
 function SvarGanttSkeleton() {
   const t = useTranslations('schedule')
@@ -37,7 +41,10 @@ function SvarGanttSkeleton() {
 }
 
 const GanttClient = dynamic(
-  () => import('@svar-ui/react-gantt').then((m) => m.Gantt),
+  () =>
+    import('@svar-ui/react-gantt/all.css')
+      .then(() => import('@svar-ui/react-gantt'))
+      .then((m) => m.Gantt),
   { ssr: false, loading: () => <SvarGanttSkeleton /> }
 )
 
@@ -71,6 +78,8 @@ type AddLinkEv = {
 type DeleteLinkEv = {
   id?: string | number
 }
+
+type RawColumn = Record<string, unknown> & { id?: string }
 
 export interface ScheduleSvarGanttProps {
   scheduleData: {
@@ -132,7 +141,20 @@ export function ScheduleSvarGantt({
   const t = useTranslations('schedule')
   const dateLocale: DateFnsLocale = intlLocale.startsWith('en') ? enUS : es
 
-  const apiRef = useRef<IApi | null>(null)
+  const [rawColumns, setRawColumns] = useState<readonly RawColumn[] | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    void import('@svar-ui/react-gantt').then((m) => {
+      if (!cancelled) {
+        setRawColumns(m.defaultColumns as readonly RawColumn[])
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const apiRef = useRef<SvarGanttApi | null>(null)
 
   const { tasks, links: allLinks } = useMemo(
     () =>
@@ -173,22 +195,21 @@ export function ScheduleSvarGantt({
     [zoom, weekStartsOn, dateLocale]
   )
 
-  const columns = useMemo(
-    () =>
-      defaultColumns.map((col) => {
-        if (col.id !== 'start' && col.id !== 'end') {
-          return col
-        }
-        return {
-          ...col,
-          template: (value: unknown) => {
-            const d = value instanceof Date ? value : null
-            return d ? format(d, 'dd/MM/yyyy', { locale: dateLocale }) : ''
-          },
-        }
-      }),
-    [dateLocale]
-  )
+  const columns = useMemo(() => {
+    if (!rawColumns) return null
+    return rawColumns.map((col) => {
+      if (col.id !== 'start' && col.id !== 'end') {
+        return col
+      }
+      return {
+        ...col,
+        template: (value: unknown) => {
+          const d = value instanceof Date ? value : null
+          return d ? format(d, 'dd/MM/yyyy', { locale: dateLocale }) : ''
+        },
+      }
+    })
+  }, [rawColumns, dateLocale])
 
   const rangeStart = useMemo(
     () => startOfDay(visibleStartDate),
@@ -224,7 +245,7 @@ export function ScheduleSvarGantt({
       if (readonly) return
       const api = apiRef.current
       if (!api) return
-      let parsed: ReturnType<IApi['getTask']>
+      let parsed: ReturnType<SvarGanttApi['getTask']>
       try {
         parsed = api.getTask(taskId)
       } catch {
@@ -310,6 +331,19 @@ export function ScheduleSvarGantt({
     [readonly, onDependencyRemove]
   )
 
+  if (!columns) {
+    return (
+      <div
+        className={cn(
+          'bloqer-svar-gantt min-h-0 min-w-0 flex-1 overflow-auto',
+          className
+        )}
+      >
+        <SvarGanttSkeleton />
+      </div>
+    )
+  }
+
   return (
     <div
       className={cn(
@@ -332,7 +366,7 @@ export function ScheduleSvarGantt({
         durationUnit="day"
         baselines={baselinesEnabled}
         readonly={readonly}
-        init={(api) => {
+        init={(api: SvarGanttApi) => {
           apiRef.current = api
         }}
         onSelectTask={(ev: { id: string | number }) => {
