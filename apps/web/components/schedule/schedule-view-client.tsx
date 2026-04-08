@@ -149,7 +149,7 @@ export function ScheduleViewClient({
   scheduleData,
   canEdit,
   canSetBaseline,
-  canCreateVersion = false,
+  canCreateVersion: _canCreateVersion = false,
   assignmentOptions = [],
 }: ScheduleViewClientProps) {
   const t = useTranslations('schedule')
