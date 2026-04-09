@@ -12,7 +12,11 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { formatCurrency } from '@/lib/format-utils'
 import { formatChartAxisCurrency } from '@/lib/chart-format'
 import { chartSemanticHsl } from '@/lib/chart-theme'
-import { CashflowTimelineComposedChart } from '@/components/charts/cashflow-timeline-composed-chart'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  CashflowTimelineComposedChart,
+  type CashflowTimelineSeriesStyle,
+} from '@/components/charts/cashflow-timeline-composed-chart'
 import {
   ChartContainer,
   ChartTooltip,
@@ -79,6 +83,8 @@ export function ProjectDashboardClient({ project, data }: Props) {
   const tProjects = useTranslations('projects')
   const router = useRouter()
   const [isExporting, setIsExporting] = useState(false)
+  const [projectCashflowStyle, setProjectCashflowStyle] =
+    useState<CashflowTimelineSeriesStyle>('lines')
 
   useMessageBus('FINANCE_TRANSACTION.CREATED', () => router.refresh())
   useMessageBus('FINANCE_TRANSACTION.UPDATED', () => router.refresh())
@@ -144,6 +150,7 @@ export function ProjectDashboardClient({ project, data }: Props) {
       label: 'Balance acumulado',
       color: chartSemanticHsl.runningBalance,
     },
+    periodNet: { label: 'Neto del período', color: chartSemanticHsl.income },
   } satisfies ChartConfig
 
   const projectCashflowTooltipLabels = {
@@ -152,6 +159,8 @@ export function ProjectDashboardClient({ project, data }: Props) {
     runningBalance: 'Balance acumulado',
     periodNet: 'Neto del período',
     vsPrevious: 'vs. mes anterior',
+    periodNetLegendPositive: 'Neto positivo (ingresos − gastos)',
+    periodNetLegendNegative: 'Neto negativo (ingresos − gastos)',
   }
 
   const axisCurrency = useMemo(
@@ -448,16 +457,40 @@ export function ProjectDashboardClient({ project, data }: Props) {
             title="Cashflow del proyecto (últimos 6 meses)"
             description="Ingresos vs gastos por mes"
           >
-            <div className="h-[280px] min-h-[280px] w-full min-w-0" style={{ minHeight: 280 }}>
-              <CashflowTimelineComposedChart
-                animationKey={`${data.cashflow.length}`}
-                data={cashflowTimelineRows}
-                config={projectCashflowConfig}
-                currency="ARS"
-                locale="es-AR"
-                tooltipLabels={projectCashflowTooltipLabels}
-                className="aspect-auto h-[280px] min-h-[280px] w-full"
-              />
+            <div className="flex min-h-[280px] w-full min-w-0 flex-col gap-2">
+              <Tabs
+                value={projectCashflowStyle}
+                onValueChange={(v) => {
+                  if (v === 'lines' || v === 'bars' || v === 'periodNet') {
+                    setProjectCashflowStyle(v)
+                  }
+                }}
+                className="w-full shrink-0"
+              >
+                <TabsList className="inline-flex h-auto min-h-9 w-full flex-wrap gap-0.5 rounded-lg bg-muted/60 p-1 sm:w-auto">
+                  <TabsTrigger value="lines" className="rounded-md px-2.5 text-xs sm:px-3 sm:text-sm">
+                    Líneas
+                  </TabsTrigger>
+                  <TabsTrigger value="bars" className="rounded-md px-2.5 text-xs sm:px-3 sm:text-sm">
+                    Barras
+                  </TabsTrigger>
+                  <TabsTrigger value="periodNet" className="rounded-md px-2.5 text-xs sm:px-3 sm:text-sm">
+                    Solo neto
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+              <div className="h-[280px] min-h-[280px] w-full min-w-0 flex-1" style={{ minHeight: 280 }}>
+                <CashflowTimelineComposedChart
+                  animationKey={`${data.cashflow.length}-${projectCashflowStyle}`}
+                  data={cashflowTimelineRows}
+                  config={projectCashflowConfig}
+                  currency="ARS"
+                  locale="es-AR"
+                  tooltipLabels={projectCashflowTooltipLabels}
+                  seriesStyle={projectCashflowStyle}
+                  className="aspect-auto h-[280px] min-h-[280px] w-full"
+                />
+              </div>
             </div>
         </ChartCard>
       </div>

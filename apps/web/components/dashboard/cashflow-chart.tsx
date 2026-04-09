@@ -6,7 +6,10 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { CashflowDataPointDetailed } from '@/app/actions/finance'
 import { chartMonthYearShortEs } from '@/lib/chart-date-labels'
 import { chartSemanticHsl } from '@/lib/chart-theme'
-import { CashflowTimelineComposedChart } from '@/components/charts/cashflow-timeline-composed-chart'
+import {
+  CashflowTimelineComposedChart,
+  type CashflowTimelineSeriesStyle,
+} from '@/components/charts/cashflow-timeline-composed-chart'
 import type { ChartConfig } from '@/components/ui/chart'
 
 export type CashflowRange = 'currentMonth' | 'last3' | 'last6' | 'last12'
@@ -27,18 +30,23 @@ interface CashflowChartProps {
 }
 
 /**
- * Cashflow: income / expense lines + subtle running-balance area (linear interpolation).
+ * Cashflow: líneas suaves, barras + balance dual, o solo neto del período (barras ± desde cero).
  * Range tabs slice the loaded timeline client-side.
  */
 export function CashflowChart({ timeline }: CashflowChartProps) {
   const t = useTranslations('dashboard')
   const locale = useLocale()
   const [range, setRange] = useState<CashflowRange>('last6')
+  const [seriesStyle, setSeriesStyle] = useState<CashflowTimelineSeriesStyle>('lines')
 
   const handleRangeChange = useCallback((v: string) => {
     if (v === 'currentMonth' || v === 'last3' || v === 'last6' || v === 'last12') {
       setRange(v)
     }
+  }, [])
+
+  const handleSeriesStyleChange = useCallback((v: string) => {
+    if (v === 'lines' || v === 'bars' || v === 'periodNet') setSeriesStyle(v)
   }, [])
 
   const slicedData = useMemo(() => {
@@ -83,6 +91,7 @@ export function CashflowChart({ timeline }: CashflowChartProps) {
       label: t('cashflowRunningBalance'),
       color: chartSemanticHsl.runningBalance,
     },
+    periodNet: { label: t('cashflowPeriodNet'), color: chartSemanticHsl.income },
   } satisfies ChartConfig
 
   const tooltipLabels = {
@@ -91,11 +100,13 @@ export function CashflowChart({ timeline }: CashflowChartProps) {
     runningBalance: t('cashflowRunningBalance'),
     periodNet: t('cashflowPeriodNet'),
     vsPrevious: t('cashflowVsPrevious'),
+    periodNetLegendPositive: t('cashflowPeriodNetLegendPositive'),
+    periodNetLegendNegative: t('cashflowPeriodNetLegendNegative'),
   }
 
   return (
     <div className="flex h-full min-h-[360px] flex-col rounded-xl border border-border/60 bg-card p-6 shadow-sm">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h3 className="text-lg font-semibold text-foreground">
             {t('cashflowTitle')}
@@ -104,30 +115,59 @@ export function CashflowChart({ timeline }: CashflowChartProps) {
             {t('cashflowSubtitle')}
           </p>
         </div>
-        <Tabs value={range} onValueChange={handleRangeChange} className="w-full sm:w-auto">
-          <TabsList className="inline-flex h-10 w-full gap-0.5 rounded-lg bg-muted/80 p-1 sm:w-auto">
-            {RANGES.map(({ value, key }) => (
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:items-end">
+          <Tabs
+            value={seriesStyle}
+            onValueChange={handleSeriesStyleChange}
+            className="w-full sm:w-auto"
+          >
+            <TabsList className="inline-flex h-auto min-h-9 w-full flex-wrap gap-0.5 rounded-lg bg-muted/60 p-1 sm:w-auto">
               <TabsTrigger
-                key={value}
-                value={value}
-                className="min-w-0 flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors sm:flex-initial sm:text-sm"
+                value="lines"
+                className="min-w-0 flex-1 rounded-md px-2.5 py-1 text-xs font-medium sm:flex-initial sm:px-3 sm:text-sm"
               >
-                {t(key)}
+                {t('cashflowChartTypeLines')}
               </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+              <TabsTrigger
+                value="bars"
+                className="min-w-0 flex-1 rounded-md px-2.5 py-1 text-xs font-medium sm:flex-initial sm:px-3 sm:text-sm"
+              >
+                {t('cashflowChartTypeBars')}
+              </TabsTrigger>
+              <TabsTrigger
+                value="periodNet"
+                className="min-w-0 flex-1 rounded-md px-2.5 py-1 text-xs font-medium sm:flex-initial sm:px-3 sm:text-sm"
+              >
+                {t('cashflowChartTypePeriodNet')}
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+          <Tabs value={range} onValueChange={handleRangeChange} className="w-full sm:w-auto">
+            <TabsList className="inline-flex h-10 w-full gap-0.5 rounded-lg bg-muted/80 p-1 sm:w-auto">
+              {RANGES.map(({ value, key }) => (
+                <TabsTrigger
+                  key={value}
+                  value={value}
+                  className="min-w-0 flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors sm:flex-initial sm:text-sm"
+                >
+                  {t(key)}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+        </div>
       </div>
 
       <div className="mt-5 flex min-h-[280px] w-full min-w-0 flex-1 flex-col">
         {chartData.length > 0 ? (
           <CashflowTimelineComposedChart
-            animationKey={range}
+            animationKey={`${range}-${seriesStyle}`}
             data={chartData}
             config={chartConfig}
             currency="ARS"
             locale={locale === 'en' ? 'en-US' : 'es-AR'}
             tooltipLabels={tooltipLabels}
+            seriesStyle={seriesStyle}
             className="aspect-auto min-h-[280px] w-full"
           />
         ) : (

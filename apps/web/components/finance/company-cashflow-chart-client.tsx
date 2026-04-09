@@ -17,7 +17,10 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { formatCurrency } from '@/lib/format-utils'
 import { formatChartAxisCurrency } from '@/lib/chart-format'
 import { chartSemanticHsl } from '@/lib/chart-theme'
-import { CashflowTimelineComposedChart } from '@/components/charts/cashflow-timeline-composed-chart'
+import {
+  CashflowTimelineComposedChart,
+  type CashflowTimelineSeriesStyle,
+} from '@/components/charts/cashflow-timeline-composed-chart'
 import {
   ChartContainer,
   ChartTooltip,
@@ -58,6 +61,8 @@ export function CompanyCashflowChartClient({
     range.from.toISOString().slice(0, 10)
   )
   const [customTo, setCustomTo] = useState(range.to.toISOString().slice(0, 10))
+  const [cashflowSeriesStyle, setCashflowSeriesStyle] =
+    useState<CashflowTimelineSeriesStyle>('lines')
 
   const preset = useMemo(() => {
     const to = range.to.getTime()
@@ -137,6 +142,7 @@ export function CompanyCashflowChartClient({
       label: 'Balance acumulado',
       color: chartSemanticHsl.runningBalance,
     },
+    periodNet: { label: 'Neto del período', color: chartSemanticHsl.income },
   } satisfies ChartConfig
 
   const cashflowTooltipLabels = {
@@ -145,6 +151,8 @@ export function CompanyCashflowChartClient({
     runningBalance: 'Balance acumulado',
     periodNet: 'Neto del período',
     vsPrevious: 'vs. mes anterior',
+    periodNetLegendPositive: 'Neto positivo (ingresos − gastos)',
+    periodNetLegendNegative: 'Neto negativo (ingresos − gastos)',
   }
 
   const yAxisFormatter = (value: number) =>
@@ -216,15 +224,37 @@ export function CompanyCashflowChartClient({
             <TabsTrigger value="breakdown">Desglose Gastos</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="cashflow" className="mt-4">
+          <TabsContent value="cashflow" className="mt-4 space-y-3">
+            <Tabs
+              value={cashflowSeriesStyle}
+              onValueChange={(v) => {
+                if (v === 'lines' || v === 'bars' || v === 'periodNet') {
+                  setCashflowSeriesStyle(v)
+                }
+              }}
+              className="w-full"
+            >
+              <TabsList className="inline-flex h-auto min-h-9 w-full flex-wrap gap-0.5 rounded-lg bg-muted/60 p-1 sm:w-auto">
+                <TabsTrigger value="lines" className="rounded-md px-2.5 text-xs sm:px-3 sm:text-sm">
+                  Líneas
+                </TabsTrigger>
+                <TabsTrigger value="bars" className="rounded-md px-2.5 text-xs sm:px-3 sm:text-sm">
+                  Barras
+                </TabsTrigger>
+                <TabsTrigger value="periodNet" className="rounded-md px-2.5 text-xs sm:px-3 sm:text-sm">
+                  Solo neto
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
             <div className="h-80 w-full min-w-0">
               <CashflowTimelineComposedChart
-                animationKey={`${preset}-${initialData.length}`}
+                animationKey={`${preset}-${initialData.length}-${cashflowSeriesStyle}`}
                 data={cashflowChartRows}
                 config={cashflowChartConfig}
                 currency="ARS"
                 locale="es-AR"
                 tooltipLabels={cashflowTooltipLabels}
+                seriesStyle={cashflowSeriesStyle}
                 className="aspect-auto h-full min-h-[280px] w-full"
               />
             </div>

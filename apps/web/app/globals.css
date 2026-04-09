@@ -940,6 +940,11 @@
   transform: rotate(90deg);
 }
 
+/* Recorte interno (bordes redondeados vía clases en el componente / contenedor padre) */
+.bloqer-svar-gantt {
+  overflow: hidden;
+}
+
 /* SVAR Gantt dentro de Bloqer: alinear bordes y superficies con tokens del tema */
 .bloqer-svar-gantt .wx-willow-theme {
   --wx-border: 1px solid hsl(var(--border));
@@ -957,6 +962,9 @@
   --wx-shadow-medium: none;
   --wx-box-shadow: none;
   --wx-box-shadow-strong: none;
+  --wx-gantt-bar-border-radius: 6px;
+  --wx-gantt-milestone-border-radius: 6px;
+  --wx-gantt-baseline-border-radius: 6px;
 }
 .dark .bloqer-svar-gantt .wx-willow-dark-theme {
   --wx-border: 1px solid hsl(var(--border));
@@ -974,6 +982,33 @@
   --wx-shadow-medium: none;
   --wx-box-shadow: none;
   --wx-box-shadow-strong: none;
+  --wx-gantt-bar-border-radius: 6px;
+  --wx-gantt-milestone-border-radius: 6px;
+  --wx-gantt-baseline-border-radius: 6px;
+}
+
+/* Escala temporal (cabecera): sin solapamiento cuando las celdas son angostas */
+.bloqer-svar-gantt .wx-scale .wx-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Barras y dependencias: feedback claro al pasar el mouse / arrastrar */
+.bloqer-svar-gantt .wx-bar {
+  transition:
+    box-shadow 0.12s ease,
+    filter 0.12s ease;
+}
+.bloqer-svar-gantt .wx-bar:hover {
+  filter: brightness(1.03);
+  box-shadow: 0 0 0 1px hsl(var(--ring) / 0.35);
+}
+.bloqer-svar-gantt .wx-line-selectable {
+  transition: stroke 0.12s ease;
+}
+.bloqer-svar-gantt .wx-resizer {
+  cursor: col-resize;
 }
 
 /* SVAR Gantt: marcador "hoy" (class from schedule-svar-gantt markers) */

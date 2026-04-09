@@ -17,25 +17,23 @@ describe('parseSchedulePlanDate', () => {
 })
 
 describe('buildSvarScalesForBloqerZoom', () => {
-  it('day zoom uses dd/MM/yyyy on second scale', () => {
+  it('day zoom: month row + short day number on second scale (avoids label overlap)', () => {
     const scales = buildSvarScalesForBloqerZoom('day', 1, es)
     expect(scales).toHaveLength(2)
+    expect(scales[0].unit).toBe('month')
     expect(scales[1].unit).toBe('day')
-    const fmt = scales[1].format
-    expect(typeof fmt).toBe('function')
-    const label = (fmt as (d: Date, n?: Date) => string)(
-      new Date(2025, 0, 8),
-      undefined
-    )
-    expect(label).toMatch(/08\/01\/2025/)
+    const monthFmt = scales[0].format as (d: Date) => string
+    expect(monthFmt(new Date(2025, 0, 8))).toMatch(/enero|January/i)
+    const dayFmt = scales[1].format as (d: Date, n?: Date) => string
+    expect(dayFmt(new Date(2025, 0, 8), undefined)).toBe('8')
   })
 
-  it('week zoom labels week start only (Monday)', () => {
+  it('week zoom: same two-row pattern with numeric day labels', () => {
     const scales = buildSvarScalesForBloqerZoom('week', 1, es)
+    expect(scales).toHaveLength(2)
     const fmt = scales[1].format as (d: Date, n?: Date) => string
-    // 2025-01-06 is Monday
-    expect(fmt(new Date(2025, 0, 6), undefined)).toMatch(/06\/01\/2025/)
-    expect(fmt(new Date(2025, 0, 7), undefined)).toBe('')
+    expect(fmt(new Date(2025, 0, 6), undefined)).toBe('6')
+    expect(fmt(new Date(2025, 0, 7), undefined)).toBe('7')
   })
 })
 

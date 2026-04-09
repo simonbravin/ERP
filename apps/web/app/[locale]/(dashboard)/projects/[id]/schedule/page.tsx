@@ -123,9 +123,8 @@ export default async function ProjectSchedulePage({
   }
 
   const canMutateSchedule = canEditSchedule(orgContext, projectRole)
-  const canEdit =
-    canMutateSchedule &&
-    (activeSchedule.status === 'DRAFT' || activeSchedule.status === 'BASELINE')
+  /** Edición del plan (Gantt, fechas, dependencias) si el rol lo permite; el estado DRAFT/APROBADO no bloquea. */
+  const canEdit = canMutateSchedule
   const canCreateVersion = canMutateSchedule
   const showRevisionFromPlan =
     canCreateVersion && activeSchedule.status !== 'DRAFT'

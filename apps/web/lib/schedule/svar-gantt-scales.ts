@@ -1,10 +1,5 @@
 import type { IScaleConfig } from '@svar-ui/react-gantt'
-import {
-  format,
-  startOfWeek,
-  isSameDay,
-  isFirstDayOfMonth,
-} from 'date-fns'
+import { format, isFirstDayOfMonth } from 'date-fns'
 import type { Locale } from 'date-fns'
 
 /**
@@ -25,14 +20,13 @@ export function parseSchedulePlanDate(iso: string): Date {
 }
 
 /**
- * Escalas de cabecera alineadas al Gantt canvas de Bloqer:
- * - día: mes arriba + dd/MM/yyyy por columna
- * - semana: mes arriba + dd/MM/yyyy solo en el inicio de semana (weekStartsOn)
- * - mes: año + mes (la línea temporal sigue siendo por día, como el canvas)
+ * Escalas de cabecera al estilo [SVAR Gantt](https://svar.dev/react/gantt/):
+ * fila superior da contexto (mes / año); la fila de día usa números cortos para
+ * que no se solapen al reducir el ancho de celda — el detalle está en la fila superior y en el grid.
  */
 export function buildSvarScalesForBloqerZoom(
   zoom: 'day' | 'week' | 'month',
-  weekStartsOn: 0 | 1,
+  _weekStartsOn: 0 | 1,
   locale: Locale
 ): IScaleConfig[] {
   if (zoom === 'day') {
@@ -45,7 +39,7 @@ export function buildSvarScalesForBloqerZoom(
       {
         unit: 'day',
         step: 1,
-        format: (d: Date) => format(d, 'dd/MM/yyyy', { locale }),
+        format: (d: Date) => format(d, 'd', { locale }),
       },
     ]
   }
@@ -60,10 +54,7 @@ export function buildSvarScalesForBloqerZoom(
       {
         unit: 'day',
         step: 1,
-        format: (d: Date) => {
-          const wk = startOfWeek(d, { weekStartsOn })
-          return isSameDay(d, wk) ? format(d, 'dd/MM/yyyy', { locale }) : ''
-        },
+        format: (d: Date) => format(d, 'd', { locale }),
       },
     ]
   }
@@ -83,7 +74,7 @@ export function buildSvarScalesForBloqerZoom(
       unit: 'day',
       step: 1,
       format: (d: Date) =>
-        isFirstDayOfMonth(d) ? format(d, 'dd/MM/yyyy', { locale }) : '',
+        isFirstDayOfMonth(d) ? format(d, 'd', { locale }) : '',
     },
   ]
 }
@@ -96,12 +87,12 @@ export function buildSvarScalesForBloqerZoom(
 export function svarCellWidthForZoom(zoom: 'day' | 'week' | 'month'): number {
   switch (zoom) {
     case 'day':
-      return 56
-    case 'week':
       return 40
+    case 'week':
+      return 36
     case 'month':
       return 28
     default:
-      return 40
+      return 36
   }
 }

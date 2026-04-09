@@ -29,7 +29,8 @@ export interface ScheduleCalendarBlockProps {
   allTableTasks: ScheduleCalendarTableTask[]
   expandedNodes: Set<string>
   onToggleExpand: (taskId: string) => void
-  onTaskClick: (taskId: string) => void
+  onTaskSelect: (taskId: string) => void
+  onTaskOpenForm: (taskId: string) => void
   onDependenciesClick: (taskId: string) => void
   onTaskDatesChange?: (taskId: string, newStartDate: Date, newEndDate: Date) => void
   canEdit: boolean
@@ -53,7 +54,8 @@ export function ScheduleCalendarBlock({
   allTableTasks,
   expandedNodes,
   onToggleExpand,
-  onTaskClick,
+  onTaskSelect,
+  onTaskOpenForm,
   onDependenciesClick,
   onTaskDatesChange,
   canEdit,
@@ -80,15 +82,16 @@ export function ScheduleCalendarBlock({
   return (
     <div
       ref={scrollContainerRef}
-      className={className ?? 'flex min-h-0 flex-1 overflow-auto'}
+      className={cn('flex min-h-0 flex-1 overflow-auto bg-card', className)}
     >
-      <div className={cn('shrink-0 border-r border-border', wbsMinClass)}>
+      <div className={cn('min-h-0 shrink-0 overflow-hidden border-r border-border', wbsMinClass)}>
         <ScheduleWbsPanel
           tasks={tableTasks}
           allTasks={allTableTasks}
           expandedNodes={expandedNodes}
           onToggleExpand={onToggleExpand}
-          onTaskClick={onTaskClick}
+          onTaskClick={onTaskSelect}
+          onTaskEditClick={onTaskOpenForm}
           onDependenciesClick={onDependenciesClick}
           onTaskDatesChange={onTaskDatesChange}
           canEdit={canEdit}
@@ -100,9 +103,11 @@ export function ScheduleCalendarBlock({
           showDetailColumns={showWbsDetailColumns}
           minimalWbsOnly={wbsMinimalStrip}
           showFooter={false}
+          matchGanttGrid
+          rootClassName="h-full min-h-0"
         />
       </div>
-      <div className="min-h-0 min-w-0 flex-1 bg-muted/15">
+      <div className="min-h-0 min-w-0 flex-1 overflow-hidden bg-card">
         <ScheduleCalendarView
           tasks={tableTasks.map((t) => ({
             id: t.id,
@@ -117,7 +122,8 @@ export function ScheduleCalendarBlock({
           visibleEndDate={visibleEndDate}
           zoom={zoom}
           weekStartsOn={weekStartsOn}
-          onTaskClick={onTaskClick}
+          onTaskSelect={onTaskSelect}
+          onTaskOpenForm={onTaskOpenForm}
           highlightedTask={highlightedTask}
           className="h-full"
         />

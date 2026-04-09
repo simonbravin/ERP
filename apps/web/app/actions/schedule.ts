@@ -32,9 +32,13 @@ import { createAuditLog } from '@/lib/audit-log'
 import { addDays, differenceInDays, startOfDay } from 'date-fns'
 import { assertBillingWriteAllowed } from '@/lib/billing/guards'
 
-/** Fechas plan, progreso y dependencias en el Gantt (DRAFT o baseline del proyecto). */
+/** Fechas plan, progreso y dependencias: cualquier versión activa del cronograma (incl. aprobada). */
 function isScheduleInteractivePlanStatus(status: string): boolean {
-  return status === 'DRAFT' || status === 'BASELINE'
+  return (
+    status === 'DRAFT' ||
+    status === 'BASELINE' ||
+    status === 'APPROVED'
+  )
 }
 
 /**
@@ -837,7 +841,7 @@ export async function removeTaskDependency(dependencyId: string) {
 }
 
 /**
- * Actualizar progreso de tarea. Solo cronogramas en DRAFT (misma regla que fechas plan y dependencias).
+ * Actualizar progreso de tarea (misma regla de estado que fechas plan y dependencias: DRAFT, BASELINE, APPROVED).
  */
 export async function updateTaskProgress(
   taskId: string,

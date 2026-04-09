@@ -19,6 +19,20 @@ import {
   parseSchedulePlanDate,
   svarCellWidthForZoom,
 } from '@/lib/schedule/svar-gantt-scales'
+import {
+  BLOQER_GANTT_MENU,
+  buildBloqerGanttContextMenuOptions,
+  buildBloqerGanttToolbarItems,
+} from '@/lib/schedule/bloqer-svar-chrome'
+import type { IApi } from '@svar-ui/gantt-store'
+import type { IToolbarItem } from '@svar-ui/react-toolbar'
+
+type BloqerSvarChromeProps = {
+  bloqerToolbarItems: IToolbarItem[]
+  bloqerMenuOptions: ReturnType<typeof buildBloqerGanttContextMenuOptions>
+  /** Alineado con `ContextMenu` de SVAR (`action.id` puede ser string o number). */
+  onBloqerMenuClick: (ev: { action?: { id?: string | number } }) => void
+}
 
 /** Sin import estático de @svar-ui (webpack en CI); mismo shape que IApi.getTask. */
 type SvarGanttApi = {
@@ -54,13 +68,45 @@ const GanttThemed = dynamic(
       .then((m) => {
         type GanttProps = ComponentProps<typeof m.Gantt>
         function SvarGanttThemed(
-          props: GanttProps & { useDarkTheme?: boolean }
+          props: GanttProps & BloqerSvarChromeProps & { useDarkTheme?: boolean }
         ) {
-          const { useDarkTheme, ...ganttProps } = props
+          const {
+            useDarkTheme,
+            init: userInit,
+            bloqerToolbarItems,
+            bloqerMenuOptions,
+            onBloqerMenuClick,
+            ...ganttProps
+          } = props
+          const [toolbarApi, setToolbarApi] = useState<unknown>(null)
           const Theme = useDarkTheme ? m.WillowDark : m.Willow
           return (
             <Theme fonts>
-              <m.Gantt {...ganttProps} />
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+                {toolbarApi ? (
+                  <div className="shrink-0 border-b border-border bg-muted/30 px-2 py-1.5">
+                    <m.Toolbar
+                      api={toolbarApi as never}
+                      items={bloqerToolbarItems}
+                    />
+                  </div>
+                ) : null}
+                <m.ContextMenu
+                  api={toolbarApi as never}
+                  options={bloqerMenuOptions}
+                  onClick={onBloqerMenuClick}
+                >
+                  <div className="min-h-0 min-w-0 flex-1 overflow-auto">
+                    <m.Gantt
+                      {...ganttProps}
+                      init={(api) => {
+                        setToolbarApi(api)
+                        userInit?.(api)
+                      }}
+                    />
+                  </div>
+                </m.ContextMenu>
+              </div>
             </Theme>
           )
         }
@@ -115,7 +161,12 @@ export interface ScheduleSvarGanttProps {
   weekStartsOn: 0 | 1
   readonly: boolean
   className?: string
-  onTaskActivate?: (taskId: string) => void
+  /** Selección (un clic): resaltar fila / tarea. */
+  onTaskSelect?: (taskId: string) => void
+  /** Doble clic en la tarea: abrir formulario de edición (opcional). */
+  onTaskOpenForm?: (taskId: string) => void
+  /** Menú contextual / acciones: gestionar dependencias de la tarea seleccionada. */
+  onTaskOpenDependencies?: (taskId: string) => void
   onTaskDatesPersist: (taskId: string, start: Date, end: Date) => Promise<void>
   onTaskProgressPersist: (taskId: string, progressPercent: number) => Promise<void>
   onDependencyAdd: (input: {
@@ -136,7 +187,9 @@ export function ScheduleSvarGantt({
   weekStartsOn,
   readonly,
   className,
-  onTaskActivate,
+  onTaskSelect,
+  onTaskOpenForm,
+  onTaskOpenDependencies,
   onTaskDatesPersist,
   onTaskProgressPersist,
   onDependencyAdd,
@@ -162,6 +215,70 @@ export function ScheduleSvarGantt({
   }, [])
 
   const apiRef = useRef<SvarGanttApi | null>(null)
+  const taskClickRef = useRef<{ id: string; at: number } | null>(null)
+
+  const openSelectedTaskInForm = useCallback(() => {
+    const api = apiRef.current as IApi | null
+    const raw = api?.getState()._selected?.[0]?.id
+    if (raw == null) return
+    onTaskOpenForm?.(String(raw))
+  }, [onTaskOpenForm])
+
+  const bloqerToolbarItems = useMemo(
+    () =>
+      buildBloqerGanttToolbarItems({
+        isReadonly: readonly,
+        readonlyHint: t('ganttToolbarReadonlySchedule'),
+        editLabel: t('ganttToolbarEditTask'),
+        onOpenTaskForm: openSelectedTaskInForm,
+      }),
+    [readonly, t, openSelectedTaskInForm]
+  )
+
+  const bloqerMenuOptions = useMemo(
+    () =>
+      buildBloqerGanttContextMenuOptions({
+        isReadonly: readonly,
+        editLabel: t('ganttCtxEditTask'),
+        dependenciesLabel: t('ganttCtxDependencies'),
+        viewLabel: t('ganttCtxViewTask'),
+      }),
+    [readonly, t]
+  )
+
+  const onBloqerMenuClick = useCallback(
+    (ev: { action?: { id?: string | number } }) => {
+      const rawAid = ev.action?.id
+      const aid = rawAid != null ? String(rawAid) : undefined
+      const api = apiRef.current as IApi | null
+      const tid = api?.getState()._selected?.[0]?.id
+      if (tid == null) return
+      const id = String(tid)
+      if (aid === BLOQER_GANTT_MENU.edit || aid === BLOQER_GANTT_MENU.view) {
+        onTaskOpenForm?.(id)
+      } else if (aid === BLOQER_GANTT_MENU.dependencies) {
+        onTaskOpenDependencies?.(id)
+      }
+    },
+    [onTaskOpenForm, onTaskOpenDependencies]
+  )
+
+  const handleSelectTask = useCallback(
+    (ev: { id: string | number }) => {
+      const id = String(ev.id)
+      onTaskSelect?.(id)
+      if (!onTaskOpenForm) return
+      const now = Date.now()
+      const prev = taskClickRef.current
+      if (prev && prev.id === id && now - prev.at < 480) {
+        taskClickRef.current = null
+        onTaskOpenForm(id)
+      } else {
+        taskClickRef.current = { id, at: now }
+      }
+    },
+    [onTaskSelect, onTaskOpenForm]
+  )
 
   const sourceTasks = useMemo(
     () => (Array.isArray(scheduleData.tasks) ? scheduleData.tasks : []),
@@ -363,6 +480,9 @@ export function ScheduleSvarGantt({
     >
       <GanttThemed
         useDarkTheme={useDarkTheme}
+        bloqerToolbarItems={bloqerToolbarItems}
+        bloqerMenuOptions={bloqerMenuOptions}
+        onBloqerMenuClick={onBloqerMenuClick}
         tasks={tasks}
         links={links}
         columns={columns}
@@ -383,9 +503,7 @@ export function ScheduleSvarGantt({
         init={(api: SvarGanttApi) => {
           apiRef.current = api
         }}
-        onSelectTask={(ev: { id: string | number }) => {
-          onTaskActivate?.(String(ev.id))
-        }}
+        onSelectTask={handleSelectTask}
         onUpdateTask={handleUpdateTask}
         onDragTask={handleDragTask}
         onAddLink={handleAddLink}

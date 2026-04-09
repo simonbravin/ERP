@@ -50,7 +50,10 @@ interface ScheduleWbsPanelProps {
   allTasks?: ScheduleWbsPanelTask[]
   expandedNodes: Set<string>
   onToggleExpand: (taskId: string) => void
+  /** Un clic: seleccionar / resaltar (Gantt y calendario alineados). */
   onTaskClick: (taskId: string) => void
+  /** Doble clic en nombre o botón editar: abrir formulario de tarea. */
+  onTaskEditClick: (taskId: string) => void
   onDependenciesClick: (taskId: string) => void
   onTaskDatesChange?: (taskId: string, newStartDate: Date, newEndDate: Date) => void
   canEdit: boolean
@@ -63,6 +66,9 @@ interface ScheduleWbsPanelProps {
   minimalWbsOnly?: boolean
   /** Falso junto al calendario: el pie extra desalineaba filas respecto a la grilla. */
   showFooter?: boolean
+  /** Alinear tipografía y bordes con la grilla izquierda del Gantt SVAR. */
+  matchGanttGrid?: boolean
+  rootClassName?: string
 }
 
 export function ScheduleWbsPanel({
@@ -71,6 +77,7 @@ export function ScheduleWbsPanel({
   expandedNodes,
   onToggleExpand,
   onTaskClick,
+  onTaskEditClick,
   onDependenciesClick,
   onTaskDatesChange,
   canEdit,
@@ -82,6 +89,8 @@ export function ScheduleWbsPanel({
   showDetailColumns = true,
   minimalWbsOnly = false,
   showFooter = true,
+  matchGanttGrid = false,
+  rootClassName,
 }: ScheduleWbsPanelProps) {
   const allTasks = allTasksProp ?? tasks
   const t = useTranslations('schedule')
@@ -93,25 +102,42 @@ export function ScheduleWbsPanel({
   const visibleTasks = tasks
 
   return (
-    <div className="flex h-full flex-col bg-card">
-      <div className="shrink-0 overflow-visible">
+    <div
+      className={cn(
+        'flex h-full min-h-0 flex-col bg-card',
+        matchGanttGrid && 'text-[11px] leading-tight',
+        rootClassName
+      )}
+    >
+      <div className="min-h-0 shrink-0 overflow-visible">
         <Table
-          className={
+          className={cn(
             minimalWbsOnly
               ? 'table-fixed w-full'
               : showDetailColumns
                 ? 'table-fixed w-[520px]'
-                : 'table-fixed w-[260px]'
-          }
+                : 'table-fixed w-[260px]',
+            matchGanttGrid && '[&_tbody_tr]:border-b [&_tbody_tr]:border-border/80'
+          )}
         >
-          <TableHeader className="sticky top-0 z-10 bg-muted [&_tr]:border-0">
+          <TableHeader
+            className={cn(
+              'sticky top-0 z-10 [&_tr]:border-0',
+              matchGanttGrid
+                ? 'border-b border-border bg-card'
+                : 'bg-muted'
+            )}
+          >
             <TableRow
               style={{ height: SCHEDULE_WBS_HEADER_HEIGHT }}
               className="[&>th]:!min-h-0 [&>th]:!py-0 [&>th]:align-middle [&>th]:leading-none"
             >
               {minimalWbsOnly ? (
                 <TableHead
-                  className="w-full max-w-[72px] px-0.5 text-center text-[10px] text-muted-foreground"
+                  className={cn(
+                    'w-full max-w-[72px] px-0.5 text-center text-[10px] text-muted-foreground',
+                    matchGanttGrid && 'pl-2'
+                  )}
                   style={{ height: SCHEDULE_WBS_HEADER_HEIGHT }}
                 >
                   {t('code')}
@@ -119,17 +145,21 @@ export function ScheduleWbsPanel({
               ) : (
                 <>
                   <TableHead
-                    className="w-[72px] px-1 text-[10px] text-muted-foreground"
+                    className={cn(
+                      'w-[72px] px-1 text-[10px] text-muted-foreground',
+                      matchGanttGrid && 'pl-3.5'
+                    )}
                     style={{ height: SCHEDULE_WBS_HEADER_HEIGHT }}
                   >
                     {t('code')}
                   </TableHead>
                   <TableHead
-                    className={
+                    className={cn(
                       showDetailColumns
                         ? 'w-[140px] px-1 text-[10px] text-muted-foreground'
-                        : 'w-[188px] px-1 text-[10px] text-muted-foreground'
-                    }
+                        : 'w-[188px] px-1 text-[10px] text-muted-foreground',
+                      matchGanttGrid && 'font-medium'
+                    )}
                     style={{ height: SCHEDULE_WBS_HEADER_HEIGHT }}
                   >
                     {t('task')}
@@ -198,6 +228,7 @@ export function ScheduleWbsPanel({
                   style={{ height: SCHEDULE_WBS_ROW_HEIGHT }}
                   className={cn(
                     'transition-colors hover:bg-muted/50 [&>td]:py-0 [&>td]:leading-none',
+                    matchGanttGrid && 'hover:bg-muted/40',
                     isHighlighted && 'bg-primary/10',
                     task.isCritical && 'bg-destructive/10'
                   )}
@@ -227,6 +258,10 @@ export function ScheduleWbsPanel({
                           type="button"
                           title={rowTitle}
                           onClick={() => onTaskClick(task.id)}
+                          onDoubleClick={(e) => {
+                            e.preventDefault()
+                            onTaskEditClick(task.id)
+                          }}
                           className="min-w-0 truncate text-left font-mono text-[9px] hover:underline"
                         >
                           {task.code}
@@ -235,11 +270,16 @@ export function ScheduleWbsPanel({
                     </TableCell>
                   ) : (
                     <>
-                      <TableCell className="px-1 py-0.5 font-mono text-[10px]">
+                      <TableCell
+                        className={cn(
+                          'px-1 py-0.5 font-mono text-[10px]',
+                          matchGanttGrid && 'pl-3.5 text-[11px]'
+                        )}
+                      >
                         {task.code}
                       </TableCell>
 
-                      <TableCell className="px-1 py-0.5">
+                      <TableCell className={cn('px-1 py-0.5', matchGanttGrid && 'text-[11px]')}>
                         <div
                           className="flex min-w-0 items-center gap-0.5"
                           style={{ paddingLeft: `${task.level * 10}px` }}
@@ -261,11 +301,16 @@ export function ScheduleWbsPanel({
                           <button
                             type="button"
                             className={cn(
-                              'min-w-0 truncate text-left text-xs hover:underline',
+                              'min-w-0 truncate text-left hover:underline',
+                              matchGanttGrid ? 'text-[11px]' : 'text-xs',
                               task.taskType === 'SUMMARY' && 'font-semibold'
                             )}
                             title={task.name}
                             onClick={() => onTaskClick(task.id)}
+                            onDoubleClick={(e) => {
+                              e.preventDefault()
+                              onTaskEditClick(task.id)
+                            }}
                           >
                             {task.name}
                           </button>
@@ -432,7 +477,7 @@ export function ScheduleWbsPanel({
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => onTaskClick(task.id)}
+                              onClick={() => onTaskEditClick(task.id)}
                               disabled={!canEdit}
                               className="h-6 w-6 p-0"
                             >

@@ -58,6 +58,19 @@ export function useChartSeriesInteraction() {
     [hiddenKeys, hoverKey]
   )
 
+  const barPresentation = useCallback(
+    (key: string) => {
+      if (hiddenKeys.has(key)) return null
+      const highlightOn = hoverKey !== null
+      const isTarget = hoverKey === key
+      const faded = highlightOn && !isTarget
+      return {
+        fillOpacity: faded ? 0.28 : 1,
+      }
+    },
+    [hiddenKeys, hoverKey]
+  )
+
   return {
     hiddenKeys,
     hoverKey,
@@ -66,5 +79,6 @@ export function useChartSeriesInteraction() {
     isVisible,
     linePresentation,
     areaPresentation,
+    barPresentation,
   }
 }

@@ -83,6 +83,8 @@ export function RecentActivityFeed({ activities, hideProjectName = false }: Rece
       FINANCETRANSACTION: 'transacción',
       DAILYREPORT: 'reporte de obra',
       SCHEDULE: 'cronograma',
+      TASKDEPENDENCY: 'dependencia entre tareas',
+      SCHEDULETASK: 'tarea del cronograma',
     }
 
     const actionLabel = actionLabels[action.toUpperCase()] || action.toLowerCase()

@@ -37,7 +37,8 @@ interface ScheduleCalendarViewProps {
   visibleEndDate: Date
   zoom: 'day' | 'week' | 'month'
   weekStartsOn: 0 | 1
-  onTaskClick?: (taskId: string) => void
+  onTaskSelect?: (taskId: string) => void
+  onTaskOpenForm?: (taskId: string) => void
   highlightedTask: string | null
   className?: string
 }
@@ -78,7 +79,8 @@ export function ScheduleCalendarView({
   visibleEndDate,
   zoom,
   weekStartsOn,
-  onTaskClick,
+  onTaskSelect,
+  onTaskOpenForm,
   highlightedTask,
   className,
 }: ScheduleCalendarViewProps) {
@@ -137,7 +139,11 @@ export function ScheduleCalendarView({
                   <li key={task.id}>
                     <button
                       type="button"
-                      onClick={() => onTaskClick?.(task.id)}
+                      onClick={() => onTaskSelect?.(task.id)}
+                      onDoubleClick={(e) => {
+                        e.preventDefault()
+                        onTaskOpenForm?.(task.id)
+                      }}
                       className={cn(
                         'px-2 py-1.5 text-xs',
                         calendarTaskChipClass(task, highlightedTask === task.id)
@@ -238,7 +244,11 @@ export function ScheduleCalendarView({
                             <button
                               key={task.id}
                               type="button"
-                              onClick={() => onTaskClick?.(task.id)}
+                              onClick={() => onTaskSelect?.(task.id)}
+                              onDoubleClick={(e) => {
+                                e.preventDefault()
+                                onTaskOpenForm?.(task.id)
+                              }}
                               className={cn(
                                 'block w-full px-0.5 py-0.5 text-left text-[10px] leading-tight',
                                 calendarTaskChipClass(task, highlightedTask === task.id)
@@ -319,7 +329,11 @@ export function ScheduleCalendarView({
                       <button
                         key={task.id}
                         type="button"
-                        onClick={() => onTaskClick?.(task.id)}
+                        onClick={() => onTaskSelect?.(task.id)}
+                        onDoubleClick={(e) => {
+                          e.preventDefault()
+                          onTaskOpenForm?.(task.id)
+                        }}
                         className={cn(
                           'block px-1 py-0.5 text-[10px]',
                           calendarTaskChipClass(task, highlightedTask === task.id)

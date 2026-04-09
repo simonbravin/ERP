@@ -10,7 +10,8 @@ import {
  * PDF tabular del cronograma (`build-schedule-print-html` + `/api/pdf`).
  *
  * Query típicos: `id` (scheduleId), `locale`, `from`/`to` (YYYY-MM-DD, filtra tareas que
- * intersectan el rango), `mode=table|view` (vista Gantt estática en HTML si `view`),
+ * intersectan el rango; en UI el Gantt abre un diálogo para elegirlos), `mode=table|view`
+ * (HTML con eje temporal y barras si `view`, A4 apaisado),
  * `showEmitidoPor`, `showFullCompanyData`.
  * Salida: **A4 apaisado** (landscape) para más columnas; pie y numeración compartidos con otros PDF HTML (`render-pdf.ts`).
  */
