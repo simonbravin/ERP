@@ -299,6 +299,7 @@ export function ScheduleSvarGantt({
   )
 
   const cellWidth = useMemo(() => svarCellWidthForZoom(zoom), [zoom])
+  const lengthUnit = zoom === 'week' ? 'week' : 'day'
 
   const columns = useMemo(() => {
     if (!rawColumns) return null
@@ -494,7 +495,7 @@ export function ScheduleSvarGantt({
         scales={scales}
         autoScale={false}
         cellWidth={cellWidth}
-        lengthUnit="day"
+        lengthUnit={lengthUnit}
         durationUnit="day"
         cellBorders="full"
         criticalPath={{ type: 'strict' }}

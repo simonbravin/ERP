@@ -1,5 +1,5 @@
 import type { IScaleConfig } from '@svar-ui/react-gantt'
-import { format, isFirstDayOfMonth } from 'date-fns'
+import { endOfWeek, format, isFirstDayOfMonth, subMilliseconds } from 'date-fns'
 import type { Locale } from 'date-fns'
 
 /**
@@ -21,12 +21,13 @@ export function parseSchedulePlanDate(iso: string): Date {
 
 /**
  * Escalas de cabecera al estilo [SVAR Gantt](https://svar.dev/react/gantt/):
- * fila superior da contexto (mes / año); la fila de día usa números cortos para
- * que no se solapen al reducir el ancho de celda — el detalle está en la fila superior y en el grid.
+ * - **Día:** mes + número de día (compacto).
+ * - **Semana:** mes + rango por semana (`unit: week`); combinar con `lengthUnit="week"` en el Gantt.
+ * - **Mes:** año + mes + marcas de día al inicio de mes.
  */
 export function buildSvarScalesForBloqerZoom(
   zoom: 'day' | 'week' | 'month',
-  _weekStartsOn: 0 | 1,
+  weekStartsOn: 0 | 1,
   locale: Locale
 ): IScaleConfig[] {
   if (zoom === 'day') {
@@ -45,6 +46,7 @@ export function buildSvarScalesForBloqerZoom(
   }
 
   if (zoom === 'week') {
+    const weekStartsOnOpt = weekStartsOn === 0 ? 0 : 1
     return [
       {
         unit: 'month',
@@ -52,9 +54,19 @@ export function buildSvarScalesForBloqerZoom(
         format: (d: Date) => format(d, 'MMMM yyyy', { locale }),
       },
       {
-        unit: 'day',
+        unit: 'week',
         step: 1,
-        format: (d: Date) => format(d, 'd', { locale }),
+        format: (d: Date, next?: Date) => {
+          const weekEnd = next
+            ? subMilliseconds(next, 1)
+            : endOfWeek(d, { weekStartsOn: weekStartsOnOpt })
+          const sameMonth =
+            d.getMonth() === weekEnd.getMonth() && d.getFullYear() === weekEnd.getFullYear()
+          if (sameMonth) {
+            return `${format(d, 'd', { locale })}–${format(weekEnd, 'd MMM', { locale })}`
+          }
+          return `${format(d, 'd MMM', { locale })} – ${format(weekEnd, 'd MMM', { locale })}`
+        },
       },
     ]
   }
@@ -89,7 +101,7 @@ export function svarCellWidthForZoom(zoom: 'day' | 'week' | 'month'): number {
     case 'day':
       return 40
     case 'week':
-      return 36
+      return 64
     case 'month':
       return 28
     default:

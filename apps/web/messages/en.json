@@ -205,7 +205,7 @@
     "ganttCtxViewTask": "View task",
     "groupingLabel": "Order & grouping",
     "todayLineToggle": "Today line on Gantt",
-    "integrationsMenu": "Integrations",
+    "integrationsMenu": "Useful actions",
     "integrationsSectionExport": "Export",
     "integrationsSectionImport": "Import",
     "exportScopeHint": "Table PDF uses the visible date range (visibility section). Gantt PDF: choose the period in the dialog (A4 landscape). Excel and MS Project XML export the full schedule version.",
@@ -2129,6 +2129,7 @@
     "activity_update_schedule": "updated the schedule",
     "activity_update_task_dates_scheduletask": "updated schedule task dates",
     "activity_create_taskdependency": "created a task dependency",
+    "activity_delete_taskdependency": "removed a task dependency",
     "activity_update_task_progress_scheduletask": "updated schedule task progress"
   },
   "billing": {

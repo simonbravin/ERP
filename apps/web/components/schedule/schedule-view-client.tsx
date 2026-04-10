@@ -157,6 +157,299 @@ function ScheduleMainChart({
   )
 }
 
+type ScheduleWorkspaceControlsProps = {
+  variant: 'page' | 'fullscreen'
+  viewMode: 'gantt' | 'calendar'
+  onViewModeChange: (v: 'gantt' | 'calendar') => void
+  searchQuery: string
+  onSearchQueryChange: (q: string) => void
+  zoom: 'day' | 'week' | 'month'
+  onZoomChange: (z: 'day' | 'week' | 'month') => void
+  showWbsDetailColumns: boolean
+  onToggleWbsDetailColumns: () => void
+  calendarWbsStrip: boolean
+  onToggleCalendarWbsStrip: () => void
+  groupBy: 'none' | 'phase' | 'assigned'
+  onGroupByChange: (v: 'none' | 'phase' | 'assigned') => void
+  weekStartsOn: 0 | 1
+  onWeekStartsOnChange: (v: 0 | 1) => void
+  onGoToToday: () => void
+  onEnterFullscreen?: () => void
+  projectStartDate: Date
+  projectEndDate: Date
+  visibleStartDate: Date
+  visibleEndDate: Date
+  onRangeChange: (start: Date, end: Date) => void
+}
+
+function ScheduleWorkspaceControls({
+  variant,
+  viewMode,
+  onViewModeChange,
+  searchQuery,
+  onSearchQueryChange,
+  zoom,
+  onZoomChange,
+  showWbsDetailColumns,
+  onToggleWbsDetailColumns,
+  calendarWbsStrip,
+  onToggleCalendarWbsStrip,
+  groupBy,
+  onGroupByChange,
+  weekStartsOn,
+  onWeekStartsOnChange,
+  onGoToToday,
+  onEnterFullscreen,
+  projectStartDate,
+  projectEndDate,
+  visibleStartDate,
+  visibleEndDate,
+  onRangeChange,
+}: ScheduleWorkspaceControlsProps) {
+  const t = useTranslations('schedule')
+  const headerPad = variant === 'fullscreen' ? 'px-4 py-3 sm:px-5' : 'px-4 py-4 sm:px-6'
+
+  const viewToggle =
+    variant === 'page' ? (
+      <TabsList className="grid h-10 w-full max-w-[280px] shrink-0 grid-cols-2 gap-0 rounded-lg border border-border bg-background p-1 shadow-sm sm:w-auto">
+        <TabsTrigger
+          value="gantt"
+          className="h-8 rounded-md px-4 text-sm font-medium text-muted-foreground shadow-none transition-colors data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm data-[state=inactive]:bg-transparent"
+        >
+          {t('viewGantt')}
+        </TabsTrigger>
+        <TabsTrigger
+          value="calendar"
+          className="h-8 rounded-md px-4 text-sm font-medium text-muted-foreground shadow-none transition-colors data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm data-[state=inactive]:bg-transparent"
+        >
+          {t('viewCalendar')}
+        </TabsTrigger>
+      </TabsList>
+    ) : (
+      <div className="grid h-10 w-full max-w-[280px] shrink-0 grid-cols-2 gap-0 rounded-lg border border-border bg-background p-1 shadow-sm sm:w-auto">
+        <Button
+          type="button"
+          variant={viewMode === 'gantt' ? 'default' : 'ghost'}
+          className="h-8 rounded-md px-4 text-sm font-medium shadow-none"
+          onClick={() => onViewModeChange('gantt')}
+        >
+          {t('viewGantt')}
+        </Button>
+        <Button
+          type="button"
+          variant={viewMode === 'calendar' ? 'default' : 'ghost'}
+          className="h-8 rounded-md px-4 text-sm font-medium shadow-none"
+          onClick={() => onViewModeChange('calendar')}
+        >
+          {t('viewCalendar')}
+        </Button>
+      </div>
+    )
+
+  return (
+    <>
+      <div
+        className={cn(
+          'border-b border-border bg-muted/30',
+          headerPad,
+          variant === 'fullscreen' && 'shrink-0'
+        )}
+      >
+        {variant === 'page' && (
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0 space-y-0.5">
+              <h3 className="text-base font-semibold tracking-tight text-foreground">
+                {t('scheduleWorkspaceTitle')}
+              </h3>
+              <p className="text-xs text-muted-foreground">{t('scheduleWorkspaceHint')}</p>
+            </div>
+            {viewToggle}
+          </div>
+        )}
+        {variant === 'fullscreen' && (
+          <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+            <div className="min-w-0 space-y-0.5">
+              <h3 className="text-base font-semibold tracking-tight text-foreground">
+                {t('scheduleWorkspaceTitle')}
+              </h3>
+              <p className="text-xs text-muted-foreground">{t('scheduleWorkspaceHint')}</p>
+            </div>
+            <div className="shrink-0">{viewToggle}</div>
+          </div>
+        )}
+        <div
+          className={cn(
+            'flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center',
+            variant === 'page' ? 'mt-4' : ''
+          )}
+        >
+          <div className="relative min-w-[min(100%,18rem)] w-full flex-1 sm:max-w-2xl lg:max-w-3xl">
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+              aria-hidden
+            />
+            <Input
+              type="search"
+              placeholder={t('searchTasks')}
+              value={searchQuery}
+              onChange={(e) => onSearchQueryChange(e.target.value)}
+              className="h-10 w-full min-w-0 border-border bg-background pl-9 text-sm"
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-1 rounded-lg border border-border bg-background px-1.5 py-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 shrink-0"
+                onClick={() => {
+                  if (zoom === 'month') onZoomChange('week')
+                  else if (zoom === 'week') onZoomChange('day')
+                }}
+                disabled={zoom === 'day'}
+                title={t('daily')}
+              >
+                <ZoomIn className="h-4 w-4" />
+              </Button>
+              <Select value={zoom} onValueChange={(v) => onZoomChange(v as 'day' | 'week' | 'month')}>
+                <SelectTrigger className="h-9 w-[100px] border-0 bg-transparent text-sm shadow-none focus:ring-0">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="day">{t('daily')}</SelectItem>
+                  <SelectItem value="week">{t('weekly')}</SelectItem>
+                  <SelectItem value="month">{t('monthly')}</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 shrink-0"
+                onClick={() => {
+                  if (zoom === 'day') onZoomChange('week')
+                  else if (zoom === 'week') onZoomChange('month')
+                }}
+                disabled={zoom === 'month'}
+                title={t('monthly')}
+              >
+                <ZoomOut className="h-4 w-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="default"
+                size="sm"
+                className="h-9 gap-1.5 px-3 text-sm"
+                onClick={onGoToToday}
+              >
+                <Calendar className="h-4 w-4" />
+                {t('legendToday')}
+              </Button>
+              <Button
+                type="button"
+                variant={showWbsDetailColumns ? 'secondary' : 'ghost'}
+                size="icon"
+                className="h-9 w-9 shrink-0"
+                aria-pressed={showWbsDetailColumns}
+                title={
+                  showWbsDetailColumns ? t('wbsDetailColumnsHide') : t('wbsDetailColumnsShow')
+                }
+                onClick={onToggleWbsDetailColumns}
+              >
+                <Columns2 className="h-4 w-4" />
+              </Button>
+              {viewMode === 'calendar' && (
+                <Button
+                  type="button"
+                  variant={calendarWbsStrip ? 'secondary' : 'ghost'}
+                  size="icon"
+                  className="h-9 w-9 shrink-0"
+                  aria-pressed={calendarWbsStrip}
+                  title={calendarWbsStrip ? t('calendarWbsWide') : t('calendarWbsNarrow')}
+                  onClick={onToggleCalendarWbsStrip}
+                >
+                  {calendarWbsStrip ? (
+                    <PanelLeft className="h-4 w-4" />
+                  ) : (
+                    <PanelLeftClose className="h-4 w-4" />
+                  )}
+                </Button>
+              )}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 shrink-0"
+                    title={t('scheduleViewOptions')}
+                  >
+                    <SlidersHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+                    {t('groupingLabel')}
+                  </DropdownMenuLabel>
+                  <DropdownMenuRadioGroup
+                    value={groupBy}
+                    onValueChange={(v) => onGroupByChange(v as 'none' | 'phase' | 'assigned')}
+                  >
+                    <DropdownMenuRadioItem value="none">{t('noGrouping')}</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="phase">{t('groupByPhase')}</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="assigned">
+                      {t('groupByAssigned')}
+                    </DropdownMenuRadioItem>
+                  </DropdownMenuRadioGroup>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+                    {t('weekStartsOn')}
+                  </DropdownMenuLabel>
+                  <DropdownMenuRadioGroup
+                    value={String(weekStartsOn)}
+                    onValueChange={(v) => onWeekStartsOnChange(v === '0' ? 0 : 1)}
+                  >
+                    <DropdownMenuRadioItem value="1">{t('weekStartMonday')}</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="0">{t('weekStartSunday')}</DropdownMenuRadioItem>
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              {onEnterFullscreen ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-9 gap-1.5 border-border bg-background px-3 text-sm"
+                  onClick={onEnterFullscreen}
+                >
+                  <Maximize2 className="h-4 w-4" />
+                  {t('fullscreen')}
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div
+        className={cn(
+          'border-t border-border bg-card px-4 py-4 sm:px-6',
+          variant === 'fullscreen' && 'shrink-0'
+        )}
+      >
+        <DateRangeSlider
+          embedded
+          projectStartDate={projectStartDate}
+          projectEndDate={projectEndDate}
+          currentStartDate={visibleStartDate}
+          currentEndDate={visibleEndDate}
+          onRangeChange={onRangeChange}
+        />
+      </div>
+    </>
+  )
+}
+
 export type ScheduleViewData = NonNullable<
   Awaited<ReturnType<typeof getScheduleForView>>
 >
@@ -1130,8 +1423,8 @@ export function ScheduleViewClient({
             <div className="min-w-0">
               <p className="text-sm font-medium text-muted-foreground">{t('dateRange')}</p>
               {canEdit && planDatesEditable ? (
-                <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-                  <div className="space-y-1.5">
+                <div className="mt-2 flex flex-row flex-wrap items-end gap-3">
+                  <div className="min-w-0 space-y-1.5">
                     <Label htmlFor="schedule-project-start" className="text-xs text-muted-foreground">
                       {t('projectStartDate')}
                     </Label>
@@ -1144,7 +1437,7 @@ export function ScheduleViewClient({
                       disabled={projectWindowSaving}
                     />
                   </div>
-                  <div className="space-y-1.5">
+                  <div className="min-w-0 space-y-1.5">
                     <Label htmlFor="schedule-project-end" className="text-xs text-muted-foreground">
                       {t('projectPlannedEndDate')}
                     </Label>
@@ -1160,7 +1453,7 @@ export function ScheduleViewClient({
                   <Button
                     type="button"
                     size="sm"
-                    className="h-10"
+                    className="h-10 shrink-0"
                     onClick={() => void handleSaveProjectWindow()}
                     disabled={projectWindowSaving}
                   >
@@ -1413,7 +1706,7 @@ export function ScheduleViewClient({
 
       {isScheduleFullscreen && (
         <div className="fixed inset-0 z-50 flex flex-col bg-background">
-          <div className="flex shrink-0 items-center justify-between border-b border-border bg-muted/30 px-4 py-3">
+          <div className="flex shrink-0 items-center justify-between border-b border-border bg-muted/30 px-4 py-2 sm:px-5">
             <span className="text-sm font-medium text-foreground">{t('fullscreen')}</span>
             <Button
               type="button"
@@ -1426,14 +1719,42 @@ export function ScheduleViewClient({
               {t('exitFullscreen')}
             </Button>
           </div>
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden" style={{ minHeight: 0 }}>
-            <ScheduleMainChart
-              mode={viewMode}
-              scrollRef={fullscreenScheduleScrollRef}
-              layout="fullscreen"
-              ganttProps={svarGanttProps}
-              calendarProps={calendarBlockProps}
+          <div
+            className="flex min-h-0 flex-1 flex-col overflow-hidden"
+            style={{ minHeight: 0 }}
+          >
+            <ScheduleWorkspaceControls
+              variant="fullscreen"
+              viewMode={viewMode}
+              onViewModeChange={(v) => setViewMode(v)}
+              searchQuery={searchQuery}
+              onSearchQueryChange={setSearchQuery}
+              zoom={zoom}
+              onZoomChange={setZoom}
+              showWbsDetailColumns={showWbsDetailColumns}
+              onToggleWbsDetailColumns={() => setShowWbsDetailColumns((v) => !v)}
+              calendarWbsStrip={calendarWbsStrip}
+              onToggleCalendarWbsStrip={() => setCalendarWbsStrip((v) => !v)}
+              groupBy={groupBy}
+              onGroupByChange={setGroupBy}
+              weekStartsOn={weekStartsOn}
+              onWeekStartsOnChange={setWeekStartsOn}
+              onGoToToday={handleGoToToday}
+              projectStartDate={schedule.projectStartDate}
+              projectEndDate={schedule.projectEndDate}
+              visibleStartDate={visibleStartDate}
+              visibleEndDate={visibleEndDate}
+              onRangeChange={handleRangeChange}
             />
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-t border-border">
+              <ScheduleMainChart
+                mode={viewMode}
+                scrollRef={fullscreenScheduleScrollRef}
+                layout="fullscreen"
+                ganttProps={svarGanttProps}
+                calendarProps={calendarBlockProps}
+              />
+            </div>
           </div>
         </div>
       )}
@@ -1444,204 +1765,30 @@ export function ScheduleViewClient({
         className="space-y-0"
       >
         <div className="erp-card overflow-hidden">
-          <div className="border-b border-border bg-muted/30 px-4 py-4 sm:px-6">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div className="min-w-0 space-y-0.5">
-                <h3 className="text-base font-semibold tracking-tight text-foreground">
-                  {t('scheduleWorkspaceTitle')}
-                </h3>
-                <p className="text-xs text-muted-foreground">{t('scheduleWorkspaceHint')}</p>
-              </div>
-              <TabsList className="grid h-10 w-full max-w-[280px] shrink-0 grid-cols-2 gap-0 rounded-lg border border-border bg-background p-1 shadow-sm sm:w-auto">
-                <TabsTrigger
-                  value="gantt"
-                  className="h-8 rounded-md px-4 text-sm font-medium text-muted-foreground shadow-none transition-colors data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm data-[state=inactive]:bg-transparent"
-                >
-                  {t('viewGantt')}
-                </TabsTrigger>
-                <TabsTrigger
-                  value="calendar"
-                  className="h-8 rounded-md px-4 text-sm font-medium text-muted-foreground shadow-none transition-colors data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm data-[state=inactive]:bg-transparent"
-                >
-                  {t('viewCalendar')}
-                </TabsTrigger>
-              </TabsList>
-            </div>
-            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-              <div className="relative min-w-0 flex-1 sm:max-w-md">
-                <Search
-                  className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-                  aria-hidden
-                />
-                <Input
-                  type="search"
-                  placeholder={t('searchTasks')}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="h-10 w-full border-border bg-background pl-9 text-sm"
-                />
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="flex flex-wrap items-center gap-1 rounded-lg border border-border bg-background px-1.5 py-1">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-9 w-9 shrink-0"
-                    onClick={() => {
-                      if (zoom === 'month') setZoom('week')
-                      else if (zoom === 'week') setZoom('day')
-                    }}
-                    disabled={zoom === 'day'}
-                    title={t('daily')}
-                  >
-                    <ZoomIn className="h-4 w-4" />
-                  </Button>
-                  <Select
-                    value={zoom}
-                    onValueChange={(v) => setZoom(v as 'day' | 'week' | 'month')}
-                  >
-                    <SelectTrigger className="h-9 w-[100px] border-0 bg-transparent text-sm shadow-none focus:ring-0">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="day">{t('daily')}</SelectItem>
-                      <SelectItem value="week">{t('weekly')}</SelectItem>
-                      <SelectItem value="month">{t('monthly')}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-9 w-9 shrink-0"
-                    onClick={() => {
-                      if (zoom === 'day') setZoom('week')
-                      else if (zoom === 'week') setZoom('month')
-                    }}
-                    disabled={zoom === 'month'}
-                    title={t('monthly')}
-                  >
-                    <ZoomOut className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="default"
-                    size="sm"
-                    className="h-9 gap-1.5 px-3 text-sm"
-                    onClick={handleGoToToday}
-                  >
-                    <Calendar className="h-4 w-4" />
-                    {t('legendToday')}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={showWbsDetailColumns ? 'secondary' : 'ghost'}
-                    size="icon"
-                    className="h-9 w-9 shrink-0"
-                    aria-pressed={showWbsDetailColumns}
-                    title={
-                      showWbsDetailColumns
-                        ? t('wbsDetailColumnsHide')
-                        : t('wbsDetailColumnsShow')
-                    }
-                    onClick={() => setShowWbsDetailColumns((v) => !v)}
-                  >
-                    <Columns2 className="h-4 w-4" />
-                  </Button>
-                  {viewMode === 'calendar' && (
-                    <Button
-                      type="button"
-                      variant={calendarWbsStrip ? 'secondary' : 'ghost'}
-                      size="icon"
-                      className="h-9 w-9 shrink-0"
-                      aria-pressed={calendarWbsStrip}
-                      title={
-                        calendarWbsStrip ? t('calendarWbsWide') : t('calendarWbsNarrow')
-                      }
-                      onClick={() => setCalendarWbsStrip((v) => !v)}
-                    >
-                      {calendarWbsStrip ? (
-                        <PanelLeft className="h-4 w-4" />
-                      ) : (
-                        <PanelLeftClose className="h-4 w-4" />
-                      )}
-                    </Button>
-                  )}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-9 w-9 shrink-0"
-                        title={t('scheduleViewOptions')}
-                      >
-                        <SlidersHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56">
-                      <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-                        {t('groupingLabel')}
-                      </DropdownMenuLabel>
-                      <DropdownMenuRadioGroup
-                        value={groupBy}
-                        onValueChange={(v) =>
-                          setGroupBy(v as 'none' | 'phase' | 'assigned')
-                        }
-                      >
-                        <DropdownMenuRadioItem value="none">
-                          {t('noGrouping')}
-                        </DropdownMenuRadioItem>
-                        <DropdownMenuRadioItem value="phase">
-                          {t('groupByPhase')}
-                        </DropdownMenuRadioItem>
-                        <DropdownMenuRadioItem value="assigned">
-                          {t('groupByAssigned')}
-                        </DropdownMenuRadioItem>
-                      </DropdownMenuRadioGroup>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-                        {t('weekStartsOn')}
-                      </DropdownMenuLabel>
-                      <DropdownMenuRadioGroup
-                        value={String(weekStartsOn)}
-                        onValueChange={(v) => setWeekStartsOn(v === '0' ? 0 : 1)}
-                      >
-                        <DropdownMenuRadioItem value="1">
-                          {t('weekStartMonday')}
-                        </DropdownMenuRadioItem>
-                        <DropdownMenuRadioItem value="0">
-                          {t('weekStartSunday')}
-                        </DropdownMenuRadioItem>
-                      </DropdownMenuRadioGroup>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-9 gap-1.5 border-border bg-background px-3 text-sm"
-                    onClick={() => setIsScheduleFullscreen(true)}
-                  >
-                    <Maximize2 className="h-4 w-4" />
-                    {t('fullscreen')}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="border-t border-border bg-card px-4 py-4 sm:px-6">
-            <DateRangeSlider
-              embedded
-              projectStartDate={schedule.projectStartDate}
-              projectEndDate={schedule.projectEndDate}
-              currentStartDate={visibleStartDate}
-              currentEndDate={visibleEndDate}
-              onRangeChange={handleRangeChange}
-            />
-          </div>
+          <ScheduleWorkspaceControls
+            variant="page"
+            viewMode={viewMode}
+            onViewModeChange={(v) => setViewMode(v)}
+            searchQuery={searchQuery}
+            onSearchQueryChange={setSearchQuery}
+            zoom={zoom}
+            onZoomChange={setZoom}
+            showWbsDetailColumns={showWbsDetailColumns}
+            onToggleWbsDetailColumns={() => setShowWbsDetailColumns((v) => !v)}
+            calendarWbsStrip={calendarWbsStrip}
+            onToggleCalendarWbsStrip={() => setCalendarWbsStrip((v) => !v)}
+            groupBy={groupBy}
+            onGroupByChange={setGroupBy}
+            weekStartsOn={weekStartsOn}
+            onWeekStartsOnChange={setWeekStartsOn}
+            onGoToToday={handleGoToToday}
+            onEnterFullscreen={() => setIsScheduleFullscreen(true)}
+            projectStartDate={schedule.projectStartDate}
+            projectEndDate={schedule.projectEndDate}
+            visibleStartDate={visibleStartDate}
+            visibleEndDate={visibleEndDate}
+            onRangeChange={handleRangeChange}
+          />
 
           <div
             className="flex min-h-0 flex-col overflow-hidden rounded-b-lg border-t border-border"

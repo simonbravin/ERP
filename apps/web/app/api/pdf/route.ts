@@ -324,12 +324,13 @@ export async function GET(request: NextRequest) {
       })
     } else if (template.id === 'schedule' && id) {
       const scheduleMode = request.nextUrl.searchParams.get('mode') === 'view' ? 'view' : 'table'
-      const org = await getOrgContext(session.user.id)
-      if (!org) {
-        return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-      }
+      const orgRecord = await prisma.organization.findUnique({
+        where: { id: orgId },
+        select: { name: true },
+      })
+      const orgNameForPdf = orgRecord?.name?.trim() || 'Organización'
       const schedule = await prisma.schedule.findFirst({
-        where: { id, orgId: org.orgId },
+        where: { id, orgId },
         include: {
           project: { select: { name: true, projectNumber: true } },
           tasks: {
@@ -372,14 +373,18 @@ export async function GET(request: NextRequest) {
           : ''
       const formatShort = (d: Date) =>
         d.toLocaleDateString(dateLocalePdf, { dateStyle: 'short' })
-      const rows = tasks.map((t) => ({
-        code: t.wbsNode?.code ?? '—',
-        name: t.wbsNode?.name ?? '—',
-        startDate: formatShort(t.plannedStartDate),
-        endDate: formatShort(t.plannedEndDate),
-        duration: t.plannedDuration,
-        progress: `${Number(t.progressPercent)}%`,
-      }))
+      const rows = tasks.map((t) => {
+        const progressNum = Number(t.progressPercent)
+        const durationNum = Number(t.plannedDuration)
+        return {
+          code: t.wbsNode?.code ?? '—',
+          name: t.wbsNode?.name ?? '—',
+          startDate: formatShort(t.plannedStartDate),
+          endDate: formatShort(t.plannedEndDate),
+          duration: Number.isFinite(durationNum) ? durationNum : 0,
+          progress: `${Number.isFinite(progressNum) ? progressNum : 0}%`,
+        }
+      })
       let orgProfile: {
         legalName: string | null
         taxId: string | null
@@ -391,7 +396,7 @@ export async function GET(request: NextRequest) {
       } | null = null
       try {
         const profile = await prisma.orgProfile.findUnique({
-          where: { orgId: org.orgId },
+          where: { orgId },
           select: {
             legalName: true,
             taxId: true,
@@ -427,7 +432,7 @@ export async function GET(request: NextRequest) {
       }
       const userName = session.user.name ?? session.user.email ?? ''
       const layout = {
-        orgName: org.orgName ?? 'Organización',
+        orgName: orgNameForPdf,
         orgLegalName: orgProfile?.legalName ?? null,
         logoUrl,
         taxId: orgProfile?.taxId ?? null,
@@ -464,16 +469,19 @@ export async function GET(request: NextRequest) {
                   filterByRange && toDate
                     ? toDate
                     : new Date(schedule.projectEndDate),
-                tasks: tasks.map((t) => ({
-                  code: t.wbsNode?.code ?? '—',
-                  name: t.wbsNode?.name ?? '—',
-                  startDate: t.plannedStartDate,
-                  endDate: t.plannedEndDate,
-                  progressPercent: Number(t.progressPercent),
-                  taskType:
-                    (t.taskType as 'TASK' | 'SUMMARY' | 'MILESTONE') ?? 'TASK',
-                  isCritical: t.isCritical,
-                })),
+                tasks: tasks.map((t) => {
+                  const progressNum = Number(t.progressPercent)
+                  return {
+                    code: t.wbsNode?.code ?? '—',
+                    name: t.wbsNode?.name ?? '—',
+                    startDate: t.plannedStartDate,
+                    endDate: t.plannedEndDate,
+                    progressPercent: Number.isFinite(progressNum) ? progressNum : 0,
+                    taskType:
+                      (t.taskType as 'TASK' | 'SUMMARY' | 'MILESTONE') ?? 'TASK',
+                    isCritical: Boolean(t.isCritical),
+                  }
+                }),
               },
               {
                 showEmitidoPor: pdfShowEmitidoPor,
@@ -493,6 +501,7 @@ export async function GET(request: NextRequest) {
         ...pdfOptions,
         margin: { top: '60px', right: '10px', bottom: '58px', left: '10px' },
         headerTemplate,
+        contentTimeoutMs: 45000,
       }
       pdfBuffer = await renderHtmlToPdf(html, baseUrl + '/', schedulePdfOptions)
     } else {

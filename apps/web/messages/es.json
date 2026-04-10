@@ -205,7 +205,7 @@
     "ganttCtxViewTask": "Ver tarea",
     "groupingLabel": "Orden y agrupación",
     "todayLineToggle": "Línea de hoy en el Gantt",
-    "integrationsMenu": "Integraciones",
+    "integrationsMenu": "Acciones útiles",
     "integrationsSectionExport": "Exportar",
     "integrationsSectionImport": "Importar",
     "exportScopeHint": "El PDF en tabla usa el rango visible (visibilidad). El PDF Gantt: elegís el período en el diálogo (A4 apaisado). Excel y MS Project XML exportan el cronograma completo.",
@@ -2131,6 +2131,7 @@
     "activity_update_schedule": "actualizó el cronograma",
     "activity_update_task_dates_scheduletask": "actualizó fechas de tareas del cronograma",
     "activity_create_taskdependency": "definió una dependencia entre tareas",
+    "activity_delete_taskdependency": "eliminó una dependencia entre tareas",
     "activity_update_task_progress_scheduletask": "actualizó el avance de una tarea del cronograma"
   },
   "billing": {

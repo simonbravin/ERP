@@ -14,6 +14,8 @@ export type RenderPdfOptions = {
   printBackground?: boolean
   /** If set, used as Puppeteer headerTemplate (e.g. project name on every page). Empty div by default. */
   headerTemplate?: string
+  /** `page.setContent` timeout (ms). Cronogramas grandes o logos lentos en serverless pueden necesitar más. */
+  contentTimeoutMs?: number
 }
 
 export type CookieInput = {
@@ -101,7 +103,7 @@ export async function renderHtmlToPdf(
         : html
     await page.setContent(htmlWithBase, {
       waitUntil: 'load',
-      timeout: 15000,
+      timeout: options.contentTimeoutMs ?? 15000,
     })
     await page.emulateMediaType('print')
     const margin = options.margin ?? {

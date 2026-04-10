@@ -28,12 +28,15 @@ describe('buildSvarScalesForBloqerZoom', () => {
     expect(dayFmt(new Date(2025, 0, 8), undefined)).toBe('8')
   })
 
-  it('week zoom: same two-row pattern with numeric day labels', () => {
+  it('week zoom: second scale is week units with a compact range label', () => {
     const scales = buildSvarScalesForBloqerZoom('week', 1, es)
     expect(scales).toHaveLength(2)
+    expect(scales[1].unit).toBe('week')
     const fmt = scales[1].format as (d: Date, n?: Date) => string
-    expect(fmt(new Date(2025, 0, 6), undefined)).toBe('6')
-    expect(fmt(new Date(2025, 0, 7), undefined)).toBe('7')
+    const withNextWeekStart = fmt(new Date(2025, 0, 6), new Date(2025, 0, 13))
+    expect(withNextWeekStart).toMatch(/6.*12/)
+    const withoutNext = fmt(new Date(2025, 0, 6), undefined)
+    expect(withoutNext).toMatch(/6.*12/)
   })
 })
 
