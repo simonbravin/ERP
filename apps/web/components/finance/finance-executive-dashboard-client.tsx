@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import {
   Area,
   BarChart,
@@ -44,6 +44,7 @@ import {
   type ChartConfig,
 } from '@/components/ui/chart'
 import { useChartSeriesInteraction } from '@/hooks/use-chart-series-interaction'
+import { createLastPointDot } from '@/components/charts/chart-line-style'
 
 const CATEGORY_LABELS: Record<string, string> = {
   EXPENSE: 'Gastos',
@@ -128,9 +129,11 @@ export function FinanceExecutiveDashboardClient({ data, alerts = [] }: Props) {
   )
 
   const trendInteraction = useChartSeriesInteraction()
-  const trendBalanceArea = trendInteraction.areaPresentation('Balance', 2.6, 0.12)
-  const trendIngresosLine = trendInteraction.linePresentation('Ingresos', 1.5)
-  const trendGastosLine = trendInteraction.linePresentation('Gastos', 1.5)
+  const trendBalanceArea = trendInteraction.areaPresentation('Balance', 3, 0.18)
+  const trendIngresosLine = trendInteraction.linePresentation('Ingresos', 2.3)
+  const trendGastosLine = trendInteraction.linePresentation('Gastos', 2.3)
+  const trendDot = useMemo(() => createLastPointDot(trendChartData.length), [trendChartData.length])
+  const trendGradientPrefix = useId().replace(/:/g, '')
 
   const categoryRawSlices = useMemo(
     () =>
@@ -289,6 +292,20 @@ export function FinanceExecutiveDashboardClient({ data, alerts = [] }: Props) {
               margin={{ top: 18, right: 20, left: 4, bottom: 8 }}
               onMouseLeave={() => trendInteraction.setHoverKey(null)}
             >
+              <defs>
+                <linearGradient id={`${trendGradientPrefix}-income-fill`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="var(--color-Ingresos)" stopOpacity={0.34} />
+                  <stop offset="100%" stopColor="var(--color-Ingresos)" stopOpacity={0.03} />
+                </linearGradient>
+                <linearGradient id={`${trendGradientPrefix}-expense-fill`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="var(--color-Gastos)" stopOpacity={0.3} />
+                  <stop offset="100%" stopColor="var(--color-Gastos)" stopOpacity={0.03} />
+                </linearGradient>
+                <linearGradient id={`${trendGradientPrefix}-balance-fill`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="var(--color-Balance)" stopOpacity={0.24} />
+                  <stop offset="100%" stopColor="var(--color-Balance)" stopOpacity={0.03} />
+                </linearGradient>
+              </defs>
               <CartesianGrid
                 vertical={false}
                 stroke="hsl(var(--border))"
@@ -333,9 +350,27 @@ export function FinanceExecutiveDashboardClient({ data, alerts = [] }: Props) {
                   type="linear"
                   dataKey="Balance"
                   stroke="var(--color-Balance)"
-                  fill="var(--color-Balance)"
-                  dot={false}
+                  fill={`url(#${trendGradientPrefix}-balance-fill)`}
+                  dot={trendDot}
                   {...trendBalanceArea}
+                />
+              ) : null}
+              {trendIngresosLine ? (
+                <Area
+                  type="linear"
+                  dataKey="Ingresos"
+                  stroke="none"
+                  fill={`url(#${trendGradientPrefix}-income-fill)`}
+                  dot={false}
+                />
+              ) : null}
+              {trendGastosLine ? (
+                <Area
+                  type="linear"
+                  dataKey="Gastos"
+                  stroke="none"
+                  fill={`url(#${trendGradientPrefix}-expense-fill)`}
+                  dot={false}
                 />
               ) : null}
               {trendIngresosLine ? (
@@ -343,7 +378,7 @@ export function FinanceExecutiveDashboardClient({ data, alerts = [] }: Props) {
                   type="linear"
                   dataKey="Ingresos"
                   stroke="var(--color-Ingresos)"
-                  dot={false}
+                  dot={trendDot}
                   {...trendIngresosLine}
                 />
               ) : null}
@@ -352,7 +387,7 @@ export function FinanceExecutiveDashboardClient({ data, alerts = [] }: Props) {
                   type="linear"
                   dataKey="Gastos"
                   stroke="var(--color-Gastos)"
-                  dot={false}
+                  dot={trendDot}
                   {...trendGastosLine}
                 />
               ) : null}

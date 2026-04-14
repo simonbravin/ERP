@@ -1,8 +1,9 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useId, useMemo } from 'react'
 import { useChartSeriesInteraction } from '@/hooks/use-chart-series-interaction'
 import {
+  Area,
   LineChart,
   Line,
   XAxis,
@@ -21,6 +22,7 @@ import { formatCurrency } from '@/lib/format-utils'
 import type { CompanyCashflowPoint } from '@/app/actions/finance'
 import { chartFinanceLines } from '@/lib/chart-theme'
 import { formatChartAxisCurrency } from '@/lib/chart-format'
+import { createLastPointDot } from '@/components/charts/chart-line-style'
 
 const MONTH_NAMES = [
   'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
@@ -61,10 +63,12 @@ export function CompanyCashflowChart({ initialData }: CompanyCashflowChartProps)
     linePresentation,
   } = useChartSeriesInteraction()
 
-  const incomeLine = linePresentation('income', 1.5)
-  const expenseLine = linePresentation('expense', 1.5)
-  const overheadLine = linePresentation('overhead', 1.5)
-  const balanceLine = linePresentation('balance', 2.6)
+  const incomeLine = linePresentation('income', 2.3)
+  const expenseLine = linePresentation('expense', 2.3)
+  const overheadLine = linePresentation('overhead', 2.3)
+  const balanceLine = linePresentation('balance', 3)
+  const dotRenderer = useMemo(() => createLastPointDot(chartData.length), [chartData.length])
+  const gradientPrefix = useId().replace(/:/g, '')
 
   if (chartData.length === 0) {
     return (
@@ -86,6 +90,24 @@ export function CompanyCashflowChart({ initialData }: CompanyCashflowChartProps)
             margin={{ top: 16, right: 18, left: 4, bottom: 8 }}
             onMouseLeave={() => setHoverKey(null)}
           >
+            <defs>
+              <linearGradient id={`${gradientPrefix}-income-fill`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="var(--color-income)" stopOpacity={0.32} />
+                <stop offset="100%" stopColor="var(--color-income)" stopOpacity={0.03} />
+              </linearGradient>
+              <linearGradient id={`${gradientPrefix}-expense-fill`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="var(--color-expense)" stopOpacity={0.3} />
+                <stop offset="100%" stopColor="var(--color-expense)" stopOpacity={0.03} />
+              </linearGradient>
+              <linearGradient id={`${gradientPrefix}-overhead-fill`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="var(--color-overhead)" stopOpacity={0.28} />
+                <stop offset="100%" stopColor="var(--color-overhead)" stopOpacity={0.03} />
+              </linearGradient>
+              <linearGradient id={`${gradientPrefix}-balance-fill`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="var(--color-balance)" stopOpacity={0.24} />
+                <stop offset="100%" stopColor="var(--color-balance)" stopOpacity={0.03} />
+              </linearGradient>
+            </defs>
             <CartesianGrid
               vertical={false}
               stroke="hsl(var(--border))"
@@ -134,11 +156,59 @@ export function CompanyCashflowChart({ initialData }: CompanyCashflowChartProps)
               }
             />
             {incomeLine ? (
+              <Area
+                type="linear"
+                dataKey="income"
+                stroke="none"
+                fill={`url(#${gradientPrefix}-income-fill)`}
+                dot={false}
+                isAnimationActive
+                animationDuration={260}
+                animationEasing="ease-out"
+              />
+            ) : null}
+            {expenseLine ? (
+              <Area
+                type="linear"
+                dataKey="expense"
+                stroke="none"
+                fill={`url(#${gradientPrefix}-expense-fill)`}
+                dot={false}
+                isAnimationActive
+                animationDuration={260}
+                animationEasing="ease-out"
+              />
+            ) : null}
+            {overheadLine ? (
+              <Area
+                type="linear"
+                dataKey="overhead"
+                stroke="none"
+                fill={`url(#${gradientPrefix}-overhead-fill)`}
+                dot={false}
+                isAnimationActive
+                animationDuration={260}
+                animationEasing="ease-out"
+              />
+            ) : null}
+            {balanceLine ? (
+              <Area
+                type="linear"
+                dataKey="balance"
+                stroke="none"
+                fill={`url(#${gradientPrefix}-balance-fill)`}
+                dot={false}
+                isAnimationActive
+                animationDuration={280}
+                animationEasing="ease-out"
+              />
+            ) : null}
+            {incomeLine ? (
               <Line
                 type="linear"
                 dataKey="income"
                 stroke="var(--color-income)"
-                dot={false}
+                dot={dotRenderer}
                 activeDot={{ r: 4, strokeWidth: 1, stroke: 'hsl(var(--background))' }}
                 isAnimationActive
                 animationDuration={280}
@@ -151,7 +221,7 @@ export function CompanyCashflowChart({ initialData }: CompanyCashflowChartProps)
                 type="linear"
                 dataKey="expense"
                 stroke="var(--color-expense)"
-                dot={false}
+                dot={dotRenderer}
                 activeDot={{ r: 4, strokeWidth: 1, stroke: 'hsl(var(--background))' }}
                 isAnimationActive
                 animationDuration={280}
@@ -164,7 +234,7 @@ export function CompanyCashflowChart({ initialData }: CompanyCashflowChartProps)
                 type="linear"
                 dataKey="overhead"
                 stroke="var(--color-overhead)"
-                dot={false}
+                dot={dotRenderer}
                 activeDot={{ r: 4, strokeWidth: 1, stroke: 'hsl(var(--background))' }}
                 isAnimationActive
                 animationDuration={280}
@@ -178,7 +248,7 @@ export function CompanyCashflowChart({ initialData }: CompanyCashflowChartProps)
                 dataKey="balance"
                 stroke="var(--color-balance)"
                 strokeDasharray="5 4"
-                dot={false}
+                dot={dotRenderer}
                 activeDot={{ r: 4, strokeWidth: 1, stroke: 'hsl(var(--background))' }}
                 isAnimationActive
                 animationDuration={320}

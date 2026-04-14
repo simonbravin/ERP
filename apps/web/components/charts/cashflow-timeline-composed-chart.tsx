@@ -27,6 +27,7 @@ import { cn } from '@/lib/utils'
 import { formatChartAxisCurrency } from '@/lib/chart-format'
 import { formatCurrency } from '@/lib/format-utils'
 import { chartSemanticHsl } from '@/lib/chart-theme'
+import { createLastPointDot } from '@/components/charts/chart-line-style'
 
 export type CashflowTimelineDatum = {
   monthLabel: string
@@ -283,11 +284,13 @@ export function CashflowTimelineComposedChart({
     barPresentation,
   } = useChartSeriesInteraction()
 
-  const balanceArea = areaPresentation('balance', 2.6, 0.12)
-  const incomeLine = linePresentation('income', 1.5)
-  const expenseLine = linePresentation('expense', 1.5)
+  const balanceArea = areaPresentation('balance', 3, 0.18)
+  const incomeLine = linePresentation('income', 2.3)
+  const expenseLine = linePresentation('expense', 2.3)
   const incomeBar = barPresentation('income')
   const expenseBar = barPresentation('expense')
+  const dotRenderer = React.useMemo(() => createLastPointDot(data.length), [data.length])
+  const gradientPrefix = React.useId().replace(/:/g, '')
 
   const curve = 'monotone' as const
   const lineStrokeProps = {
@@ -312,6 +315,20 @@ export function CashflowTimelineComposedChart({
         margin={CHART_MARGIN}
         onMouseLeave={() => setHoverKey(null)}
       >
+        <defs>
+          <linearGradient id={`${gradientPrefix}-income-fill`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--color-income)" stopOpacity={0.34} />
+            <stop offset="100%" stopColor="var(--color-income)" stopOpacity={0.03} />
+          </linearGradient>
+          <linearGradient id={`${gradientPrefix}-expense-fill`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--color-expense)" stopOpacity={0.3} />
+            <stop offset="100%" stopColor="var(--color-expense)" stopOpacity={0.03} />
+          </linearGradient>
+          <linearGradient id={`${gradientPrefix}-balance-fill`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--color-balance)" stopOpacity={0.24} />
+            <stop offset="100%" stopColor="var(--color-balance)" stopOpacity={0.03} />
+          </linearGradient>
+        </defs>
         <CartesianGrid
           vertical={false}
           stroke="hsl(var(--border))"
@@ -389,8 +406,8 @@ export function CashflowTimelineComposedChart({
                 type={curve}
                 dataKey="balance"
                 stroke="var(--color-balance)"
-                fill="var(--color-balance)"
-                dot={false}
+                fill={`url(#${gradientPrefix}-balance-fill)`}
+                dot={dotRenderer}
                 activeDot={{ r: 4, strokeWidth: 1, stroke: 'hsl(var(--background))' }}
                 isAnimationActive
                 animationDuration={320}
@@ -400,32 +417,56 @@ export function CashflowTimelineComposedChart({
               />
             ) : null}
             {incomeLine ? (
-              <Line
-                type={curve}
-                dataKey="income"
-                stroke="var(--color-income)"
-                dot={false}
-                activeDot={{ r: 4, strokeWidth: 1, stroke: 'hsl(var(--background))' }}
-                isAnimationActive
-                animationDuration={280}
-                animationEasing="ease-out"
-                {...lineStrokeProps}
-                {...incomeLine}
-              />
+              <>
+                <Area
+                  type={curve}
+                  dataKey="income"
+                  stroke="none"
+                  fill={`url(#${gradientPrefix}-income-fill)`}
+                  dot={false}
+                  isAnimationActive
+                  animationDuration={260}
+                  animationEasing="ease-out"
+                />
+                <Line
+                  type={curve}
+                  dataKey="income"
+                  stroke="var(--color-income)"
+                  dot={dotRenderer}
+                  activeDot={{ r: 4, strokeWidth: 1, stroke: 'hsl(var(--background))' }}
+                  isAnimationActive
+                  animationDuration={280}
+                  animationEasing="ease-out"
+                  {...lineStrokeProps}
+                  {...incomeLine}
+                />
+              </>
             ) : null}
             {expenseLine ? (
-              <Line
-                type={curve}
-                dataKey="expense"
-                stroke="var(--color-expense)"
-                dot={false}
-                activeDot={{ r: 4, strokeWidth: 1, stroke: 'hsl(var(--background))' }}
-                isAnimationActive
-                animationDuration={280}
-                animationEasing="ease-out"
-                {...lineStrokeProps}
-                {...expenseLine}
-              />
+              <>
+                <Area
+                  type={curve}
+                  dataKey="expense"
+                  stroke="none"
+                  fill={`url(#${gradientPrefix}-expense-fill)`}
+                  dot={false}
+                  isAnimationActive
+                  animationDuration={260}
+                  animationEasing="ease-out"
+                />
+                <Line
+                  type={curve}
+                  dataKey="expense"
+                  stroke="var(--color-expense)"
+                  dot={dotRenderer}
+                  activeDot={{ r: 4, strokeWidth: 1, stroke: 'hsl(var(--background))' }}
+                  isAnimationActive
+                  animationDuration={280}
+                  animationEasing="ease-out"
+                  {...lineStrokeProps}
+                  {...expenseLine}
+                />
+              </>
             ) : null}
           </>
         ) : seriesStyle === 'bars' ? (

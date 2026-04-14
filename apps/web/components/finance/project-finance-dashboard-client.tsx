@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useId, useMemo } from 'react'
 import {
   Area,
   BarChart,
@@ -40,6 +40,7 @@ import {
   ChartLegendContent,
   type ChartConfig,
 } from '@/components/ui/chart'
+import { createLastPointDot } from '@/components/charts/chart-line-style'
 
 const EXPENSE_TYPE_LABELS: Record<string, string> = {
   EXPENSE: 'Gastos',
@@ -93,6 +94,8 @@ export function ProjectFinanceDashboardClient({ data, alerts = [] }: ProjectFina
     () => (v: number) => formatCurrency(v, 'ARS'),
     []
   )
+  const trendDot = useMemo(() => createLastPointDot(trendChartData.length), [trendChartData.length])
+  const gradientPrefix = useId().replace(/:/g, '')
 
   const compositionRawSlices = useMemo(
     () =>
@@ -224,6 +227,20 @@ export function ProjectFinanceDashboardClient({ data, alerts = [] }: ProjectFina
               data={trendChartData}
               margin={{ top: 18, right: 20, left: 4, bottom: 8 }}
             >
+              <defs>
+                <linearGradient id={`${gradientPrefix}-income-fill`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="var(--color-Ingresos)" stopOpacity={0.34} />
+                  <stop offset="100%" stopColor="var(--color-Ingresos)" stopOpacity={0.03} />
+                </linearGradient>
+                <linearGradient id={`${gradientPrefix}-expense-fill`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="var(--color-Gastos)" stopOpacity={0.3} />
+                  <stop offset="100%" stopColor="var(--color-Gastos)" stopOpacity={0.03} />
+                </linearGradient>
+                <linearGradient id={`${gradientPrefix}-balance-fill`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="var(--color-Balance)" stopOpacity={0.24} />
+                  <stop offset="100%" stopColor="var(--color-Balance)" stopOpacity={0.03} />
+                </linearGradient>
+              </defs>
               <CartesianGrid
                 vertical={false}
                 stroke="hsl(var(--border))"
@@ -260,24 +277,37 @@ export function ProjectFinanceDashboardClient({ data, alerts = [] }: ProjectFina
                 type="linear"
                 dataKey="Balance"
                 stroke="var(--color-Balance)"
-                strokeWidth={2.6}
-                fill="var(--color-Balance)"
-                fillOpacity={0.12}
+                strokeWidth={3}
+                fill={`url(#${gradientPrefix}-balance-fill)`}
+                dot={trendDot}
+              />
+              <Area
+                type="linear"
+                dataKey="Ingresos"
+                stroke="none"
+                fill={`url(#${gradientPrefix}-income-fill)`}
+                dot={false}
+              />
+              <Area
+                type="linear"
+                dataKey="Gastos"
+                stroke="none"
+                fill={`url(#${gradientPrefix}-expense-fill)`}
                 dot={false}
               />
               <Line
                 type="linear"
                 dataKey="Ingresos"
                 stroke="var(--color-Ingresos)"
-                strokeWidth={1.5}
-                dot={false}
+                strokeWidth={2.3}
+                dot={trendDot}
               />
               <Line
                 type="linear"
                 dataKey="Gastos"
                 stroke="var(--color-Gastos)"
-                strokeWidth={1.5}
-                dot={false}
+                strokeWidth={2.3}
+                dot={trendDot}
               />
             </ComposedChart>
           </ChartContainer>
