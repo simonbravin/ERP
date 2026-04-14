@@ -4,6 +4,7 @@ import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from 'sonner'
 import { SystemHealthWidgetGate } from '@/components/debug/system-health-widget-gate'
 import { GlobalNotificationsListener } from '@/components/global-notifications-listener'
+import { SpeedInsights } from '@vercel/speed-insights/next'
 import './globals.css'
 
 const inter = Inter({
@@ -41,6 +42,7 @@ export default function RootLayout({
           <GlobalNotificationsListener />
           <SystemHealthWidgetGate />
         </ThemeProvider>
+        <SpeedInsights />
       </body>
     </html>
   )
